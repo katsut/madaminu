@@ -30,6 +30,7 @@ ios/Madaminu.xcodeproj/xcuserdata/
 ios/Madaminu.xcworkspace/xcuserdata/
 ios/DerivedData/
 ios/build/
+.build/
 
 # BMAD plans
 .claude/plans/
