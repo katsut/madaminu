@@ -1,0 +1,13 @@
+from sqlalchemy import JSON, ForeignKey, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from madaminu.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+
+class GameEnding(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "game_endings"
+
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), unique=True, nullable=False)
+    ending_text: Mapped[str] = mapped_column(Text, nullable=False)
+    true_criminal_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False)
+    objective_results: Mapped[dict | None] = mapped_column(JSON, nullable=True)
