@@ -16,6 +16,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Madaminu API", version="0.1.0", lifespan=lifespan)
 
+from madaminu.routers.rooms import router as rooms_router  # noqa: E402
+
+app.include_router(rooms_router)
+
 
 @app.get("/health")
 async def health_check():
