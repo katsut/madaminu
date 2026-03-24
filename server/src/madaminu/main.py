@@ -1,9 +1,13 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, WebSocket
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from madaminu.db import get_db
 from madaminu.db.database import engine
 from madaminu.models import Base
+from madaminu.routers.rooms import router as rooms_router
+from madaminu.ws.handler import handle_websocket
 
 
 @asynccontextmanager
@@ -15,12 +19,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Madaminu API", version="0.1.0", lifespan=lifespan)
-
-from madaminu.routers.rooms import router as rooms_router  # noqa: E402
-
 app.include_router(rooms_router)
 
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+@app.websocket("/ws/{room_code}")
+async def websocket_endpoint(websocket: WebSocket, room_code: str, db: AsyncSession = Depends(get_db)):
+    await handle_websocket(websocket, room_code, db)
