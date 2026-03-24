@@ -29,9 +29,7 @@ async def create_character(
     x_session_token: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code)
-    )
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
         raise HTTPException(status_code=404, detail="Room not found") from None
