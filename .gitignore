@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+*.db
+
+# uv
+uv.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# iOS
+ios/Madaminu.xcodeproj/xcuserdata/
+ios/Madaminu.xcworkspace/xcuserdata/
+ios/DerivedData/
+ios/build/
+
+# BMAD plans
+.claude/plans/
