@@ -28,6 +28,19 @@ class PlayerInfo(BaseModel):
     connection_status: str
 
 
+class CreateCharacterRequest(BaseModel):
+    character_name: str = Field(..., min_length=1, max_length=50)
+    character_personality: str = Field(..., min_length=1, max_length=500)
+    character_background: str = Field(..., min_length=1, max_length=1000)
+
+
+class CharacterResponse(BaseModel):
+    player_id: str
+    character_name: str
+    character_personality: str
+    character_background: str
+
+
 class RoomInfoResponse(BaseModel):
     room_code: str
     status: str
