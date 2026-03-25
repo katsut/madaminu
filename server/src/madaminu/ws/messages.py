@@ -21,7 +21,7 @@ class PhaseStartedData(BaseModel):
     phase_type: str
     phase_order: int
     duration_sec: int
-    investigation_locations: dict | None = None
+    investigation_locations: list[dict] | None = None
 
 
 class PhaseTimerData(BaseModel):
