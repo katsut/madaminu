@@ -1,6 +1,6 @@
 import Foundation
 
-struct CreateRoomResponse: Codable {
+struct CreateRoomResponse: Codable, Sendable {
     let roomCode: String
     let playerId: String
     let sessionToken: String
@@ -12,7 +12,7 @@ struct CreateRoomResponse: Codable {
     }
 }
 
-struct JoinRoomResponse: Codable {
+struct JoinRoomResponse: Codable, Sendable {
     let playerId: String
     let sessionToken: String
 
@@ -22,7 +22,7 @@ struct JoinRoomResponse: Codable {
     }
 }
 
-struct PlayerInfo: Codable, Identifiable {
+struct PlayerInfo: Codable, Identifiable, Sendable {
     let id: String
     let displayName: String
     let characterName: String?
@@ -38,7 +38,7 @@ struct PlayerInfo: Codable, Identifiable {
     }
 }
 
-struct CharacterResponse: Codable {
+struct CharacterResponse: Codable, Sendable {
     let playerId: String
     let characterName: String
     let characterPersonality: String
@@ -52,7 +52,7 @@ struct CharacterResponse: Codable {
     }
 }
 
-struct RoomListItem: Codable, Identifiable {
+struct RoomListItem: Codable, Identifiable, Sendable {
     var id: String { roomCode }
     let roomCode: String
     let status: String
@@ -69,7 +69,7 @@ struct RoomListItem: Codable, Identifiable {
     }
 }
 
-struct RoomInfoResponse: Codable {
+struct RoomInfoResponse: Codable, Sendable {
     let roomCode: String
     let status: String
     let players: [PlayerInfo]

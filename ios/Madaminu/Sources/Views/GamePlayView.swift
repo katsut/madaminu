@@ -15,6 +15,7 @@ struct GamePlayView: View {
                 IntroView(viewModel: viewModel)
             case .playing:
                 VStack(spacing: 0) {
+                    errorBanner
                     phaseHeader
                     Divider().background(Color.mdSurface)
 
@@ -52,6 +53,26 @@ struct GamePlayView: View {
         .onDisappear {
             viewModel.disconnect()
         }
+    }
+
+    private var errorBanner: some View {
+        Group {
+            if let error = viewModel.errorMessage {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.mdBackground)
+                    Text(error)
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdBackground)
+                    Spacer()
+                }
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.sm)
+                .background(Color.mdAccent)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
     }
 
     private var phaseHeader: some View {
@@ -118,18 +139,27 @@ struct GamePlayView: View {
             Text(viewModel.gameStatus.isEmpty ? "ルームに接続しています..." : "ルーム準備中...")
                 .font(.mdBody)
                 .foregroundStyle(Color.mdTextSecondary)
-
-            if let error = viewModel.errorMessage {
-                Text(error)
-                    .font(.mdCaption)
-                    .foregroundStyle(Color.mdError)
-            }
         }
     }
 
     private var endingView: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
+                if let error = viewModel.errorMessage {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(Color.mdBackground)
+                        Text(error)
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdBackground)
+                        Spacer()
+                    }
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.vertical, Spacing.sm)
+                    .background(Color.mdAccent)
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                }
+
                 if let ending = viewModel.ending {
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.md) {
