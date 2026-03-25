@@ -3,6 +3,7 @@ import SwiftUI
 
 struct NotebookView: View {
     @Bindable var viewModel: GameViewModel
+    @Binding var isPresented: Bool
 
     var body: some View {
         ZStack {
@@ -28,6 +29,11 @@ struct NotebookView: View {
                 .font(.mdTitle)
                 .foregroundStyle(Color.mdPrimary)
             Spacer()
+            Button { isPresented = false } label: {
+                Image(systemName: "xmark")
+                    .font(.mdHeadline)
+                    .foregroundStyle(Color.mdTextSecondary)
+            }
         }
     }
 
