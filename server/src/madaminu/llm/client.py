@@ -1,14 +1,14 @@
 import logging
 import time
 
-import anthropic
+from openai import AsyncOpenAI
 
 from madaminu.config import settings
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "claude-sonnet-4-20250514"
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
+DEFAULT_MODEL = "gpt-5.4-mini"
+LIGHT_MODEL = "gpt-5.4-nano"
 
 
 class LLMUsage:
@@ -20,10 +20,10 @@ class LLMUsage:
 
     @property
     def estimated_cost_usd(self) -> float:
-        if "sonnet" in self.model:
-            return (self.input_tokens * 3.0 + self.output_tokens * 15.0) / 1_000_000
-        if "haiku" in self.model:
-            return (self.input_tokens * 0.8 + self.output_tokens * 4.0) / 1_000_000
+        if "5.4-mini" in self.model:
+            return (self.input_tokens * 0.4 + self.output_tokens * 1.6) / 1_000_000
+        if "5.4-nano" in self.model:
+            return (self.input_tokens * 0.1 + self.output_tokens * 0.4) / 1_000_000
         return 0.0
 
     def __repr__(self) -> str:
@@ -35,7 +35,7 @@ class LLMUsage:
 
 class LLMClient:
     def __init__(self):
-        self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     async def generate(
         self,
@@ -46,20 +46,22 @@ class LLMClient:
     ) -> tuple[str, LLMUsage]:
         start = time.monotonic()
 
-        response = await self._client.messages.create(
+        response = await self._client.chat.completions.create(
             model=model,
             max_tokens=max_tokens,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
         )
 
         duration_ms = int((time.monotonic() - start) * 1000)
 
-        text = response.content[0].text
+        text = response.choices[0].message.content or ""
         usage = LLMUsage(
             model=model,
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
+            input_tokens=response.usage.prompt_tokens if response.usage else 0,
+            output_tokens=response.usage.completion_tokens if response.usage else 0,
             duration_ms=duration_ms,
         )
 

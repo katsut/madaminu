@@ -39,7 +39,7 @@ MOCK_ADJUSTMENT = {
     "next_phase_guidance": "医者の沈黙を他プレイヤーに気づかせる情報を投入",
 }
 
-MOCK_USAGE = LLMUsage(model="claude-sonnet-4-20250514", input_tokens=3000, output_tokens=2000, duration_ms=5000)
+MOCK_USAGE = LLMUsage(model="gpt-5.4-mini", input_tokens=3000, output_tokens=2000, duration_ms=5000)
 
 
 async def _create_game_for_adjustment(session_factory) -> tuple[str, str, str]:
@@ -128,7 +128,7 @@ async def test_adjust_phase_updates_gm_state(session_factory):
             adjustment, usage = await adjust_phase(db, game_id, phase_id)
 
     assert adjustment["analysis"]["truth_proximity"] == "low"
-    assert usage.model == "claude-sonnet-4-20250514"
+    assert usage.model == "gpt-5.4-mini"
 
     async with session_factory() as db:
         result = await db.execute(select(Game).where(Game.id == game_id))
