@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from madaminu.db import get_db
 from madaminu.models import Game, GameStatus, Player
+from madaminu.services.ai_player import fill_ai_players
 from madaminu.services.scenario_engine import generate_scenario, validate_scenario
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,12 @@ async def start_game(
 
     characters_ready = sum(1 for p in game.players if p.character_name)
     if characters_ready < 4:
-        raise HTTPException(status_code=400, detail=f"Need at least 4 characters, got {characters_ready}") from None
+        ai_added = await fill_ai_players(db, game.id, target_count=4)
+        if ai_added:
+            logger.info("Added %d AI players to fill the room", len(ai_added))
+            characters_ready += len(ai_added)
+        if characters_ready < 4:
+            raise HTTPException(status_code=400, detail=f"Need at least 4 characters, got {characters_ready}") from None
 
     total_cost = 0.0
 
