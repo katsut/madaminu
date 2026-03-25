@@ -33,3 +33,11 @@ class PhaseEndedData(BaseModel):
     phase_id: str
     phase_type: str
     next_phase_type: str | None = None
+
+
+class SpeechActiveData(BaseModel):
+    player_id: str
+
+
+class SpeechReleasedData(BaseModel):
+    player_id: str
