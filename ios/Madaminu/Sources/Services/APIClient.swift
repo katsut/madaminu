@@ -14,13 +14,23 @@ actor APIClient {
         self.baseURL = baseURL
     }
 
-    func createRoom(displayName: String) async throws -> CreateRoomResponse {
-        let body = ["display_name": displayName]
+    func listRooms() async throws -> [RoomListItem] {
+        return try await get("/api/v1/rooms")
+    }
+
+    func createRoom(displayName: String, password: String? = nil) async throws -> CreateRoomResponse {
+        var body = ["display_name": displayName]
+        if let password, !password.isEmpty {
+            body["password"] = password
+        }
         return try await post("/api/v1/rooms", body: body)
     }
 
-    func joinRoom(roomCode: String, displayName: String) async throws -> JoinRoomResponse {
-        let body = ["display_name": displayName]
+    func joinRoom(roomCode: String, displayName: String, password: String? = nil) async throws -> JoinRoomResponse {
+        var body = ["display_name": displayName]
+        if let password, !password.isEmpty {
+            body["password"] = password
+        }
         return try await post("/api/v1/rooms/\(roomCode)/join", body: body)
     }
 

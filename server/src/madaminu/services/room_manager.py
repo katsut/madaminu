@@ -18,7 +18,7 @@ def _generate_room_code() -> str:
     return "".join(random.choices(chars, k=ROOM_CODE_LENGTH))
 
 
-async def create_room(db: AsyncSession, display_name: str) -> tuple[Game, Player]:
+async def create_room(db: AsyncSession, display_name: str, password: str | None = None) -> tuple[Game, Player]:
     for _ in range(10):
         code = _generate_room_code()
         existing = await db.execute(select(Game).where(Game.room_code == code))
@@ -31,6 +31,7 @@ async def create_room(db: AsyncSession, display_name: str) -> tuple[Game, Player
         id=str(uuid.uuid4()),
         room_code=code,
         status=GameStatus.waiting,
+        password=password if password else None,
     )
     db.add(game)
     await db.flush()
@@ -54,7 +55,9 @@ async def create_room(db: AsyncSession, display_name: str) -> tuple[Game, Player
     return game, player
 
 
-async def join_room(db: AsyncSession, room_code: str, display_name: str) -> tuple[Game, Player]:
+async def join_room(
+    db: AsyncSession, room_code: str, display_name: str, password: str | None = None
+) -> tuple[Game, Player]:
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
@@ -62,6 +65,9 @@ async def join_room(db: AsyncSession, room_code: str, display_name: str) -> tupl
 
     if game.status != GameStatus.waiting:
         raise ValueError("Game already started")
+
+    if game.password and game.password != password:
+        raise ValueError("Invalid password")
 
     if len(game.players) >= MAX_PLAYERS:
         raise ValueError(f"Room is full (max {MAX_PLAYERS} players)")
@@ -79,6 +85,17 @@ async def join_room(db: AsyncSession, room_code: str, display_name: str) -> tupl
     await db.refresh(player)
 
     return game, player
+
+
+async def list_rooms(db: AsyncSession) -> list[Game]:
+    result = await db.execute(
+        select(Game)
+        .options(selectinload(Game.players))
+        .where(Game.status == GameStatus.waiting)
+        .order_by(Game.created_at.desc())
+        .limit(20)
+    )
+    return list(result.scalars().all())
 
 
 async def get_room(db: AsyncSession, room_code: str) -> Game:

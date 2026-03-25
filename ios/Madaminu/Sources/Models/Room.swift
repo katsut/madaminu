@@ -52,6 +52,23 @@ struct CharacterResponse: Codable {
     }
 }
 
+struct RoomListItem: Codable, Identifiable {
+    var id: String { roomCode }
+    let roomCode: String
+    let status: String
+    let playerCount: Int
+    let hostName: String?
+    let hasPassword: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case roomCode = "room_code"
+        case status
+        case playerCount = "player_count"
+        case hostName = "host_name"
+        case hasPassword = "has_password"
+    }
+}
+
 struct RoomInfoResponse: Codable {
     let roomCode: String
     let status: String

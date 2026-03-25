@@ -10,6 +10,8 @@ final class RoomViewModel {
 
     var roomCode = ""
     var joinCode = ""
+    var password = ""
+    var availableRooms: [RoomListItem] = []
     var players: [PlayerInfo] = []
     var isHost = false
     var isLoading = false
@@ -46,7 +48,7 @@ final class RoomViewModel {
         errorMessage = nil
 
         do {
-            let response = try await api.createRoom(displayName: displayName)
+            let response = try await api.createRoom(displayName: displayName, password: password.isEmpty ? nil : password)
             roomCode = response.roomCode
             playerId = response.playerId
             sessionToken = response.sessionToken
@@ -74,8 +76,40 @@ final class RoomViewModel {
         errorMessage = nil
 
         do {
-            let response = try await api.joinRoom(roomCode: joinCode, displayName: displayName)
+            let response = try await api.joinRoom(roomCode: joinCode, displayName: displayName, password: password.isEmpty ? nil : password)
             roomCode = joinCode
+            playerId = response.playerId
+            sessionToken = response.sessionToken
+            isHost = false
+            isInRoom = true
+            await refreshRoom()
+        } catch {
+            errorMessage = "ルームに参加できませんでした"
+        }
+
+        isLoading = false
+    }
+
+    func fetchRooms() async {
+        do {
+            availableRooms = try await api.listRooms()
+        } catch {
+            availableRooms = []
+        }
+    }
+
+    func joinFromList(roomCode: String, password: String? = nil) async {
+        guard !displayName.isEmpty else {
+            errorMessage = "名前を入力してください"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let response = try await api.joinRoom(roomCode: roomCode, displayName: displayName, password: password)
+            self.roomCode = roomCode
             playerId = response.playerId
             sessionToken = response.sessionToken
             isHost = false
