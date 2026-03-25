@@ -1,0 +1,53 @@
+import Foundation
+
+struct CreateRoomResponse: Codable {
+    let roomCode: String
+    let playerId: String
+    let sessionToken: String
+
+    enum CodingKeys: String, CodingKey {
+        case roomCode = "room_code"
+        case playerId = "player_id"
+        case sessionToken = "session_token"
+    }
+}
+
+struct JoinRoomResponse: Codable {
+    let playerId: String
+    let sessionToken: String
+
+    enum CodingKeys: String, CodingKey {
+        case playerId = "player_id"
+        case sessionToken = "session_token"
+    }
+}
+
+struct PlayerInfo: Codable, Identifiable {
+    let id: String
+    let displayName: String
+    let characterName: String?
+    let isHost: Bool
+    let connectionStatus: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+        case characterName = "character_name"
+        case isHost = "is_host"
+        case connectionStatus = "connection_status"
+    }
+}
+
+struct RoomInfoResponse: Codable {
+    let roomCode: String
+    let status: String
+    let players: [PlayerInfo]
+    let hostPlayerId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case roomCode = "room_code"
+        case status
+        case players
+        case hostPlayerId = "host_player_id"
+    }
+}
