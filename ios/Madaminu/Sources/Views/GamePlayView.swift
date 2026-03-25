@@ -106,12 +106,19 @@ struct GamePlayView: View {
 
     private var waitingView: some View {
         VStack(spacing: Spacing.md) {
-            Image(systemName: "hourglass")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.mdTextMuted)
-            Text("ゲームの準備中...")
+            ProgressView()
+                .tint(Color.mdPrimary)
+                .scaleEffect(1.5)
+
+            Text(viewModel.gameStatus.isEmpty ? "ルームに接続しています..." : "ルーム準備中...")
                 .font(.mdBody)
                 .foregroundStyle(Color.mdTextSecondary)
+
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdError)
+            }
         }
     }
 

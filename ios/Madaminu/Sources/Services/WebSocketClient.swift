@@ -9,13 +9,20 @@ final class WebSocketClient {
     private var webSocketTask: URLSessionWebSocketTask?
     private var onMessage: ((String, [String: Any]) -> Void)?
 
-    func connect(roomCode: String, token: String, baseURL: String = "wss://REDACTED.example.com") {
-        guard let url = URL(string: "\(baseURL)/ws/\(roomCode)?token=\(token)") else { return }
+    var connectionError: String?
 
+    func connect(roomCode: String, token: String, baseURL: String = "wss://REDACTED.example.com") {
+        guard let url = URL(string: "\(baseURL)/ws/\(roomCode)?token=\(token)") else {
+            connectionError = "Invalid WebSocket URL"
+            return
+        }
+
+        connectionError = nil
         let session = URLSession(configuration: .default)
         webSocketTask = session.webSocketTask(with: url)
         webSocketTask?.resume()
         isConnected = true
+        print("[WS] Connecting to \(url)")
         receiveLoop()
     }
 
@@ -57,7 +64,9 @@ final class WebSocketClient {
                         break
                     }
                     self?.receiveLoop()
-                case .failure:
+                case .failure(let error):
+                    print("[WS] Connection error: \(error)")
+                    self?.connectionError = error.localizedDescription
                     self?.isConnected = false
                 }
             }
