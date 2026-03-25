@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -6,22 +7,56 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from madaminu.config import settings
 from madaminu.db import get_db
 from madaminu.models import Game, GameStatus, Player
 from madaminu.services.ai_player import fill_ai_players
-from madaminu.services.scenario_engine import generate_scenario, validate_scenario
+from madaminu.services.scenario_engine import generate_scenario
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/rooms", tags=["game"])
 
 MAX_VALIDATION_RETRIES = 2
+LLM_COST_LIMIT_USD = 2.0
 
 
 class StartGameResponse(BaseModel):
     status: str
-    scenario_setting: dict
+    scenario_setting: dict | None = None
     total_cost_usd: float
+
+
+async def _generate_scenario_background(
+    game_id: str,
+    room_code: str,
+    session_factory,
+    phase_manager,
+    ws_manager,
+):
+    from madaminu.ws.messages import WSMessage
+
+    try:
+        async with session_factory() as db:
+            scenario, gen_usages = await generate_scenario(db, game_id)
+            total_cost = sum(u.estimated_cost_usd for u in gen_usages)
+            logger.info("Scenario generated for %s, cost: $%.4f", room_code, total_cost)
+
+        if phase_manager:
+            await phase_manager.start_first_phase(game_id, room_code)
+
+        if ws_manager:
+            await ws_manager.broadcast(
+                room_code,
+                WSMessage(type="game.ready", data={"room_code": room_code}),
+            )
+    except Exception:
+        logger.exception("Background scenario generation failed for game %s", game_id)
+        if ws_manager:
+            await ws_manager.broadcast(
+                room_code,
+                WSMessage(type="error", data={"message": "Scenario generation failed"}),
+            )
 
 
 @router.post("/{room_code}/start", response_model=StartGameResponse)
@@ -39,6 +74,9 @@ async def start_game(
     if game.status != GameStatus.waiting:
         raise HTTPException(status_code=400, detail="Game already started") from None
 
+    if game.total_llm_cost_usd > LLM_COST_LIMIT_USD:
+        raise HTTPException(status_code=429, detail="LLM cost limit exceeded for this game") from None
+
     player_result = await db.execute(
         select(Player).where(Player.game_id == game.id, Player.session_token == x_session_token)
     )
@@ -55,18 +93,47 @@ async def start_game(
         if characters_ready < 4:
             raise HTTPException(status_code=400, detail=f"Need at least 4 characters, got {characters_ready}") from None
 
-    total_cost = 0.0
+    if settings.testing:
+        scenario, gen_usages = await generate_scenario(db, game.id)
+        total_cost = sum(u.estimated_cost_usd for u in gen_usages)
+        logger.info("Scenario generated, cost: $%.4f", total_cost)
 
-    scenario, gen_usages = await generate_scenario(db, game.id)
-    total_cost += sum(u.estimated_cost_usd for u in gen_usages)
-    logger.info("Scenario generated, cost: $%.4f", total_cost)
+        pm = getattr(request.app.state, "phase_manager", None)
+        if pm:
+            await pm.start_first_phase(game.id, room_code)
+
+        return StartGameResponse(
+            status=game.status,
+            scenario_setting=scenario.get("setting", {}) if scenario else {},
+            total_cost_usd=round(total_cost, 4),
+        )
+
+    game.status = GameStatus.generating
+    await db.commit()
+
+    from madaminu.db.database import async_session
+    from madaminu.ws.handler import manager as ws_manager
+    from madaminu.ws.messages import WSMessage
 
     pm = getattr(request.app.state, "phase_manager", None)
-    if pm:
-        await pm.start_first_phase(game.id, room_code)
+    session_factory = getattr(request.app.state, "_session_factory", None) or async_session
+
+    await ws_manager.broadcast(
+        room_code,
+        WSMessage(type="game.generating", data={"room_code": room_code}),
+    )
+
+    asyncio.create_task(
+        _generate_scenario_background(
+            game_id=game.id,
+            room_code=room_code,
+            session_factory=session_factory,
+            phase_manager=pm,
+            ws_manager=ws_manager,
+        )
+    )
 
     return StartGameResponse(
         status=game.status,
-        scenario_setting=scenario.get("setting", {}) if scenario else {},
-        total_cost_usd=round(total_cost, 4),
+        total_cost_usd=round(game.total_llm_cost_usd, 4),
     )

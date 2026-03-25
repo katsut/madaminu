@@ -28,13 +28,13 @@ struct IntroView: View {
                     .font(.mdLargeTitle)
                     .foregroundStyle(Color.mdPrimary)
 
-                if let setting = viewModel.scenarioSetting["location"] as? String {
+                if let setting = viewModel.scenarioSetting.location {
                     Text("舞台: \(setting)")
                         .font(.mdTitle2)
                         .foregroundStyle(Color.mdTextPrimary)
                 }
 
-                if let situation = viewModel.scenarioSetting["situation"] as? String {
+                if let situation = viewModel.scenarioSetting.situation {
                     MDCard {
                         Text(situation)
                             .font(.mdBody)
@@ -42,7 +42,7 @@ struct IntroView: View {
                     }
                 }
 
-                if let victim = viewModel.scenarioSetting["victim_name"] as? String {
+                if let victim = viewModel.scenarioSetting.victimName {
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.xs) {
                             Label("被害者", systemImage: "person.slash")

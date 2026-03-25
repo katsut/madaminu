@@ -19,7 +19,7 @@ final class GameViewModel {
     var ending: EndingData?
     var isSpeaking = false
     var errorMessage: String?
-    var scenarioSetting: [String: Any] = [:]
+    var scenarioSetting: ScenarioSettingData = ScenarioSettingData()
 
     let roomCode: String
     let playerId: String
@@ -38,7 +38,7 @@ final class GameViewModel {
 
     func connect() {
         ws.setMessageHandler { [weak self] type, data in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.handleMessage(type: type, data: data)
             }
         }
@@ -77,7 +77,17 @@ final class GameViewModel {
         ws.send(type: "phase.extend")
     }
 
-    private func handleMessage(type: String, data: [String: Any]) {
+    private func setError(_ message: String) {
+        errorMessage = message
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            if self?.errorMessage == message {
+                self?.errorMessage = nil
+            }
+        }
+    }
+
+    private func handleMessage(type: String, data: [String: String]) {
         switch type {
         case "game.state":
             handleGameState(data)
@@ -91,15 +101,15 @@ final class GameViewModel {
             isSpeaking = true
             speechRecognizer.startRecording()
         case "speech.denied":
-            errorMessage = "他のプレイヤーが発言中です"
+            setError("他のプレイヤーが発言中です")
         case "speech.active":
-            currentSpeakerId = data["player_id"] as? String
+            currentSpeakerId = data["player_id"]
         case "speech.released":
             currentSpeakerId = nil
         case "investigate.result":
             handleInvestigateResult(data)
         case "investigate.denied":
-            errorMessage = "調査できません"
+            setError("調査できません")
         case "evidence.received":
             handleEvidenceReceived(data)
         case "vote.results":
@@ -107,29 +117,39 @@ final class GameViewModel {
         case "game.ending":
             handleEnding(data)
         case "error":
-            errorMessage = data["message"] as? String
+            if let message = data["message"] {
+                setError(message)
+            }
         default:
             break
         }
     }
 
-    private func handleGameState(_ data: [String: Any]) {
-        gameStatus = data["status"] as? String ?? ""
-        mySecretInfo = data["my_secret_info"] as? String
-        myObjective = data["my_objective"] as? String
+    private func handleGameState(_ data: [String: String]) {
+        gameStatus = data["status"] ?? ""
+        mySecretInfo = data["my_secret_info"]
+        myObjective = data["my_objective"]
+        myRole = data["my_role"]
+        currentSpeakerId = data["current_speaker_id"]
 
-        if let setting = data["scenario_setting"] as? [String: Any] {
-            scenarioSetting = setting
+        if let settingJSON = data["scenario_setting"],
+           let settingData = settingJSON.data(using: .utf8),
+           let setting = try? JSONSerialization.jsonObject(with: settingData) as? [String: Any] {
+            scenarioSetting.location = setting["location"] as? String
+            scenarioSetting.situation = setting["situation"] as? String
         }
-        if let victim = data["victim"] as? [String: Any] {
-            scenarioSetting["victim_name"] = victim["name"]
-            scenarioSetting["victim_description"] = victim["description"]
-        }
-        myRole = data["my_role"] as? String
-        currentSpeakerId = data["current_speaker_id"] as? String
 
-        if let playersData = data["players"] as? [[String: Any]] {
-            players = playersData.compactMap { dict in
+        if let victimJSON = data["victim"],
+           let victimData = victimJSON.data(using: .utf8),
+           let victim = try? JSONSerialization.jsonObject(with: victimData) as? [String: Any] {
+            scenarioSetting.victimName = victim["name"] as? String
+            scenarioSetting.victimDescription = victim["description"] as? String
+        }
+
+        if let playersJSON = data["players"],
+           let playersData = playersJSON.data(using: .utf8),
+           let playersArray = try? JSONSerialization.jsonObject(with: playersData) as? [[String: Any]] {
+            players = playersArray.compactMap { dict in
                 guard let id = dict["id"] as? String,
                       let displayName = dict["display_name"] as? String else { return nil }
                 return PlayerInfo(
@@ -142,19 +162,22 @@ final class GameViewModel {
             }
         }
 
-        if let phaseData = data["current_phase"] as? [String: Any] {
-            parsePhaseInfo(phaseData)
+        if let phaseJSON = data["current_phase"],
+           let phaseData = phaseJSON.data(using: .utf8),
+           let phaseDict = try? JSONSerialization.jsonObject(with: phaseData) as? [String: Any] {
+            parsePhaseInfo(phaseDict)
         }
     }
 
-    private func handlePhaseStarted(_ data: [String: Any]) {
-        parsePhaseInfo(data)
+    private func handlePhaseStarted(_ data: [String: String]) {
+        let dict = stringDataToDict(data)
+        parsePhaseInfo(dict)
     }
 
-    private func handlePhaseTimer(_ data: [String: Any]) {
-        guard let remaining = data["remaining_sec"] as? Int else { return }
-        if var phase = currentPhase {
-            phase = PhaseInfo(
+    private func handlePhaseTimer(_ data: [String: String]) {
+        guard let remainingStr = data["remaining_sec"], let remaining = Int(remainingStr) else { return }
+        if let phase = currentPhase {
+            currentPhase = PhaseInfo(
                 phaseId: phase.phaseId,
                 phaseType: phase.phaseType,
                 phaseOrder: phase.phaseOrder,
@@ -162,19 +185,18 @@ final class GameViewModel {
                 remainingSec: remaining,
                 investigationLocations: phase.investigationLocations
             )
-            currentPhase = phase
         }
     }
 
-    private func handleInvestigateResult(_ data: [String: Any]) {
-        let title = data["title"] as? String ?? "調査結果"
-        let content = data["content"] as? String ?? ""
+    private func handleInvestigateResult(_ data: [String: String]) {
+        let title = data["title"] ?? "調査結果"
+        let content = data["content"] ?? ""
         evidences.append(EvidenceItem(title: title, content: content))
     }
 
-    private func handleEvidenceReceived(_ data: [String: Any]) {
-        let title = data["title"] as? String ?? "新しい手がかり"
-        let content = data["content"] as? String ?? ""
+    private func handleEvidenceReceived(_ data: [String: String]) {
+        let title = data["title"] ?? "新しい手がかり"
+        let content = data["content"] ?? ""
         evidences.append(EvidenceItem(title: title, content: content))
     }
 
@@ -182,9 +204,13 @@ final class GameViewModel {
         screen = .playing
     }
 
-    private func handleEnding(_ data: [String: Any]) {
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: data),
-              let endingData = try? JSONDecoder().decode(EndingData.self, from: jsonData) else { return }
+    private func handleEnding(_ data: [String: String]) {
+        let dict = stringDataToDict(data)
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: dict),
+              let endingData = try? JSONDecoder().decode(EndingData.self, from: jsonData) else {
+            setError("エンディングデータの解析に失敗しました")
+            return
+        }
         ending = endingData
         gameStatus = "ended"
         screen = .ended
@@ -218,4 +244,26 @@ final class GameViewModel {
             investigationLocations: locations
         )
     }
+
+    private func stringDataToDict(_ data: [String: String]) -> [String: Any] {
+        var result: [String: Any] = [:]
+        for (key, value) in data {
+            if let intVal = Int(value) {
+                result[key] = intVal
+            } else if let d = value.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: d) {
+                result[key] = json
+            } else {
+                result[key] = value
+            }
+        }
+        return result
+    }
+}
+
+struct ScenarioSettingData {
+    var location: String?
+    var situation: String?
+    var victimName: String?
+    var victimDescription: String?
 }

@@ -8,26 +8,54 @@ final class RoomViewModel {
         didSet { UserDefaults.standard.set(displayName, forKey: "displayName") }
     }
 
-    var roomCode = ""
+    var roomCode: String = "" {
+        didSet { UserDefaults.standard.set(roomCode, forKey: "session.roomCode") }
+    }
+
     var joinCode = ""
     var password = ""
     var availableRooms: [RoomListItem] = []
     var players: [PlayerInfo] = []
-    var isHost = false
+
+    var isHost: Bool = false {
+        didSet { UserDefaults.standard.set(isHost, forKey: "session.isHost") }
+    }
+
     var isLoading = false
     var errorMessage: String?
-    var playerId: String?
-    var sessionToken: String?
-    var isInRoom = false
+
+    var playerId: String? {
+        didSet { UserDefaults.standard.set(playerId, forKey: "session.playerId") }
+    }
+
+    var sessionToken: String? {
+        didSet { UserDefaults.standard.set(sessionToken, forKey: "session.sessionToken") }
+    }
+
+    var isInRoom: Bool = false {
+        didSet { UserDefaults.standard.set(isInRoom, forKey: "session.isInRoom") }
+    }
+
     var showCharacterCreation = false
     var hasCreatedCharacter = false
-    var isGameStarted = false
+
+    var isGameStarted: Bool = false {
+        didSet { UserDefaults.standard.set(isGameStarted, forKey: "session.isGameStarted") }
+    }
+
     var progressMessage: String?
 
     private let api = APIClient()
 
     init() {
-        self.displayName = UserDefaults.standard.string(forKey: "displayName") ?? ""
+        let defaults = UserDefaults.standard
+        self.displayName = defaults.string(forKey: "displayName") ?? ""
+        self.playerId = defaults.string(forKey: "session.playerId")
+        self.sessionToken = defaults.string(forKey: "session.sessionToken")
+        self.roomCode = defaults.string(forKey: "session.roomCode") ?? ""
+        self.isHost = defaults.bool(forKey: "session.isHost")
+        self.isInRoom = defaults.bool(forKey: "session.isInRoom")
+        self.isGameStarted = defaults.bool(forKey: "session.isGameStarted")
     }
 
     var canStartGame: Bool {
@@ -36,6 +64,16 @@ final class RoomViewModel {
 
     var allPlayersReady: Bool {
         players.allSatisfy { $0.characterName != nil }
+    }
+
+    func clearSavedSession() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: "session.playerId")
+        defaults.removeObject(forKey: "session.sessionToken")
+        defaults.removeObject(forKey: "session.roomCode")
+        defaults.removeObject(forKey: "session.isHost")
+        defaults.removeObject(forKey: "session.isInRoom")
+        defaults.removeObject(forKey: "session.isGameStarted")
     }
 
     func createRoom() async {
@@ -132,6 +170,7 @@ final class RoomViewModel {
         hasCreatedCharacter = false
         isGameStarted = false
         errorMessage = nil
+        clearSavedSession()
     }
 
     func refreshRoom() async {
