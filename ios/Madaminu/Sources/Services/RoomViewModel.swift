@@ -1,9 +1,8 @@
 import Foundation
 import Observation
 
-@MainActor
 @Observable
-final class RoomViewModel {
+final class RoomViewModel: @unchecked Sendable {
     var displayName: String {
         didSet { UserDefaults.standard.set(displayName, forKey: "displayName") }
     }
@@ -48,14 +47,7 @@ final class RoomViewModel {
     private let api = APIClient()
 
     init() {
-        let defaults = UserDefaults.standard
-        self.displayName = defaults.string(forKey: "displayName") ?? ""
-        self.playerId = defaults.string(forKey: "session.playerId")
-        self.sessionToken = defaults.string(forKey: "session.sessionToken")
-        self.roomCode = defaults.string(forKey: "session.roomCode") ?? ""
-        self.isHost = defaults.bool(forKey: "session.isHost")
-        self.isInRoom = defaults.bool(forKey: "session.isInRoom")
-        self.isGameStarted = defaults.bool(forKey: "session.isGameStarted")
+        self.displayName = UserDefaults.standard.string(forKey: "displayName") ?? ""
     }
 
     var canStartGame: Bool {
@@ -195,13 +187,13 @@ final class RoomViewModel {
         errorMessage = nil
         progressMessage = "AIプレイヤーを準備中..."
 
-        Task { @MainActor in
+        Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
-            if isLoading { progressMessage = "シナリオを生成中..." }
+            if self?.isLoading == true { self?.progressMessage = "シナリオを生成中..." }
             try? await Task.sleep(for: .seconds(10))
-            if isLoading { progressMessage = "物語を組み立てています..." }
+            if self?.isLoading == true { self?.progressMessage = "物語を組み立てています..." }
             try? await Task.sleep(for: .seconds(15))
-            if isLoading { progressMessage = "もう少しお待ちください..." }
+            if self?.isLoading == true { self?.progressMessage = "もう少しお待ちください..." }
         }
 
         do {
