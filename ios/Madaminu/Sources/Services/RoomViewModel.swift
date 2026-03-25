@@ -4,7 +4,10 @@ import Observation
 @MainActor
 @Observable
 final class RoomViewModel {
-    var displayName = ""
+    var displayName: String {
+        didSet { UserDefaults.standard.set(displayName, forKey: "displayName") }
+    }
+
     var roomCode = ""
     var joinCode = ""
     var players: [PlayerInfo] = []
@@ -19,6 +22,10 @@ final class RoomViewModel {
     var isGameStarted = false
 
     private let api = APIClient()
+
+    init() {
+        self.displayName = UserDefaults.standard.string(forKey: "displayName") ?? ""
+    }
 
     var canStartGame: Bool {
         isHost && players.count >= 4

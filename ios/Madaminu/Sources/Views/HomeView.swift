@@ -30,40 +30,51 @@ public struct HomeView: View {
                     dismissKeyboard()
                 }
 
-            VStack(spacing: Spacing.lg) {
-                Spacer()
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: Spacing.lg) {
+                        Spacer().frame(height: Spacing.xxl)
 
-                Text("マダミヌ")
-                    .font(.mdLargeTitle)
-                    .foregroundStyle(Color.mdPrimary)
+                        Text("マダミヌ")
+                            .font(.mdLargeTitle)
+                            .foregroundStyle(Color.mdPrimary)
 
-                Text("AI Murder Mystery")
-                    .font(.mdCallout)
-                    .foregroundStyle(Color.mdTextSecondary)
+                        Text("AI Murder Mystery")
+                            .font(.mdCallout)
+                            .foregroundStyle(Color.mdTextSecondary)
 
-                Spacer()
+                        Spacer().frame(height: Spacing.xl)
 
-                MDTextField(label: "あなたの名前", text: $viewModel.displayName, placeholder: "名前を入力")
+                        MDTextField(label: "あなたの名前", text: $viewModel.displayName, placeholder: "名前を入力")
+                            .onTapGesture {
+                                withAnimation {
+                                    proxy.scrollTo("buttons", anchor: .bottom)
+                                }
+                            }
 
-                MDButton("ルームを作成", isLoading: viewModel.isLoading) {
-                    dismissKeyboard()
-                    Task { await viewModel.createRoom() }
+                        MDButton("ルームを作成", isLoading: viewModel.isLoading) {
+                            dismissKeyboard()
+                            Task { await viewModel.createRoom() }
+                        }
+
+                        MDButton("ルームに参加", style: .secondary) {
+                            dismissKeyboard()
+                            showJoinSheet = true
+                        }
+                        .id("buttons")
+
+                        if let error = viewModel.errorMessage {
+                            Text(error)
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdError)
+                        }
+
+                        Spacer().frame(height: Spacing.xxl)
+                    }
+                    .padding(Spacing.lg)
                 }
-
-                MDButton("ルームに参加", style: .secondary) {
-                    dismissKeyboard()
-                    showJoinSheet = true
-                }
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(.mdCaption)
-                        .foregroundStyle(Color.mdError)
-                }
-
-                Spacer().frame(height: Spacing.md)
+                .scrollDismissesKeyboard(.interactively)
             }
-            .padding(Spacing.lg)
         }
         .sheet(isPresented: $showJoinSheet) {
             JoinRoomSheet(viewModel: viewModel, isPresented: $showJoinSheet)
