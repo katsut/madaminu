@@ -9,4 +9,4 @@ RUN uv sync --no-dev
 
 ENV PORT=8000
 
-CMD rm -f madaminu.db && uv run uvicorn madaminu.main:app --host 0.0.0.0 --port $PORT
+CMD uv run uvicorn madaminu.main:app --host 0.0.0.0 --port $PORT
