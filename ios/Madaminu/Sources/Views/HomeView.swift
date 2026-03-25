@@ -26,62 +26,47 @@ public struct HomeView: View {
         ZStack {
             Color.mdBackground
                 .ignoresSafeArea()
-                .onTapGesture {
-                    dismissKeyboard()
-                }
 
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: Spacing.lg) {
-                        Spacer().frame(height: Spacing.xxl)
+            VStack(spacing: 0) {
+                Spacer()
 
-                        Text("マダミヌ")
-                            .font(.mdLargeTitle)
-                            .foregroundStyle(Color.mdPrimary)
+                Text("マダミヌ")
+                    .font(.mdLargeTitle)
+                    .foregroundStyle(Color.mdPrimary)
 
-                        Text("AI Murder Mystery")
-                            .font(.mdCallout)
-                            .foregroundStyle(Color.mdTextSecondary)
+                Text("AI Murder Mystery")
+                    .font(.mdCallout)
+                    .foregroundStyle(Color.mdTextSecondary)
+                    .padding(.bottom, Spacing.xl)
 
-                        Spacer().frame(height: Spacing.xl)
+                Spacer()
 
-                        MDTextField(label: "あなたの名前", text: $viewModel.displayName, placeholder: "名前を入力")
-                            .onTapGesture {
-                                withAnimation {
-                                    proxy.scrollTo("buttons", anchor: .bottom)
-                                }
-                            }
+                VStack(spacing: Spacing.md) {
+                    MDTextField(label: "あなたの名前", text: $viewModel.displayName, placeholder: "名前を入力")
 
-                        MDButton("ルームを作成", isLoading: viewModel.isLoading) {
-                            dismissKeyboard()
-                            Task { await viewModel.createRoom() }
-                        }
-
-                        MDButton("ルームに参加", style: .secondary) {
-                            dismissKeyboard()
-                            showJoinSheet = true
-                        }
-                        .id("buttons")
-
-                        if let error = viewModel.errorMessage {
-                            Text(error)
-                                .font(.mdCaption)
-                                .foregroundStyle(Color.mdError)
-                        }
-
-                        Spacer().frame(height: Spacing.xxl)
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdError)
                     }
-                    .padding(Spacing.lg)
+
+                    MDButton("ルームを作成", isLoading: viewModel.isLoading) {
+                        Task { await viewModel.createRoom() }
+                    }
+
+                    MDButton("ルームに参加", style: .secondary) {
+                        showJoinSheet = true
+                    }
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .padding(Spacing.lg)
+                .padding(.bottom, Spacing.md)
             }
+        }
+        .onTapGesture {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
         .sheet(isPresented: $showJoinSheet) {
             JoinRoomSheet(viewModel: viewModel, isPresented: $showJoinSheet)
         }
-    }
-
-    private func dismissKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
