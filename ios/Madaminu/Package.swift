@@ -29,5 +29,10 @@ let package = Package(
             exclude: ["DesignSystem", "App"],
             sources: ["Models", "Services", "Views"]
         ),
+        .executableTarget(
+            name: "MadaminuApp",
+            dependencies: ["MadaminuKit", "DesignSystem"],
+            path: "Sources/App"
+        ),
     ]
 )

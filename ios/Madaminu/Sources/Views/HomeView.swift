@@ -1,11 +1,13 @@
 import DesignSystem
 import SwiftUI
 
-struct HomeView: View {
+public struct HomeView: View {
     @State private var viewModel = RoomViewModel()
     @State private var showJoinSheet = false
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         if viewModel.isGameStarted, let pid = viewModel.playerId, let token = viewModel.sessionToken {
             GamePlayView(viewModel: GameViewModel(
                 roomCode: viewModel.roomCode,
