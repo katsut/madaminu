@@ -1,0 +1,53 @@
+## 現在のゲーム状況
+
+### シナリオ骨格
+$scenario_skeleton
+
+### GM内部状態
+$gm_internal_state
+
+### 終了したフェーズ
+- フェーズ種別: $phase_type
+- フェーズ番号: $phase_order
+
+### プレイヤー情報
+$players_info
+
+### このフェーズの発言ログ
+$speech_logs
+
+## タスク
+
+上記の情報を分析し、次フェーズに向けて以下をJSON形式で出力してください:
+
+```json
+{
+  "analysis": {
+    "key_developments": "このフェーズで起きた重要な展開の要約",
+    "truth_proximity": "プレイヤーが真相にどれだけ近づいているか (low/medium/high)",
+    "stagnation_detected": false
+  },
+  "evidence_distribution": [
+    {
+      "target_player_id": "対象プレイヤーのID",
+      "title": "証拠のタイトル",
+      "content": "証拠の内容（日本語）",
+      "reason": "この証拠を配布する理由"
+    }
+  ],
+  "gm_state_update": {
+    "gm_strategy": "更新されたGM戦略",
+    "player_gm_notes": {
+      "キャラクター名": "更新されたGMノート"
+    }
+  },
+  "next_phase_guidance": "次フェーズでGMが意識すべきポイント"
+}
+```
+
+### 判断基準
+- truth_proximity が low の場合: 真相に近づくヒントとなる証拠を積極的に配布
+- truth_proximity が high の場合: ミスリードや複雑さを加える証拠を検討
+- stagnation_detected が true の場合: 議論を活性化する新情報を投入
+- 証拠配布は0〜3個程度。不要なら空配列でOK
+- 各プレイヤーの秘密・目的に矛盾しない範囲で調整すること
