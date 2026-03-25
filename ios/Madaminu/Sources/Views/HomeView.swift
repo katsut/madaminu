@@ -7,17 +7,22 @@ public struct HomeView: View {
     @State private var showCreateSheet = false
     @State private var joinPassword = ""
     @State private var joiningRoomCode: String?
+    @State private var gameViewModel: GameViewModel?
 
     public init() {}
 
     public var body: some View {
-        if viewModel.isGameStarted, let pid = viewModel.playerId, let token = viewModel.sessionToken {
-            GamePlayView(viewModel: GameViewModel(
-                roomCode: viewModel.roomCode,
-                playerId: pid,
-                sessionToken: token,
-                isHost: viewModel.isHost
-            ))
+        if let gvm = gameViewModel {
+            GamePlayView(viewModel: gvm)
+        } else if viewModel.isGameStarted, let pid = viewModel.playerId, let token = viewModel.sessionToken {
+            Color.clear.onAppear {
+                gameViewModel = GameViewModel(
+                    roomCode: viewModel.roomCode,
+                    playerId: pid,
+                    sessionToken: token,
+                    isHost: viewModel.isHost
+                )
+            }
         } else if viewModel.isInRoom {
             RoomLobbyView(viewModel: viewModel)
         } else {
