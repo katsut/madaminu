@@ -1,0 +1,37 @@
+name: Madaminu
+options:
+  bundleIdPrefix: com.katsut.madaminu
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+
+packages:
+  DesignSystem:
+    path: .
+  MadaminuKit:
+    path: .
+
+targets:
+  Madaminu:
+    type: application
+    platform: iOS
+    sources:
+      - Sources/App
+    dependencies:
+      - package: MadaminuKit
+      - package: DesignSystem
+    settings:
+      base:
+        INFOPLIST_GENERATION: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.katsut.madaminu
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "6.0"
+        DEVELOPMENT_TEAM: HKBTTBGB25
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSSpeechRecognitionUsageDescription: "ゲーム中の発言を文字起こしするために音声認識を使用します"
+        NSMicrophoneUsageDescription: "ゲーム中の発言を録音するためにマイクを使用します"
