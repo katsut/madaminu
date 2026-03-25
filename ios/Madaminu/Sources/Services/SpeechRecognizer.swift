@@ -2,9 +2,8 @@ import AVFoundation
 import Observation
 import Speech
 
-@MainActor
 @Observable
-final class SpeechRecognizer {
+final class SpeechRecognizer: @unchecked Sendable {
     var transcript = ""
     var isRecording = false
     var permissionGranted = false
@@ -80,14 +79,12 @@ final class SpeechRecognizer {
         }
 
         recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
-            Task { @MainActor [weak self] in
-                if let result {
-                    self?.transcript = result.bestTranscription.formattedString
-                }
+            if let result {
+                self?.transcript = result.bestTranscription.formattedString
+            }
 
-                if error != nil || (result?.isFinal ?? false) {
-                    self?.stopRecordingInternal()
-                }
+            if error != nil || (result?.isFinal ?? false) {
+                self?.stopRecordingInternal()
             }
         }
     }

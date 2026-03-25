@@ -1,9 +1,8 @@
 import Foundation
 import Observation
 
-@MainActor
 @Observable
-final class GameViewModel {
+final class GameViewModel: @unchecked Sendable {
     enum GameScreen { case intro, playing, ended }
 
     var screen: GameScreen = .intro
@@ -40,15 +39,11 @@ final class GameViewModel {
 
     func connect() {
         ws.setMessageHandler { [weak self] type, data in
-            Task { @MainActor [weak self] in
-                self?.handleMessage(type: type, data: data)
-            }
+            self?.handleMessage(type: type, data: data)
         }
         ws.setStateChangeHandler { [weak self] connected, error in
-            Task { @MainActor [weak self] in
-                self?.isConnected = connected
-                self?.connectionError = error
-            }
+            self?.isConnected = connected
+            self?.connectionError = error
         }
         ws.connect(roomCode: roomCode, token: sessionToken)
     }
@@ -87,7 +82,7 @@ final class GameViewModel {
 
     private func setError(_ message: String) {
         errorMessage = message
-        Task { @MainActor [weak self] in
+        Task { [weak self] in
             try? await Task.sleep(for: .seconds(5))
             if self?.errorMessage == message {
                 self?.errorMessage = nil
