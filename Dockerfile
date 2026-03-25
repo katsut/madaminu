@@ -3,9 +3,9 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 WORKDIR /app
 
 COPY server/pyproject.toml ./
-RUN uv sync --no-dev
-
 COPY server/src/ src/
+
+RUN uv sync --no-dev
 
 EXPOSE 8000
 
