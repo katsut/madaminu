@@ -168,6 +168,8 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 await _handle_speech_request(room_code, player_id, websocket)
             elif msg_type == "speech.release":
                 await _handle_speech_release(room_code, player_id, data, websocket)
+            elif msg_type == "investigate":
+                await _handle_investigate(db, room_code, player_id, data, websocket)
     except WebSocketDisconnect:
         pass
     finally:
@@ -250,3 +252,39 @@ async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str,
         await pm.advance_phase(game.id, room_code)
     elif msg_type == "phase.extend":
         await pm.extend_phase(game.id, room_code)
+
+
+async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    from madaminu.services.scenario_engine import investigate_location
+
+    location_id = data.get("data", {}).get("location_id", "")
+    if not location_id:
+        await websocket.send_json(WSMessage(type="error", data={"message": "Missing location_id"}).model_dump())
+        return
+
+    result = await db.execute(select(Game).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None or game.status != GameStatus.playing:
+        return
+
+    try:
+        evidence, usage = await investigate_location(db, game.id, player_id, location_id)
+    except Exception:
+        logger.exception("Investigation failed for player %s", player_id)
+        await websocket.send_json(WSMessage(type="error", data={"message": "Investigation failed"}).model_dump())
+        return
+
+    if evidence is None:
+        await websocket.send_json(
+            WSMessage(type="investigate.denied", data={"reason": "Investigation not available"}).model_dump()
+        )
+        return
+
+    await manager.send_to_player(
+        room_code,
+        player_id,
+        WSMessage(
+            type="investigate.result",
+            data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
+        ),
+    )
