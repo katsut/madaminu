@@ -3,45 +3,26 @@ import Observation
 
 @Observable
 final class RoomViewModel: @unchecked Sendable {
-    var displayName: String {
+    // MARK: - User input (persisted)
+    var displayName: String = "" {
         didSet { UserDefaults.standard.set(displayName, forKey: "displayName") }
     }
 
-    var roomCode: String = "" {
-        didSet { UserDefaults.standard.set(roomCode, forKey: "session.roomCode") }
-    }
-
+    // MARK: - Room state
+    var roomCode = ""
     var joinCode = ""
     var password = ""
     var availableRooms: [RoomListItem] = []
     var players: [PlayerInfo] = []
-
-    var isHost: Bool = false {
-        didSet { UserDefaults.standard.set(isHost, forKey: "session.isHost") }
-    }
-
+    var isHost = false
     var isLoading = false
     var errorMessage: String?
-
-    var playerId: String? {
-        didSet { UserDefaults.standard.set(playerId, forKey: "session.playerId") }
-    }
-
-    var sessionToken: String? {
-        didSet { UserDefaults.standard.set(sessionToken, forKey: "session.sessionToken") }
-    }
-
-    var isInRoom: Bool = false {
-        didSet { UserDefaults.standard.set(isInRoom, forKey: "session.isInRoom") }
-    }
-
+    var playerId: String?
+    var sessionToken: String?
+    var isInRoom = false
     var showCharacterCreation = false
     var hasCreatedCharacter = false
-
-    var isGameStarted: Bool = false {
-        didSet { UserDefaults.standard.set(isGameStarted, forKey: "session.isGameStarted") }
-    }
-
+    var isGameStarted = false
     var progressMessage: String?
 
     private let api = APIClient()
@@ -50,23 +31,11 @@ final class RoomViewModel: @unchecked Sendable {
         self.displayName = UserDefaults.standard.string(forKey: "displayName") ?? ""
     }
 
-    var canStartGame: Bool {
-        isHost && players.count >= 4
-    }
-
     var allPlayersReady: Bool {
         players.allSatisfy { $0.characterName != nil }
     }
 
-    func clearSavedSession() {
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: "session.playerId")
-        defaults.removeObject(forKey: "session.sessionToken")
-        defaults.removeObject(forKey: "session.roomCode")
-        defaults.removeObject(forKey: "session.isHost")
-        defaults.removeObject(forKey: "session.isInRoom")
-        defaults.removeObject(forKey: "session.isGameStarted")
-    }
+    // MARK: - Room actions
 
     func createRoom() async {
         guard !displayName.isEmpty else {
@@ -162,7 +131,6 @@ final class RoomViewModel: @unchecked Sendable {
         hasCreatedCharacter = false
         isGameStarted = false
         errorMessage = nil
-        clearSavedSession()
     }
 
     func refreshRoom() async {
@@ -198,7 +166,6 @@ final class RoomViewModel: @unchecked Sendable {
 
         do {
             try await api.startGame(roomCode: roomCode, sessionToken: token)
-            progressMessage = nil
             isGameStarted = true
         } catch let apiError as APIError {
             switch apiError {

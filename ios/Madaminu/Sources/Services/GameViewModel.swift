@@ -5,6 +5,7 @@ import Observation
 final class GameViewModel: @unchecked Sendable {
     enum GameScreen { case intro, playing, ended }
 
+    // MARK: - Game state
     var screen: GameScreen = .intro
     var gameStatus = ""
     var currentPhase: PhaseInfo?
@@ -20,15 +21,18 @@ final class GameViewModel: @unchecked Sendable {
     var errorMessage: String?
     var isConnected = false
     var connectionError: String?
-    var scenarioSetting: ScenarioSettingData = ScenarioSettingData()
+    var scenarioSetting = ScenarioSettingData()
+    var currentTranscript = ""
 
+    // MARK: - Identity
     let roomCode: String
     let playerId: String
     let sessionToken: String
     let isHost: Bool
 
+    // MARK: - Services (not Observable, created externally)
     private let ws = WebSocketClient()
-    var speechRecognizer: SpeechRecognizer?
+    private var _speechRecognizer: SpeechRecognizer?
 
     init(roomCode: String, playerId: String, sessionToken: String, isHost: Bool) {
         self.roomCode = roomCode
@@ -37,7 +41,15 @@ final class GameViewModel: @unchecked Sendable {
         self.isHost = isHost
     }
 
-    func connect() {
+    // MARK: - Lifecycle
+
+    /// Call from .task { } in GamePlayView (guaranteed MainActor context)
+    @MainActor
+    func setup() async {
+        let sr = SpeechRecognizer()
+        _speechRecognizer = sr
+        await sr.requestPermission()
+
         ws.setMessageHandler { [weak self] type, data in
             self?.handleMessage(type: type, data: data)
         }
@@ -52,16 +64,21 @@ final class GameViewModel: @unchecked Sendable {
         ws.disconnect()
     }
 
+    // MARK: - Actions
+
     func requestSpeech() {
         ws.send(type: "speech.request")
     }
 
     func releaseSpeech() {
         ws.send(type: "speech.release", data: [
-            "transcript": speechRecognizer?.transcript ?? "",
+            "transcript": currentTranscript,
         ])
-        speechRecognizer?.stopRecording()
+        Task { @MainActor [weak self] in
+            self?._speechRecognizer?.stopRecording()
+        }
         isSpeaking = false
+        currentTranscript = ""
     }
 
     func investigate(locationId: String) {
@@ -80,20 +97,24 @@ final class GameViewModel: @unchecked Sendable {
         ws.send(type: "phase.extend")
     }
 
-    private func setError(_ message: String) {
-        errorMessage = message
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(5))
-            if self?.errorMessage == message {
-                self?.errorMessage = nil
-            }
-        }
+    func dismissIntro() {
+        screen = .playing
     }
+
+    func updateTranscript(_ text: String) {
+        currentTranscript = text
+    }
+
+    // MARK: - Message handling
 
     private func handleMessage(type: String, data: [String: String]) {
         switch type {
         case "game.state":
             handleGameState(data)
+        case "game.generating":
+            gameStatus = "generating"
+        case "game.ready":
+            gameStatus = "playing"
         case "phase.started":
             handlePhaseStarted(data)
         case "phase.timer":
@@ -102,7 +123,12 @@ final class GameViewModel: @unchecked Sendable {
             currentPhase = nil
         case "speech.granted":
             isSpeaking = true
-            speechRecognizer?.startRecording()
+            let vm = self
+            Task { @MainActor in
+                vm._speechRecognizer?.startRecording { transcript in
+                    vm.currentTranscript = transcript
+                }
+            }
         case "speech.denied":
             setError("他のプレイヤーが発言中です")
         case "speech.active":
@@ -125,6 +151,16 @@ final class GameViewModel: @unchecked Sendable {
             }
         default:
             break
+        }
+    }
+
+    private func setError(_ message: String) {
+        errorMessage = message
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            if self?.errorMessage == message {
+                self?.errorMessage = nil
+            }
         }
     }
 
@@ -173,8 +209,7 @@ final class GameViewModel: @unchecked Sendable {
     }
 
     private func handlePhaseStarted(_ data: [String: String]) {
-        let dict = stringDataToDict(data)
-        parsePhaseInfo(dict)
+        parsePhaseInfo(stringDataToDict(data))
     }
 
     private func handlePhaseTimer(_ data: [String: String]) {
@@ -192,19 +227,11 @@ final class GameViewModel: @unchecked Sendable {
     }
 
     private func handleInvestigateResult(_ data: [String: String]) {
-        let title = data["title"] ?? "調査結果"
-        let content = data["content"] ?? ""
-        evidences.append(EvidenceItem(title: title, content: content))
+        evidences.append(EvidenceItem(title: data["title"] ?? "調査結果", content: data["content"] ?? ""))
     }
 
     private func handleEvidenceReceived(_ data: [String: String]) {
-        let title = data["title"] ?? "新しい手がかり"
-        let content = data["content"] ?? ""
-        evidences.append(EvidenceItem(title: title, content: content))
-    }
-
-    func dismissIntro() {
-        screen = .playing
+        evidences.append(EvidenceItem(title: data["title"] ?? "新しい手がかり", content: data["content"] ?? ""))
     }
 
     private func handleEnding(_ data: [String: String]) {
@@ -230,11 +257,7 @@ final class GameViewModel: @unchecked Sendable {
             locations = locsData.compactMap { loc in
                 guard let id = loc["id"] as? String,
                       let name = loc["name"] as? String else { return nil }
-                return InvestigationLocation(
-                    id: id,
-                    name: name,
-                    description: loc["description"] as? String ?? ""
-                )
+                return InvestigationLocation(id: id, name: name, description: loc["description"] as? String ?? "")
             }
         }
 
