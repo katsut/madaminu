@@ -1,0 +1,62 @@
+Generate a murder mystery scenario skeleton for the following players.
+
+## Players
+
+$characters
+
+## Requirements
+
+Create a complete scenario with the following structure (respond in JSON):
+
+{
+  "setting": {
+    "location": "場所の説明",
+    "era": "時代設定",
+    "situation": "状況説明（事件の概要）"
+  },
+  "victim": {
+    "name": "被害者の名前",
+    "description": "被害者の説明"
+  },
+  "relationships": [
+    {
+      "player1": "プレイヤー名",
+      "player2": "プレイヤー名",
+      "relationship": "関係性の説明"
+    }
+  ],
+  "players": [
+    {
+      "character_name": "キャラクター名",
+      "role": "criminal|witness|related|innocent",
+      "secret_info": "このキャラクターの秘密（他のプレイヤーには見えない）",
+      "objective": "このキャラクターの個人目的",
+      "gm_notes": "GMがこの秘密を使ってシナリオを展開するためのメモ"
+    }
+  ],
+  "phases": [
+    {
+      "phase_type": "investigation",
+      "duration_sec": 300,
+      "description": "このフェーズの説明",
+      "investigation_locations": [
+        {
+          "id": "location_1",
+          "name": "場所名",
+          "description": "場所の説明"
+        }
+      ]
+    }
+  ],
+  "gm_strategy": "GMがゲーム全体をどう展開させるかの戦略メモ"
+}
+
+## Constraints
+
+- Exactly one player must be the criminal
+- The criminal must be one of the player characters
+- Each player must have a unique secret and objective
+- The mystery must be solvable through the clues provided
+- Include 3 phases: investigation, discussion, voting
+- Investigation phase should have 4-6 locations to explore
+- All text content must be in Japanese
