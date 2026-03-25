@@ -121,7 +121,16 @@ struct RoomLobbyView: View {
 
     private var bottomActions: some View {
         VStack(spacing: Spacing.sm) {
-            if !viewModel.hasCreatedCharacter {
+            if let progress = viewModel.progressMessage {
+                VStack(spacing: Spacing.sm) {
+                    ProgressView()
+                        .tint(Color.mdPrimary)
+                    Text(progress)
+                        .font(.mdCallout)
+                        .foregroundStyle(Color.mdPrimary)
+                }
+                .padding(Spacing.md)
+            } else if !viewModel.hasCreatedCharacter {
                 MDButton("キャラクターを作成") {
                     viewModel.showCharacterCreation = true
                 }

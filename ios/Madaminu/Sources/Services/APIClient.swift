@@ -35,6 +35,7 @@ actor APIClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(sessionToken, forHTTPHeaderField: "X-Session-Token")
 
