@@ -1,19 +1,19 @@
 import SwiftUI
 
-enum MDButtonStyle {
+public enum MDButtonStyle: Sendable {
     case primary
     case secondary
     case danger
     case ghost
 }
 
-struct MDButton: View {
+public struct MDButton: View {
     let title: String
     let style: MDButtonStyle
     let isLoading: Bool
     let action: () -> Void
 
-    init(
+    public init(
         _ title: String,
         style: MDButtonStyle = .primary,
         isLoading: Bool = false,
@@ -25,7 +25,7 @@ struct MDButton: View {
         self.action = action
     }
 
-    var body: some View {
+    public var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.xs) {
                 if isLoading {
