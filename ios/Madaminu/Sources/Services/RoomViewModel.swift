@@ -20,6 +20,7 @@ final class RoomViewModel {
     var showCharacterCreation = false
     var hasCreatedCharacter = false
     var isGameStarted = false
+    var progressMessage: String?
 
     private let api = APIClient()
 
@@ -119,9 +120,20 @@ final class RoomViewModel {
 
         isLoading = true
         errorMessage = nil
+        progressMessage = "AIプレイヤーを準備中..."
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            if isLoading { progressMessage = "シナリオを生成中..." }
+            try? await Task.sleep(for: .seconds(10))
+            if isLoading { progressMessage = "物語を組み立てています..." }
+            try? await Task.sleep(for: .seconds(15))
+            if isLoading { progressMessage = "もう少しお待ちください..." }
+        }
 
         do {
             try await api.startGame(roomCode: roomCode, sessionToken: token)
+            progressMessage = nil
             isGameStarted = true
         } catch let apiError as APIError {
             switch apiError {
@@ -134,6 +146,7 @@ final class RoomViewModel {
             errorMessage = "ゲーム開始に失敗しました: \(error.localizedDescription)"
         }
 
+        progressMessage = nil
         isLoading = false
     }
 

@@ -57,25 +57,9 @@ async def start_game(
 
     total_cost = 0.0
 
-    scenario = None
-    for attempt in range(MAX_VALIDATION_RETRIES + 1):
-        scenario, gen_usages = await generate_scenario(db, game.id)
-        total_cost += sum(u.estimated_cost_usd for u in gen_usages)
-
-        validation, val_usage = await validate_scenario(scenario)
-        total_cost += val_usage.estimated_cost_usd
-
-        if validation.get("is_valid", False):
-            logger.info("Scenario validated on attempt %d", attempt + 1)
-            break
-
-        issues = validation.get("issues", [])
-        critical_issues = [i for i in issues if i.get("severity") == "critical"]
-        if not critical_issues:
-            logger.info("Scenario has warnings but no critical issues, accepting")
-            break
-
-        logger.warning("Scenario validation failed (attempt %d): %s", attempt + 1, critical_issues)
+    scenario, gen_usages = await generate_scenario(db, game.id)
+    total_cost += sum(u.estimated_cost_usd for u in gen_usages)
+    logger.info("Scenario generated, cost: $%.4f", total_cost)
 
     pm = getattr(request.app.state, "phase_manager", None)
     if pm:
