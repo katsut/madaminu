@@ -96,7 +96,7 @@ struct RoomLobbyView: View {
                 }
             } else if viewModel.canStartGame {
                 MDButton("ゲーム開始", isLoading: viewModel.isLoading) {
-                    // TODO: start game
+                    Task { await viewModel.startGame() }
                 }
                 .disabled(!viewModel.allPlayersReady)
 

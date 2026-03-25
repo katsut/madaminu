@@ -6,7 +6,14 @@ struct HomeView: View {
     @State private var showJoinSheet = false
 
     var body: some View {
-        if viewModel.isInRoom {
+        if viewModel.isGameStarted, let pid = viewModel.playerId, let token = viewModel.sessionToken {
+            GamePlayView(viewModel: GameViewModel(
+                roomCode: viewModel.roomCode,
+                playerId: pid,
+                sessionToken: token,
+                isHost: viewModel.isHost
+            ))
+        } else if viewModel.isInRoom {
             RoomLobbyView(viewModel: viewModel)
         } else {
             homeContent

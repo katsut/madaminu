@@ -16,6 +16,7 @@ final class RoomViewModel {
     var isInRoom = false
     var showCharacterCreation = false
     var hasCreatedCharacter = false
+    var isGameStarted = false
 
     private let api = APIClient()
 
@@ -92,6 +93,22 @@ final class RoomViewModel {
         } catch {
             errorMessage = "ルーム情報の取得に失敗しました"
         }
+    }
+
+    func startGame() async {
+        guard let token = sessionToken else { return }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await api.startGame(roomCode: roomCode, sessionToken: token)
+            isGameStarted = true
+        } catch {
+            errorMessage = "ゲーム開始に失敗しました"
+        }
+
+        isLoading = false
     }
 
     func createCharacter(name: String, personality: String, background: String) async {

@@ -28,6 +28,20 @@ actor APIClient {
         return try await get("/api/v1/rooms/\(roomCode)")
     }
 
+    func startGame(roomCode: String, sessionToken: String) async throws {
+        guard let url = URL(string: baseURL + "/api/v1/rooms/\(roomCode)/start") else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(sessionToken, forHTTPHeaderField: "X-Session-Token")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response, data: data)
+    }
+
     func createCharacter(
         roomCode: String,
         sessionToken: String,
