@@ -5,10 +5,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from madaminu.models import ConnectionStatus, Game, Player
+from madaminu.models import ConnectionStatus, Game, GameStatus, Player
 from madaminu.ws.messages import PlayerConnectedData, PlayerDisconnectedData, WSMessage
 
 logger = logging.getLogger(__name__)
+
+_phase_manager = None
+
+
+def get_phase_manager():
+    return _phase_manager
+
+
+def set_phase_manager(pm):
+    global _phase_manager
+    _phase_manager = pm
 
 
 class ConnectionManager:
@@ -88,6 +99,12 @@ async def get_game_state_for_player(db: AsyncSession, room_code: str, player_id:
         state["my_objective"] = current_player.objective
         state["my_role"] = current_player.role
 
+    pm = get_phase_manager()
+    if pm and game.current_phase_id:
+        phase_info = await pm.get_current_phase_info(game.id)
+        if phase_info:
+            state["current_phase"] = phase_info
+
     return state
 
 
@@ -131,6 +148,9 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
             data = await websocket.receive_json()
             msg_type = data.get("type", "")
             logger.info("WS message from %s: %s", player_id, msg_type)
+
+            if msg_type in ("phase.advance", "phase.extend"):
+                await _handle_host_command(db, room_code, player_id, msg_type, websocket)
     except WebSocketDisconnect:
         pass
     finally:
@@ -149,3 +169,30 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 data=PlayerDisconnectedData(player_id=player_id, display_name=display_name).model_dump(),
             ),
         )
+
+
+async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str, msg_type: str, websocket: WebSocket):
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        return
+
+    player = next((p for p in game.players if p.id == player_id), None)
+    if player is None or not player.is_host:
+        await websocket.send_json(
+            WSMessage(type="error", data={"message": "Only the host can control phases"}).model_dump()
+        )
+        return
+
+    if game.status not in (GameStatus.playing, GameStatus.voting):
+        await websocket.send_json(WSMessage(type="error", data={"message": "Game is not in progress"}).model_dump())
+        return
+
+    pm = get_phase_manager()
+    if pm is None:
+        return
+
+    if msg_type == "phase.advance":
+        await pm.advance_phase(game.id, room_code)
+    elif msg_type == "phase.extend":
+        await pm.extend_phase(game.id, room_code)
