@@ -1,11 +1,17 @@
 import SwiftUI
 
-struct MDTextEditor: View {
+public struct MDTextEditor: View {
     let label: String
     @Binding var text: String
     var minHeight: CGFloat = 100
 
-    var body: some View {
+    public init(label: String, text: Binding<String>, minHeight: CGFloat = 100) {
+        self.label = label
+        self._text = text
+        self.minHeight = minHeight
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xxs) {
             Text(label)
                 .font(.mdCaption)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension Font {
+public extension Font {
     static let mdLargeTitle = Font.system(size: 28, weight: .bold, design: .serif)
     static let mdTitle = Font.system(size: 22, weight: .bold, design: .serif)
     static let mdTitle2 = Font.system(size: 18, weight: .semibold, design: .serif)

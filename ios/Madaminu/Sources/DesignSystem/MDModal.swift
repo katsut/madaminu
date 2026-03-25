@@ -1,17 +1,17 @@
 import SwiftUI
 
-struct MDModal<Content: View>: View {
+public struct MDModal<Content: View>: View {
     let title: String
     let content: Content
     let onDismiss: () -> Void
 
-    init(title: String, onDismiss: @escaping () -> Void, @ViewBuilder content: () -> Content) {
+    public init(title: String, onDismiss: @escaping () -> Void, @ViewBuilder content: () -> Content) {
         self.title = title
         self.onDismiss = onDismiss
         self.content = content()
     }
 
-    var body: some View {
+    public var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Text(title)

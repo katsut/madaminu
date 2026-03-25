@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension Color {
+public extension Color {
     // MARK: - Primary
     static let mdPrimary = Color(hex: "C9A96E")
     static let mdPrimaryLight = Color(hex: "DFC490")
