@@ -94,21 +94,23 @@ struct RoomLobbyView: View {
                 MDButton("キャラクターを作成") {
                     viewModel.showCharacterCreation = true
                 }
-            } else if viewModel.canStartGame {
+            } else if viewModel.isHost {
                 MDButton("ゲーム開始", isLoading: viewModel.isLoading) {
                     Task { await viewModel.startGame() }
                 }
-                .disabled(!viewModel.allPlayersReady)
 
-                if !viewModel.allPlayersReady {
+                let humanReady = viewModel.players.filter { $0.characterName != nil }.count
+                let aiNeeded = max(0, 4 - humanReady)
+
+                if aiNeeded > 0 {
+                    Text("AIプレイヤーが\(aiNeeded)人補充されます")
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdPrimary)
+                } else if !viewModel.allPlayersReady {
                     Text("全員のキャラクター作成を待っています...")
                         .font(.mdCaption)
                         .foregroundStyle(Color.mdTextMuted)
                 }
-            } else if viewModel.isHost {
-                Text("4人以上でゲームを開始できます")
-                    .font(.mdCaption)
-                    .foregroundStyle(Color.mdTextMuted)
             } else {
                 Text("ホストがゲームを開始するのを待っています...")
                     .font(.mdCaption)
