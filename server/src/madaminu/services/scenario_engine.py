@@ -8,7 +8,18 @@ from sqlalchemy.orm import selectinload
 
 from madaminu.llm.client import HAIKU_MODEL, LLMUsage, llm_client
 from madaminu.llm.prompts import format_characters_for_prompt, load_template, render_template
-from madaminu.models import Evidence, EvidenceSource, Game, GameStatus, Phase, PhaseType, PlayerRole, SpeechLog
+from madaminu.models import (
+    Evidence,
+    EvidenceSource,
+    Game,
+    GameEnding,
+    GameStatus,
+    Phase,
+    PhaseType,
+    PlayerRole,
+    SpeechLog,
+    Vote,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -243,6 +254,76 @@ async def investigate_location(
     await db.commit()
 
     return evidence, usage
+
+
+async def generate_ending(db: AsyncSession, game_id: str) -> tuple[GameEnding, LLMUsage]:
+    game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
+    game = game_result.scalar_one()
+
+    votes_result = await db.execute(select(Vote).where(Vote.game_id == game_id))
+    votes = votes_result.scalars().all()
+
+    logs_result = await db.execute(select(SpeechLog).where(SpeechLog.game_id == game_id).order_by(SpeechLog.created_at))
+    all_logs = logs_result.scalars().all()
+
+    id_to_name = {p.id: p.character_name or p.display_name for p in game.players}
+    players_info = _format_players_for_adjustment(game.players)
+    vote_results = _format_votes(votes, id_to_name)
+    speech_summary = _summarize_speech_logs(all_logs, id_to_name)
+
+    system_prompt = load_template("scenario_system")
+    user_prompt = render_template(
+        "ending_generation",
+        scenario_skeleton=json.dumps(game.scenario_skeleton or {}, ensure_ascii=False, indent=2),
+        gm_internal_state=json.dumps(game.gm_internal_state or {}, ensure_ascii=False, indent=2),
+        players_info=players_info,
+        vote_results=vote_results,
+        speech_summary=speech_summary if speech_summary else "(発言なし)",
+    )
+
+    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt)
+    result = _parse_scenario_json(raw_response)
+
+    ending = GameEnding(
+        id=str(uuid.uuid4()),
+        game_id=game_id,
+        ending_text=result.get("ending_text", ""),
+        true_criminal_id=result.get("true_criminal_id", ""),
+        objective_results=result.get("objective_results"),
+    )
+    db.add(ending)
+
+    game.status = GameStatus.ended
+    await db.commit()
+
+    return ending, usage
+
+
+def _format_votes(votes, id_to_name: dict[str, str]) -> str:
+    if not votes:
+        return "(投票なし)"
+    lines = []
+    vote_counts: dict[str, int] = {}
+    for v in votes:
+        voter = id_to_name.get(v.voter_player_id, "Unknown")
+        suspect = id_to_name.get(v.suspect_player_id, "Unknown")
+        lines.append(f"- {voter} → {suspect}")
+        vote_counts[suspect] = vote_counts.get(suspect, 0) + 1
+
+    lines.append("\n集計:")
+    for name, count in sorted(vote_counts.items(), key=lambda x: -x[1]):
+        lines.append(f"- {name}: {count}票")
+    return "\n".join(lines)
+
+
+def _summarize_speech_logs(logs, id_to_name: dict[str, str]) -> str:
+    if not logs:
+        return ""
+    lines = []
+    for log in logs[-20:]:
+        name = id_to_name.get(log.player_id, "Unknown")
+        lines.append(f"[{name}]: {log.transcript}")
+    return "\n".join(lines)
 
 
 def _format_players_for_adjustment(players) -> str:
