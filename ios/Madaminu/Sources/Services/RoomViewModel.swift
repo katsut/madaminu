@@ -14,6 +14,8 @@ final class RoomViewModel {
     var playerId: String?
     var sessionToken: String?
     var isInRoom = false
+    var showCharacterCreation = false
+    var hasCreatedCharacter = false
 
     private let api = APIClient()
 
@@ -83,8 +85,36 @@ final class RoomViewModel {
         do {
             let info = try await api.getRoomInfo(roomCode: roomCode)
             players = info.players
+
+            if let me = players.first(where: { $0.id == playerId }) {
+                hasCreatedCharacter = me.characterName != nil
+            }
         } catch {
             errorMessage = "ルーム情報の取得に失敗しました"
         }
+    }
+
+    func createCharacter(name: String, personality: String, background: String) async {
+        guard let token = sessionToken else { return }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            _ = try await api.createCharacter(
+                roomCode: roomCode,
+                sessionToken: token,
+                name: name,
+                personality: personality,
+                background: background
+            )
+            hasCreatedCharacter = true
+            showCharacterCreation = false
+            await refreshRoom()
+        } catch {
+            errorMessage = "キャラクター作成に失敗しました"
+        }
+
+        isLoading = false
     }
 }

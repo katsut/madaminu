@@ -23,6 +23,9 @@ struct RoomLobbyView: View {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
+        .sheet(isPresented: $viewModel.showCharacterCreation) {
+            CharacterCreationView(viewModel: viewModel)
+        }
     }
 
     private var header: some View {
@@ -87,7 +90,11 @@ struct RoomLobbyView: View {
 
     private var bottomActions: some View {
         VStack(spacing: Spacing.sm) {
-            if viewModel.canStartGame {
+            if !viewModel.hasCreatedCharacter {
+                MDButton("キャラクターを作成") {
+                    viewModel.showCharacterCreation = true
+                }
+            } else if viewModel.canStartGame {
                 MDButton("ゲーム開始", isLoading: viewModel.isLoading) {
                     // TODO: start game
                 }
