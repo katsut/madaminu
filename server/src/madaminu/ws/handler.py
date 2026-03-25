@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from madaminu.models import ConnectionStatus, Game, GameStatus, Phase, Player
+from madaminu.models import ConnectionStatus, Game, GameStatus, Phase, Player, Vote
 from madaminu.ws.messages import PlayerConnectedData, PlayerDisconnectedData, WSMessage
 
 logger = logging.getLogger(__name__)
@@ -170,6 +170,8 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 await _handle_speech_release(room_code, player_id, data, websocket)
             elif msg_type == "investigate":
                 await _handle_investigate(db, room_code, player_id, data, websocket)
+            elif msg_type == "vote.submit":
+                await _handle_vote(db, room_code, player_id, data, websocket)
     except WebSocketDisconnect:
         pass
     finally:
@@ -288,3 +290,76 @@ async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, 
             data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
         ),
     )
+
+
+async def _handle_vote(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    import uuid
+
+    from madaminu.services.scenario_engine import generate_ending
+
+    suspect_id = data.get("data", {}).get("suspect_player_id", "")
+    if not suspect_id:
+        await websocket.send_json(WSMessage(type="error", data={"message": "Missing suspect_player_id"}).model_dump())
+        return
+
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None or game.status != GameStatus.voting:
+        await websocket.send_json(WSMessage(type="error", data={"message": "Not in voting phase"}).model_dump())
+        return
+
+    existing = await db.execute(select(Vote).where(Vote.game_id == game.id, Vote.voter_player_id == player_id))
+    if existing.scalar_one_or_none() is not None:
+        await websocket.send_json(WSMessage(type="error", data={"message": "Already voted"}).model_dump())
+        return
+
+    vote = Vote(
+        id=str(uuid.uuid4()),
+        game_id=game.id,
+        voter_player_id=player_id,
+        suspect_player_id=suspect_id,
+    )
+    db.add(vote)
+    await db.commit()
+
+    await manager.broadcast(
+        room_code,
+        WSMessage(type="vote.cast", data={"voter_id": player_id}),
+    )
+
+    votes_result = await db.execute(select(Vote).where(Vote.game_id == game.id))
+    all_votes = votes_result.scalars().all()
+
+    if len(all_votes) < len(game.players):
+        return
+
+    vote_summary = {}
+    for v in all_votes:
+        vote_summary[v.voter_player_id] = v.suspect_player_id
+
+    await manager.broadcast(
+        room_code,
+        WSMessage(type="vote.results", data={"votes": vote_summary}),
+    )
+
+    try:
+        ending, usage = await generate_ending(db, game.id)
+        logger.info("Ending generated: %s", usage)
+
+        await manager.broadcast(
+            room_code,
+            WSMessage(
+                type="game.ending",
+                data={
+                    "ending_text": ending.ending_text,
+                    "true_criminal_id": ending.true_criminal_id,
+                    "objective_results": ending.objective_results,
+                },
+            ),
+        )
+    except Exception:
+        logger.exception("Ending generation failed for game %s", game.id)
+        await manager.broadcast(
+            room_code,
+            WSMessage(type="error", data={"message": "Ending generation failed"}),
+        )
