@@ -27,38 +27,42 @@ public struct HomeView: View {
             Color.mdBackground
                 .ignoresSafeArea()
 
-            VStack(spacing: Spacing.lg) {
-                Spacer()
+            ScrollView {
+                VStack(spacing: Spacing.lg) {
+                    Spacer().frame(height: Spacing.xxl)
 
-                Text("マダミヌ")
-                    .font(.mdLargeTitle)
-                    .foregroundStyle(Color.mdPrimary)
+                    Text("マダミヌ")
+                        .font(.mdLargeTitle)
+                        .foregroundStyle(Color.mdPrimary)
 
-                Text("AI Murder Mystery")
-                    .font(.mdCallout)
-                    .foregroundStyle(Color.mdTextSecondary)
+                    Text("AI Murder Mystery")
+                        .font(.mdCallout)
+                        .foregroundStyle(Color.mdTextSecondary)
 
-                Spacer()
+                    Spacer().frame(height: Spacing.xxl)
 
-                MDTextField(label: "あなたの名前", text: $viewModel.displayName, placeholder: "名前を入力")
+                    MDTextField(label: "あなたの名前", text: $viewModel.displayName, placeholder: "名前を入力")
 
-                MDButton("ルームを作成", isLoading: viewModel.isLoading) {
-                    Task { await viewModel.createRoom() }
+                    MDButton("ルームを作成", isLoading: viewModel.isLoading) {
+                        Task { await viewModel.createRoom() }
+                    }
+
+                    MDButton("ルームに参加", style: .secondary) {
+                        showJoinSheet = true
+                    }
+
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdError)
+                    }
                 }
-
-                MDButton("ルームに参加", style: .secondary) {
-                    showJoinSheet = true
-                }
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(.mdCaption)
-                        .foregroundStyle(Color.mdError)
-                }
-
-                Spacer().frame(height: Spacing.md)
+                .padding(Spacing.lg)
             }
-            .padding(Spacing.lg)
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .onTapGesture {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
         .sheet(isPresented: $showJoinSheet) {
             JoinRoomSheet(viewModel: viewModel, isPresented: $showJoinSheet)
