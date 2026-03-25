@@ -30,6 +30,7 @@ class Game(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     host_player_id: Mapped[str | None] = mapped_column(ForeignKey("players.id", use_alter=True), nullable=True)
     status: Mapped[GameStatus] = mapped_column(Enum(GameStatus), default=GameStatus.waiting, nullable=False)
     current_phase_id: Mapped[str | None] = mapped_column(ForeignKey("phases.id", use_alter=True), nullable=True)
+    password: Mapped[str | None] = mapped_column(String(100), nullable=True)
     template_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     scenario_skeleton: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     gm_internal_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)

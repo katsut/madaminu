@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 class CreateRoomRequest(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=50)
+    password: str | None = None
 
 
 class CreateRoomResponse(BaseModel):
@@ -13,6 +14,7 @@ class CreateRoomResponse(BaseModel):
 
 class JoinRoomRequest(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=50)
+    password: str | None = None
 
 
 class JoinRoomResponse(BaseModel):
@@ -46,3 +48,12 @@ class RoomInfoResponse(BaseModel):
     status: str
     players: list[PlayerInfo]
     host_player_id: str | None
+    has_password: bool = False
+
+
+class RoomListItem(BaseModel):
+    room_code: str
+    status: str
+    player_count: int
+    host_name: str | None = None
+    has_password: bool = False
