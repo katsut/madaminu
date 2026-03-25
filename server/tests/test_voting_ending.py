@@ -27,7 +27,7 @@ MOCK_ENDING = {
     },
 }
 
-MOCK_USAGE = LLMUsage(model="claude-sonnet-4-20250514", input_tokens=4000, output_tokens=2000, duration_ms=6000)
+MOCK_USAGE = LLMUsage(model="gpt-5.4-mini", input_tokens=4000, output_tokens=2000, duration_ms=6000)
 
 
 async def _create_voting_game(session_factory) -> tuple[str, list[str]]:
@@ -117,7 +117,7 @@ async def test_generate_ending(session_factory):
 
     assert ending.ending_text == mock_ending["ending_text"]
     assert ending.true_criminal_id == player_ids[1]
-    assert usage.model == "claude-sonnet-4-20250514"
+    assert usage.model == "gpt-5.4-mini"
 
     async with session_factory() as db:
         result = await db.execute(select(Game).where(Game.id == game_id))

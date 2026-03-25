@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from madaminu.llm.client import HAIKU_MODEL, LLMUsage, llm_client
+from madaminu.llm.client import LIGHT_MODEL, LLMUsage, llm_client
 from madaminu.llm.prompts import format_characters_for_prompt, load_template, render_template
 from madaminu.models import (
     Evidence,
@@ -105,7 +105,7 @@ async def validate_scenario(scenario: dict) -> tuple[dict, LLMUsage]:
     system_prompt = load_template("scenario_system")
     user_prompt = render_template("scenario_validate", scenario=json.dumps(scenario, ensure_ascii=False, indent=2))
 
-    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=HAIKU_MODEL)
+    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
     validation = _parse_scenario_json(raw_response)
     return validation, usage
 
@@ -238,7 +238,7 @@ async def investigate_location(
         existing_evidence=existing_text,
     )
 
-    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=HAIKU_MODEL)
+    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
     result = _parse_scenario_json(raw_response)
 
     evidence = Evidence(
