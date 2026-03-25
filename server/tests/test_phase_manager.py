@@ -142,11 +142,14 @@ async def test_extend_phase(session_factory, phase_manager):
     phase_manager.cleanup_game(game_id)
 
 
-async def test_get_current_phase_info(session_factory, phase_manager):
-    game_id, room_code, phase_ids = await _create_game_with_phases(session_factory)
+async def test_get_current_phase_dict(session_factory, phase_manager):
+    from madaminu.ws.handler import _get_current_phase_dict
 
+    game_id, room_code, phase_ids = await _create_game_with_phases(session_factory)
     await phase_manager.start_first_phase(game_id, room_code)
-    info = await phase_manager.get_current_phase_info(game_id)
+
+    async with session_factory() as db:
+        info = await _get_current_phase_dict(db, phase_ids[0])
 
     assert info is not None
     assert info["phase_id"] == phase_ids[0]
@@ -157,8 +160,11 @@ async def test_get_current_phase_info(session_factory, phase_manager):
     phase_manager.cleanup_game(game_id)
 
 
-async def test_get_current_phase_info_no_game(session_factory, phase_manager):
-    info = await phase_manager.get_current_phase_info("nonexistent")
+async def test_get_current_phase_dict_not_found(session_factory):
+    from madaminu.ws.handler import _get_current_phase_dict
+
+    async with session_factory() as db:
+        info = await _get_current_phase_dict(db, "nonexistent")
     assert info is None
 
 

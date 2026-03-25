@@ -105,20 +105,6 @@ class PhaseManager:
         )
         return phase
 
-    async def get_current_phase_info(self, game_id: str) -> dict | None:
-        async with self._session_factory() as db:
-            game_result = await db.execute(select(Game).where(Game.id == game_id))
-            game = game_result.scalar_one_or_none()
-            if game is None or game.current_phase_id is None:
-                return None
-
-            phase_result = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
-            phase = phase_result.scalar_one_or_none()
-            if phase is None:
-                return None
-
-            return _phase_to_dict(phase)
-
     def cleanup_game(self, game_id: str):
         self._cancel_timer(game_id)
 
@@ -202,20 +188,3 @@ class PhaseManager:
                 ).model_dump(),
             ),
         )
-
-
-def _phase_to_dict(phase: Phase) -> dict:
-    remaining = 0
-    if phase.started_at:
-        started = phase.started_at if phase.started_at.tzinfo else phase.started_at.replace(tzinfo=UTC)
-        elapsed = (datetime.now(UTC) - started).total_seconds()
-        remaining = max(0, phase.duration_sec - int(elapsed))
-
-    return {
-        "phase_id": phase.id,
-        "phase_type": phase.phase_type,
-        "phase_order": phase.phase_order,
-        "duration_sec": phase.duration_sec,
-        "remaining_sec": remaining,
-        "investigation_locations": phase.investigation_locations,
-    }

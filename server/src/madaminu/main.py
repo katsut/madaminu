@@ -10,7 +10,7 @@ from madaminu.routers.characters import router as characters_router
 from madaminu.routers.game import router as game_router
 from madaminu.routers.rooms import router as rooms_router
 from madaminu.services.phase_manager import PhaseManager
-from madaminu.ws.handler import handle_websocket, set_phase_manager
+from madaminu.ws.handler import handle_websocket
 
 
 @asynccontextmanager
@@ -18,9 +18,7 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    pm = PhaseManager(async_session)
-    set_phase_manager(pm)
-    app.state.phase_manager = pm
+    app.state.phase_manager = PhaseManager(async_session)
 
     yield
     await engine.dispose()

@@ -6,14 +6,12 @@ from sqlalchemy.pool import StaticPool
 from madaminu.db.database import get_db
 from madaminu.main import app
 from madaminu.models import Base
-from madaminu.ws.handler import set_phase_manager
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
 
 
 @pytest.fixture(autouse=True)
 async def test_engine():
-    set_phase_manager(None)
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
@@ -23,7 +21,6 @@ async def test_engine():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
-    set_phase_manager(None)
     await engine.dispose()
 
 
