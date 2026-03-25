@@ -19,6 +19,8 @@ final class GameViewModel {
     var ending: EndingData?
     var isSpeaking = false
     var errorMessage: String?
+    var isConnected = false
+    var connectionError: String?
     var scenarioSetting: ScenarioSettingData = ScenarioSettingData()
 
     let roomCode: String
@@ -40,6 +42,12 @@ final class GameViewModel {
         ws.setMessageHandler { [weak self] type, data in
             Task { @MainActor [weak self] in
                 self?.handleMessage(type: type, data: data)
+            }
+        }
+        ws.setStateChangeHandler { [weak self] connected, error in
+            Task { @MainActor [weak self] in
+                self?.isConnected = connected
+                self?.connectionError = error
             }
         }
         ws.connect(roomCode: roomCode, token: sessionToken)

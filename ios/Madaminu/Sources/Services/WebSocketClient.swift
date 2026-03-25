@@ -1,61 +1,57 @@
 import Foundation
-import Observation
 import os
 
-@Observable
-final class WebSocketClient: @unchecked Sendable {
-    @MainActor var isConnected = false
-    @MainActor var connectionError: String?
-
+final class WebSocketClient: Sendable {
     private let lock = NSLock()
 
-    private var _webSocketTask: URLSessionWebSocketTask?
-    private var _onMessage: (@Sendable (String, [String: String]) -> Void)?
-    private var _roomCode: String?
-    private var _token: String?
-    private var _baseURLString: String?
-    private var _retryCount = 0
-    private var _intentionalDisconnect = false
-    private var _receiveTask: Task<Void, Never>?
+    private struct State {
+        var webSocketTask: URLSessionWebSocketTask?
+        var onMessage: (@Sendable (String, [String: String]) -> Void)?
+        var onStateChange: (@Sendable (Bool, String?) -> Void)?
+        var roomCode: String?
+        var token: String?
+        var baseURLString: String?
+        var retryCount = 0
+        var intentionalDisconnect = false
+        var receiveTask: Task<Void, Never>?
+    }
 
+    private let state = NSLockProtected(State())
     private let maxRetries = 3
     private let logger = Logger(subsystem: "com.katsut.madaminu", category: "WebSocket")
 
-    nonisolated init() {}
+    init() {}
 
     func connect(roomCode: String, token: String, baseURL: String = "wss://REDACTED.example.com") {
-        lock.withLock {
-            _roomCode = roomCode
-            _token = token
-            _baseURLString = baseURL
-            _retryCount = 0
-            _intentionalDisconnect = false
+        state.write {
+            $0.roomCode = roomCode
+            $0.token = token
+            $0.baseURLString = baseURL
+            $0.retryCount = 0
+            $0.intentionalDisconnect = false
         }
-
         performConnect()
     }
 
     func disconnect() {
-        let task: URLSessionWebSocketTask? = lock.withLock {
-            _intentionalDisconnect = true
-            let t = _webSocketTask
-            _receiveTask?.cancel()
-            _receiveTask = nil
-            _webSocketTask = nil
+        let task = state.write { s -> URLSessionWebSocketTask? in
+            s.intentionalDisconnect = true
+            s.receiveTask?.cancel()
+            s.receiveTask = nil
+            let t = s.webSocketTask
+            s.webSocketTask = nil
             return t
         }
-
         task?.cancel(with: .goingAway, reason: nil)
-
-        Task { @MainActor in
-            self.isConnected = false
-        }
+        notifyStateChange(connected: false, error: nil)
     }
 
     func setMessageHandler(_ handler: @escaping @Sendable (String, [String: String]) -> Void) {
-        lock.withLock {
-            _onMessage = handler
-        }
+        state.write { $0.onMessage = handler }
+    }
+
+    func setStateChangeHandler(_ handler: @escaping @Sendable (Bool, String?) -> Void) {
+        state.write { $0.onStateChange = handler }
     }
 
     func send(type: String, data: [String: String] = [:]) {
@@ -63,7 +59,7 @@ final class WebSocketClient: @unchecked Sendable {
         guard let jsonData = try? JSONSerialization.data(withJSONObject: message),
               let jsonString = String(data: jsonData, encoding: .utf8) else { return }
 
-        let task: URLSessionWebSocketTask? = lock.withLock { _webSocketTask }
+        let task = state.read { $0.webSocketTask }
 
         Task { [jsonString] in
             try? await task?.send(.string(jsonString))
@@ -71,51 +67,46 @@ final class WebSocketClient: @unchecked Sendable {
     }
 
     private func performConnect() {
-        let params: (String, String, String)? = lock.withLock {
-            guard let rc = _roomCode, let tk = _token, let bu = _baseURLString else { return nil }
+        let params = state.read { s -> (String, String, String)? in
+            guard let rc = s.roomCode, let tk = s.token, let bu = s.baseURLString else { return nil }
             return (rc, tk, bu)
         }
 
         guard let (roomCode, token, baseURLString) = params else { return }
 
         guard let url = URL(string: "\(baseURLString)/ws/\(roomCode)?token=\(token)") else {
-            Task { @MainActor in
-                self.connectionError = "Invalid WebSocket URL"
-            }
+            notifyStateChange(connected: false, error: "Invalid WebSocket URL")
             return
-        }
-
-        Task { @MainActor in
-            self.connectionError = nil
         }
 
         let session = URLSession(configuration: .default)
         let newTask = session.webSocketTask(with: url)
 
-        lock.withLock {
-            _webSocketTask = newTask
-        }
+        state.write { $0.webSocketTask = newTask }
 
         newTask.resume()
         logger.info("Connecting to \(url)")
-
-        Task { @MainActor in
-            self.isConnected = true
-        }
-
+        notifyStateChange(connected: true, error: nil)
         startReceiveLoop()
     }
 
     private func startReceiveLoop() {
-        lock.withLock {
-            _receiveTask?.cancel()
-            let task = _webSocketTask
-            let handler = _onMessage
-            _receiveTask = Task { [weak self] in
-                guard let self, let task else { return }
-                await self.receiveLoop(task: task, handler: handler)
-            }
+        let (task, handler) = state.write { s -> (URLSessionWebSocketTask?, (@Sendable (String, [String: String]) -> Void)?) in
+            s.receiveTask?.cancel()
+            let t = s.webSocketTask
+            let h = s.onMessage
+            s.receiveTask = nil
+            return (t, h)
         }
+
+        guard let task else { return }
+
+        let receiveTask = Task { [weak self] in
+            guard let self else { return }
+            await self.receiveLoop(task: task, handler: handler)
+        }
+
+        state.write { $0.receiveTask = receiveTask }
     }
 
     private func receiveLoop(task: URLSessionWebSocketTask, handler: (@Sendable (String, [String: String]) -> Void)?) async {
@@ -124,10 +115,10 @@ final class WebSocketClient: @unchecked Sendable {
                 let message = try await task.receive()
                 switch message {
                 case .string(let text):
-                    handleRawMessage(text, handler: handler)
+                    parseAndDeliver(text, handler: handler)
                 case .data(let data):
                     if let text = String(data: data, encoding: .utf8) {
-                        handleRawMessage(text, handler: handler)
+                        parseAndDeliver(text, handler: handler)
                     }
                 @unknown default:
                     break
@@ -135,19 +126,14 @@ final class WebSocketClient: @unchecked Sendable {
             } catch {
                 if Task.isCancelled { return }
                 logger.error("Connection error: \(error.localizedDescription)")
-
-                await MainActor.run {
-                    self.connectionError = error.localizedDescription
-                    self.isConnected = false
-                }
-
+                notifyStateChange(connected: false, error: error.localizedDescription)
                 await attemptReconnect()
                 return
             }
         }
     }
 
-    private nonisolated func handleRawMessage(_ text: String, handler: (@Sendable (String, [String: String]) -> Void)?) {
+    private func parseAndDeliver(_ text: String, handler: (@Sendable (String, [String: String]) -> Void)?) {
         guard let data = text.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = json["type"] as? String else { return }
@@ -173,21 +159,24 @@ final class WebSocketClient: @unchecked Sendable {
         handler?(type, stringData)
     }
 
+    private func notifyStateChange(connected: Bool, error: String?) {
+        let handler = state.read { $0.onStateChange }
+        handler?(connected, error)
+    }
+
     private func attemptReconnect() async {
-        let (shouldReconnect, currentRetry) = lock.withLock {
-            let should = !_intentionalDisconnect && _retryCount < maxRetries
-            let retry = _retryCount
-            if should { _retryCount += 1 }
+        let (shouldReconnect, currentRetry) = state.write { s -> (Bool, Int) in
+            let should = !s.intentionalDisconnect && s.retryCount < maxRetries
+            let retry = s.retryCount
+            if should { s.retryCount += 1 }
             return (should, retry)
         }
 
         guard shouldReconnect else {
-            let isIntentional = lock.withLock { _intentionalDisconnect }
+            let isIntentional = state.read { $0.intentionalDisconnect }
             if !isIntentional {
                 logger.warning("Max reconnection attempts reached")
-                await MainActor.run {
-                    self.connectionError = "接続に失敗しました。再試行してください。"
-                }
+                notifyStateChange(connected: false, error: "接続に失敗しました。再試行してください。")
             }
             return
         }
@@ -197,10 +186,29 @@ final class WebSocketClient: @unchecked Sendable {
 
         try? await Task.sleep(for: .seconds(delay))
 
-        let stillShouldReconnect = lock.withLock { !_intentionalDisconnect }
+        let stillShouldReconnect = state.read { !$0.intentionalDisconnect }
 
         if stillShouldReconnect {
             performConnect()
         }
+    }
+}
+
+/// Thread-safe wrapper around a value protected by NSLock
+private final class NSLockProtected<Value>: @unchecked Sendable {
+    private var value: Value
+    private let lock = NSLock()
+
+    init(_ value: Value) {
+        self.value = value
+    }
+
+    func read<T>(_ body: (Value) -> T) -> T {
+        lock.withLock { body(value) }
+    }
+
+    @discardableResult
+    func write<T>(_ body: (inout Value) -> T) -> T {
+        lock.withLock { body(&value) }
     }
 }
