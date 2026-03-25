@@ -76,6 +76,9 @@ class PhaseManager:
             await db.commit()
 
         await self._broadcast_phase_ended(room_code, current_phase, next_phase)
+
+        await self._run_phase_adjustment(game_id, room_code, current_phase.id)
+
         await self._broadcast_phase_started(room_code, next_phase)
         self._start_timer(game_id, room_code, next_phase)
         return next_phase
@@ -156,6 +159,28 @@ class PhaseManager:
 
         logger.info("Phase timer expired for game %s, phase %s", game_id, phase_id)
         await self.advance_phase(game_id, room_code)
+
+    async def _run_phase_adjustment(self, game_id: str, room_code: str, ended_phase_id: str):
+        from madaminu.services.scenario_engine import adjust_phase
+        from madaminu.ws.handler import manager
+
+        try:
+            async with self._session_factory() as db:
+                adjustment, usage = await adjust_phase(db, game_id, ended_phase_id)
+                logger.info("Phase adjustment for game %s: %s", game_id, usage)
+
+                for ev in adjustment.get("evidence_distribution", []):
+                    target_id = ev.get("target_player_id", "")
+                    await manager.send_to_player(
+                        room_code,
+                        target_id,
+                        WSMessage(
+                            type="evidence.received",
+                            data={"title": ev.get("title", ""), "content": ev.get("content", "")},
+                        ),
+                    )
+        except Exception:
+            logger.exception("Phase adjustment failed for game %s", game_id)
 
     async def _broadcast_phase_started(self, room_code: str, phase: Phase):
         from madaminu.ws.handler import manager
