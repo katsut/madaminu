@@ -10,6 +10,20 @@ struct RoomLobbyView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: Spacing.md) {
+                HStack {
+                    Button {
+                        viewModel.leaveRoom()
+                    } label: {
+                        HStack(spacing: Spacing.xxs) {
+                            Image(systemName: "chevron.left")
+                            Text("退出")
+                        }
+                        .font(.mdCallout)
+                        .foregroundStyle(Color.mdTextSecondary)
+                    }
+                    Spacer()
+                }
+
                 header
                 playerList
                 Spacer()

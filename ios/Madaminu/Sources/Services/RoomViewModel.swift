@@ -87,6 +87,18 @@ final class RoomViewModel {
         isLoading = false
     }
 
+    func leaveRoom() {
+        isInRoom = false
+        roomCode = ""
+        players = []
+        playerId = nil
+        sessionToken = nil
+        isHost = false
+        hasCreatedCharacter = false
+        isGameStarted = false
+        errorMessage = nil
+    }
+
     func refreshRoom() async {
         guard !roomCode.isEmpty else { return }
 
