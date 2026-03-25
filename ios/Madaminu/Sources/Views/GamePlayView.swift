@@ -37,8 +37,8 @@ struct GamePlayView: View {
                 bottomBar
             }
         }
-        .sheet(isPresented: $showNotebook) {
-            NotebookView(viewModel: viewModel)
+        .fullScreenCover(isPresented: $showNotebook) {
+            NotebookView(viewModel: viewModel, isPresented: $showNotebook)
         }
         .task {
             await viewModel.speechRecognizer.requestPermission()
