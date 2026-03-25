@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +25,7 @@ class StartGameResponse(BaseModel):
 
 @router.post("/{room_code}/start", response_model=StartGameResponse)
 async def start_game(
+    request: Request,
     room_code: str,
     x_session_token: str = Header(...),
     db: AsyncSession = Depends(get_db),
@@ -69,6 +70,10 @@ async def start_game(
             break
 
         logger.warning("Scenario validation failed (attempt %d): %s", attempt + 1, critical_issues)
+
+    pm = getattr(request.app.state, "phase_manager", None)
+    if pm:
+        await pm.start_first_phase(game.id, room_code)
 
     return StartGameResponse(
         status=game.status,

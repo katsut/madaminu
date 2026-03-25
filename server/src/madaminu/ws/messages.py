@@ -14,3 +14,22 @@ class PlayerConnectedData(BaseModel):
 class PlayerDisconnectedData(BaseModel):
     player_id: str
     display_name: str
+
+
+class PhaseStartedData(BaseModel):
+    phase_id: str
+    phase_type: str
+    phase_order: int
+    duration_sec: int
+    investigation_locations: dict | None = None
+
+
+class PhaseTimerData(BaseModel):
+    phase_id: str
+    remaining_sec: int
+
+
+class PhaseEndedData(BaseModel):
+    phase_id: str
+    phase_type: str
+    next_phase_type: str | None = None
