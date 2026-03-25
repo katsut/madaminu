@@ -42,6 +42,7 @@ class PhaseManager:
 
         await self._broadcast_phase_started(room_code, first_phase)
         self._start_timer(game_id, room_code, first_phase)
+        asyncio.create_task(self._schedule_ai_speeches(game_id, room_code, first_phase))
         return first_phase
 
     async def advance_phase(self, game_id: str, room_code: str) -> Phase | None:
@@ -81,6 +82,7 @@ class PhaseManager:
 
         await self._broadcast_phase_started(room_code, next_phase)
         self._start_timer(game_id, room_code, next_phase)
+        asyncio.create_task(self._schedule_ai_speeches(game_id, room_code, next_phase))
         return next_phase
 
     async def extend_phase(self, game_id: str, room_code: str, extra_sec: int = EXTEND_DURATION_SEC) -> Phase:
@@ -159,6 +161,48 @@ class PhaseManager:
 
         logger.info("Phase timer expired for game %s, phase %s", game_id, phase_id)
         await self.advance_phase(game_id, room_code)
+
+    async def _schedule_ai_speeches(self, game_id: str, room_code: str, phase: Phase):
+        if phase.phase_type not in (PhaseType.discussion, PhaseType.investigation):
+            return
+
+        try:
+            await asyncio.sleep(15)
+
+            from madaminu.services.ai_player import generate_ai_speech
+            from madaminu.ws.handler import manager
+
+            async with self._session_factory() as db:
+                game_result = await db.execute(
+                    select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+                )
+                game = game_result.scalar_one()
+                ai_players = [p for p in game.players if p.is_ai]
+
+            for ai_player in ai_players:
+                await asyncio.sleep(10)
+                try:
+                    async with self._session_factory() as db:
+                        text, usage = await generate_ai_speech(db, game_id, ai_player.id, phase.id)
+                    if text:
+                        await manager.broadcast(
+                            room_code,
+                            WSMessage(
+                                type="speech.ai",
+                                data={
+                                    "player_id": ai_player.id,
+                                    "character_name": ai_player.character_name,
+                                    "transcript": text,
+                                },
+                            ),
+                        )
+                        logger.info("AI player %s spoke: %s", ai_player.character_name, text[:50])
+                except Exception:
+                    logger.exception("AI speech failed for %s", ai_player.id)
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception("AI speech scheduling failed for game %s", game_id)
 
     async def _run_phase_adjustment(self, game_id: str, room_code: str, ended_phase_id: str):
         from madaminu.services.scenario_engine import adjust_phase
