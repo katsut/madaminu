@@ -28,20 +28,37 @@ struct RoomLobbyView: View {
         }
     }
 
+    @State private var copied = false
+
     private var header: some View {
         VStack(spacing: Spacing.xs) {
             Text("ルーム")
                 .font(.mdCallout)
                 .foregroundStyle(Color.mdTextSecondary)
 
-            Text(viewModel.roomCode)
-                .font(.mdLargeTitle)
-                .foregroundStyle(Color.mdPrimary)
-                .tracking(8)
+            Button {
+                UIPasteboard.general.string = viewModel.roomCode
+                copied = true
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    copied = false
+                }
+            } label: {
+                HStack(spacing: Spacing.xs) {
+                    Text(viewModel.roomCode)
+                        .font(.mdLargeTitle)
+                        .foregroundStyle(Color.mdPrimary)
+                        .tracking(8)
 
-            Text("\(viewModel.players.count)人が参加中")
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .font(.mdCaption)
+                        .foregroundStyle(copied ? Color.mdSuccess : Color.mdTextMuted)
+                }
+            }
+
+            Text(copied ? "コピーしました" : "\(viewModel.players.count)人が参加中")
                 .font(.mdCaption)
-                .foregroundStyle(Color.mdTextMuted)
+                .foregroundStyle(copied ? Color.mdSuccess : Color.mdTextMuted)
         }
         .padding(.top, Spacing.md)
     }
