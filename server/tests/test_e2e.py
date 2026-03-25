@@ -231,10 +231,12 @@ def _mock_llm_generate(responses: list[tuple[str, LLMUsage]]):
 
 def _scenario_and_validation_mock():
     """Mock that handles generate_scenario + validate_scenario calls."""
-    return _mock_llm_generate([
-        (json.dumps(MOCK_SCENARIO, ensure_ascii=False), MOCK_USAGE),
-        (json.dumps(MOCK_VALIDATION, ensure_ascii=False), MOCK_USAGE_LIGHT),
-    ])
+    return _mock_llm_generate(
+        [
+            (json.dumps(MOCK_SCENARIO, ensure_ascii=False), MOCK_USAGE),
+            (json.dumps(MOCK_VALIDATION, ensure_ascii=False), MOCK_USAGE_LIGHT),
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -559,12 +561,12 @@ async def test_voting_and_ending_flow(e2e_client, e2e_session_factory):
         patch("madaminu.services.scenario_engine.llm_client.generate_json", ending_mock),
         e2e_client.websocket_connect(f"/ws/{room_code}?token={charlie_token}") as ws,
     ):
-            state = ws.receive_json()
-            assert state["type"] == "game.state"
-            assert state["data"]["status"] == "voting"
+        state = ws.receive_json()
+        assert state["type"] == "game.state"
+        assert state["data"]["status"] == "voting"
 
-            ws.send_json({"type": "vote.submit", "data": {"suspect_player_id": criminal_id}})
-            messages = _collect_messages(ws, until_type="game.ending")
+        ws.send_json({"type": "vote.submit", "data": {"suspect_player_id": criminal_id}})
+        messages = _collect_messages(ws, until_type="game.ending")
 
     assert any(m["type"] == "vote.cast" for m in messages)
     assert any(m["type"] == "vote.results" for m in messages)
@@ -729,9 +731,7 @@ async def test_room_state_after_game_start(async_client, e2e_session_factory):
         assert game.scenario_skeleton is not None
         assert game.current_phase_id is not None
 
-        phases_result = await db.execute(
-            select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order)
-        )
+        phases_result = await db.execute(select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order))
         phases = phases_result.scalars().all()
         assert len(phases) == 3
         assert phases[0].phase_type == PhaseType.investigation
