@@ -1,3 +1,4 @@
+import MadaminuKit
 import SwiftUI
 
 @main
