@@ -111,8 +111,15 @@ final class RoomViewModel {
         do {
             try await api.startGame(roomCode: roomCode, sessionToken: token)
             isGameStarted = true
+        } catch let apiError as APIError {
+            switch apiError {
+            case .requestFailed(let code, let msg):
+                errorMessage = "ゲーム開始に失敗しました (\(code)): \(msg)"
+            default:
+                errorMessage = "ゲーム開始に失敗しました: \(apiError)"
+            }
         } catch {
-            errorMessage = "ゲーム開始に失敗しました"
+            errorMessage = "ゲーム開始に失敗しました: \(error.localizedDescription)"
         }
 
         isLoading = false
