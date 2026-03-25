@@ -4,6 +4,9 @@ import Observation
 @MainActor
 @Observable
 final class GameViewModel {
+    enum GameScreen { case intro, playing, ended }
+
+    var screen: GameScreen = .intro
     var gameStatus = ""
     var currentPhase: PhaseInfo?
     var currentSpeakerId: String?
@@ -16,6 +19,7 @@ final class GameViewModel {
     var ending: EndingData?
     var isSpeaking = false
     var errorMessage: String?
+    var scenarioSetting: [String: Any] = [:]
 
     let roomCode: String
     let playerId: String
@@ -113,6 +117,14 @@ final class GameViewModel {
         gameStatus = data["status"] as? String ?? ""
         mySecretInfo = data["my_secret_info"] as? String
         myObjective = data["my_objective"] as? String
+
+        if let setting = data["scenario_setting"] as? [String: Any] {
+            scenarioSetting = setting
+        }
+        if let victim = data["victim"] as? [String: Any] {
+            scenarioSetting["victim_name"] = victim["name"]
+            scenarioSetting["victim_description"] = victim["description"]
+        }
         myRole = data["my_role"] as? String
         currentSpeakerId = data["current_speaker_id"] as? String
 
@@ -166,11 +178,16 @@ final class GameViewModel {
         evidences.append(EvidenceItem(title: title, content: content))
     }
 
+    func dismissIntro() {
+        screen = .playing
+    }
+
     private func handleEnding(_ data: [String: Any]) {
         guard let jsonData = try? JSONSerialization.data(withJSONObject: data),
               let endingData = try? JSONDecoder().decode(EndingData.self, from: jsonData) else { return }
         ending = endingData
         gameStatus = "ended"
+        screen = .ended
     }
 
     private func parsePhaseInfo(_ data: [String: Any]) {
