@@ -9,7 +9,7 @@ final class WebSocketClient {
     private var webSocketTask: URLSessionWebSocketTask?
     private var onMessage: ((String, [String: Any]) -> Void)?
 
-    func connect(roomCode: String, token: String, baseURL: String = "ws://localhost:8000") {
+    func connect(roomCode: String, token: String, baseURL: String = "wss://murder-production.up.railway.app") {
         guard let url = URL(string: "\(baseURL)/ws/\(roomCode)?token=\(token)") else { return }
 
         let session = URLSession(configuration: .default)

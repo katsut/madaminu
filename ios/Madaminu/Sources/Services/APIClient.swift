@@ -10,7 +10,7 @@ enum APIError: Error {
 actor APIClient {
     let baseURL: String
 
-    init(baseURL: String = "http://localhost:8000") {
+    init(baseURL: String = "https://murder-production.up.railway.app") {
         self.baseURL = baseURL
     }
 
