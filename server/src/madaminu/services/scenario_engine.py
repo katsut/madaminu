@@ -95,6 +95,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         )
         db.add(phase)
 
+    game.total_llm_cost_usd += sum(u.estimated_cost_usd for u in usages)
     await db.commit()
     await db.refresh(game)
 
@@ -151,6 +152,8 @@ async def adjust_phase(db: AsyncSession, game_id: str, ended_phase_id: str) -> t
             existing_notes.update(update["player_gm_notes"])
             gm_state["player_gm_notes"] = existing_notes
         game.gm_internal_state = gm_state
+
+    game.total_llm_cost_usd += usage.estimated_cost_usd
 
     distributed_evidence = []
     player_id_map = {p.id: p for p in game.players}
@@ -251,6 +254,7 @@ async def investigate_location(
         source=EvidenceSource.investigation,
     )
     db.add(evidence)
+    game.total_llm_cost_usd += usage.estimated_cost_usd
     await db.commit()
 
     return evidence, usage
@@ -293,6 +297,7 @@ async def generate_ending(db: AsyncSession, game_id: str) -> tuple[GameEnding, L
     )
     db.add(ending)
 
+    game.total_llm_cost_usd += usage.estimated_cost_usd
     game.status = GameStatus.ended
     await db.commit()
 

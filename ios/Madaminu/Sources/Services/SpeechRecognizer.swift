@@ -71,7 +71,7 @@ final class SpeechRecognizer {
         }
 
         recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 if let result {
                     self?.transcript = result.bestTranscription.formattedString
                 }
