@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,6 +11,8 @@ from madaminu.llm.prompts import format_characters_for_prompt, load_template, re
 from madaminu.models import Evidence, EvidenceSource, Game, GameStatus, Phase, PhaseType, PlayerRole, SpeechLog
 
 logger = logging.getLogger(__name__)
+
+MAX_INVESTIGATIONS_PER_PHASE = 3
 
 ROLE_MAP = {
     "criminal": PlayerRole.criminal,
@@ -161,6 +163,86 @@ async def adjust_phase(db: AsyncSession, game_id: str, ended_phase_id: str) -> t
 
     await db.commit()
     return adjustment, usage
+
+
+async def investigate_location(
+    db: AsyncSession,
+    game_id: str,
+    player_id: str,
+    location_id: str,
+) -> tuple[Evidence | None, LLMUsage | None]:
+    game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
+    game = game_result.scalar_one()
+
+    if game.current_phase_id is None:
+        return None, None
+
+    phase_result = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
+    phase = phase_result.scalar_one()
+
+    if phase.phase_type != PhaseType.investigation:
+        return None, None
+
+    locations = phase.investigation_locations or []
+    location = next((loc for loc in locations if loc.get("id") == location_id), None)
+    if location is None:
+        return None, None
+
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(Evidence)
+        .where(
+            Evidence.game_id == game_id,
+            Evidence.player_id == player_id,
+            Evidence.phase_id == phase.id,
+            Evidence.source == EvidenceSource.investigation,
+        )
+    )
+    investigation_count = count_result.scalar_one()
+    if investigation_count >= MAX_INVESTIGATIONS_PER_PHASE:
+        return None, None
+
+    player = next((p for p in game.players if p.id == player_id), None)
+    if player is None:
+        return None, None
+
+    existing_result = await db.execute(
+        select(Evidence).where(Evidence.game_id == game_id, Evidence.player_id == player_id)
+    )
+    existing = existing_result.scalars().all()
+    existing_text = "\n".join(f"- {e.title}: {e.content}" for e in existing) if existing else "(なし)"
+
+    system_prompt = load_template("scenario_system")
+    user_prompt = render_template(
+        "investigation",
+        scenario_skeleton=json.dumps(game.scenario_skeleton or {}, ensure_ascii=False, indent=2),
+        gm_internal_state=json.dumps(game.gm_internal_state or {}, ensure_ascii=False, indent=2),
+        player_id=player_id,
+        player_name=player.character_name or player.display_name,
+        player_role=player.role or "unknown",
+        player_secret=player.secret_info or "N/A",
+        player_objective=player.objective or "N/A",
+        location_name=location.get("name", location_id),
+        location_description=location.get("description", ""),
+        existing_evidence=existing_text,
+    )
+
+    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=HAIKU_MODEL)
+    result = _parse_scenario_json(raw_response)
+
+    evidence = Evidence(
+        id=str(uuid.uuid4()),
+        game_id=game_id,
+        player_id=player_id,
+        phase_id=phase.id,
+        title=result.get("title", "調査結果"),
+        content=result.get("content", ""),
+        source=EvidenceSource.investigation,
+    )
+    db.add(evidence)
+    await db.commit()
+
+    return evidence, usage
 
 
 def _format_players_for_adjustment(players) -> str:

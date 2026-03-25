@@ -1,0 +1,38 @@
+## 調査リクエスト
+
+### シナリオ骨格
+$scenario_skeleton
+
+### GM内部状態
+$gm_internal_state
+
+### 調査プレイヤー
+- ID: $player_id
+- Name: $player_name
+- Role: $player_role
+- Secret: $player_secret
+- Objective: $player_objective
+
+### 調査対象
+- 場所/対象: $location_name ($location_description)
+
+### これまでの調査結果（このプレイヤー）
+$existing_evidence
+
+## タスク
+
+上記のプレイヤーが「$location_name」を調査しました。
+プレイヤーの役割・秘密・目的とシナリオの整合性を考慮し、調査結果をJSON形式で出力してください:
+
+```json
+{
+  "title": "発見した証拠のタイトル（日本語、簡潔に）",
+  "content": "調査結果の詳細な描写（日本語、2〜4文）"
+}
+```
+
+### ガイドライン
+- プレイヤーの秘密に関連する場所なら、秘密に触れる手がかりを含めてよい
+- 犯人の手がかりは段階的に。決定的証拠は避け、推理の材料を提供する
+- 結果はフレーバーテキストとして没入感のある描写にする
+- プレイヤーの目的達成に役立つ情報を含めることも検討する
