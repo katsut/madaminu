@@ -41,18 +41,19 @@ final class WebSocketClient {
         guard let jsonData = try? JSONSerialization.data(withJSONObject: message),
               let jsonString = String(data: jsonData, encoding: .utf8) else { return }
 
-        webSocketTask?.send(.string(jsonString)) { error in
-            if let error {
-                print("WebSocket send error: \(error)")
-            }
+        let task = webSocketTask
+        Task.detached {
+            try? await task?.send(.string(jsonString))
         }
     }
 
     private func receiveLoop() {
-        webSocketTask?.receive { [weak self] result in
-            Task { @MainActor in
-                switch result {
-                case .success(let message):
+        let task = webSocketTask
+        Task.detached { [weak self] in
+            guard let task else { return }
+            do {
+                let message = try await task.receive()
+                await MainActor.run {
                     switch message {
                     case .string(let text):
                         self?.handleMessage(text)
@@ -64,7 +65,9 @@ final class WebSocketClient {
                         break
                     }
                     self?.receiveLoop()
-                case .failure(let error):
+                }
+            } catch {
+                await MainActor.run {
                     print("[WS] Connection error: \(error)")
                     self?.connectionError = error.localizedDescription
                     self?.isConnected = false
