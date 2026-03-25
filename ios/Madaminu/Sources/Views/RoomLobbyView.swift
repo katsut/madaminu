@@ -23,7 +23,7 @@ struct RoomLobbyView: View {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
-        .sheet(isPresented: $viewModel.showCharacterCreation) {
+        .fullScreenCover(isPresented: $viewModel.showCharacterCreation) {
             CharacterCreationView(viewModel: viewModel)
         }
     }
