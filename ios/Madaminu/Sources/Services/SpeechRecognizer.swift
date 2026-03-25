@@ -13,7 +13,7 @@ final class SpeechRecognizer {
     private var audioEngine: AVAudioEngine?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "ja-JP"))
+    private var speechRecognizer: SFSpeechRecognizer?
 
     func requestPermission() async {
         let speechStatus = await withCheckedContinuation { continuation in
@@ -29,6 +29,10 @@ final class SpeechRecognizer {
         if !permissionGranted {
             errorMessage = "マイクと音声認識の権限が必要です"
         }
+
+        if permissionGranted {
+            speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "ja-JP"))
+        }
     }
 
     func startRecording() {
@@ -36,6 +40,11 @@ final class SpeechRecognizer {
             errorMessage = "権限が許可されていません"
             return
         }
+
+        if speechRecognizer == nil {
+            speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "ja-JP"))
+        }
+
         guard let speechRecognizer, speechRecognizer.isAvailable else {
             errorMessage = "音声認識が利用できません"
             return
