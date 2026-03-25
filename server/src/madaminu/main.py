@@ -11,6 +11,7 @@ from madaminu.routers.characters import router as characters_router
 from madaminu.routers.game import router as game_router
 from madaminu.routers.rooms import router as rooms_router
 from madaminu.services.phase_manager import PhaseManager
+from madaminu.services.speech_manager import SpeechManager
 from madaminu.ws.handler import handle_websocket
 
 
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         app.state.phase_manager = PhaseManager(async_session)
+        app.state.speech_manager = SpeechManager(async_session)
 
     yield
 

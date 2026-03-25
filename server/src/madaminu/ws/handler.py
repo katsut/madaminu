@@ -116,6 +116,8 @@ async def get_game_state_for_player(db: AsyncSession, room_code: str, player_id:
         if phase_info:
             state["current_phase"] = phase_info
 
+    state["current_speaker_id"] = None
+
     return state
 
 
@@ -162,6 +164,10 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
 
             if msg_type in ("phase.advance", "phase.extend"):
                 await _handle_host_command(db, room_code, player_id, msg_type, websocket)
+            elif msg_type == "speech.request":
+                await _handle_speech_request(room_code, player_id, websocket)
+            elif msg_type == "speech.release":
+                await _handle_speech_release(room_code, player_id, data, websocket)
     except WebSocketDisconnect:
         pass
     finally:
@@ -180,6 +186,43 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 data=PlayerDisconnectedData(player_id=player_id, display_name=display_name).model_dump(),
             ),
         )
+
+
+def _get_speech_manager(websocket: WebSocket):
+    return getattr(websocket.app.state, "speech_manager", None)
+
+
+async def _handle_speech_request(room_code: str, player_id: str, websocket: WebSocket):
+    sm = _get_speech_manager(websocket)
+    if sm is None:
+        return
+
+    granted = await sm.request_speech(room_code, player_id)
+    if granted:
+        await manager.send_to_player(
+            room_code,
+            player_id,
+            WSMessage(type="speech.granted", data={"player_id": player_id}),
+        )
+        await sm.broadcast_speech_granted(room_code, player_id)
+    else:
+        current = sm.get_current_speaker(room_code)
+        await manager.send_to_player(
+            room_code,
+            player_id,
+            WSMessage(type="speech.denied", data={"current_speaker_id": current}),
+        )
+
+
+async def _handle_speech_release(room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    sm = _get_speech_manager(websocket)
+    if sm is None:
+        return
+
+    transcript = data.get("data", {}).get("transcript", "")
+    released = await sm.release_speech(room_code, player_id, transcript)
+    if released:
+        await sm.broadcast_speech_released(room_code, player_id)
 
 
 async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str, msg_type: str, websocket: WebSocket):
