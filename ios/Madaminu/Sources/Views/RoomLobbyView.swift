@@ -116,6 +116,13 @@ struct RoomLobbyView: View {
                     .font(.mdCaption)
                     .foregroundStyle(Color.mdTextMuted)
             }
+
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdError)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 }
