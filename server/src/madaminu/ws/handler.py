@@ -1,11 +1,12 @@
 import logging
+from datetime import UTC, datetime
 
 from fastapi import WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from madaminu.models import ConnectionStatus, Game, Player
+from madaminu.models import ConnectionStatus, Game, GameStatus, Phase, Player
 from madaminu.ws.messages import PlayerConnectedData, PlayerDisconnectedData, WSMessage
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,28 @@ async def authenticate_player(db: AsyncSession, room_code: str, token: str) -> P
     return result.scalar_one_or_none()
 
 
+async def _get_current_phase_dict(db: AsyncSession, current_phase_id: str) -> dict | None:
+    result = await db.execute(select(Phase).where(Phase.id == current_phase_id))
+    phase = result.scalar_one_or_none()
+    if phase is None:
+        return None
+
+    remaining = 0
+    if phase.started_at:
+        started = phase.started_at if phase.started_at.tzinfo else phase.started_at.replace(tzinfo=UTC)
+        elapsed = (datetime.now(UTC) - started).total_seconds()
+        remaining = max(0, phase.duration_sec - int(elapsed))
+
+    return {
+        "phase_id": phase.id,
+        "phase_type": phase.phase_type,
+        "phase_order": phase.phase_order,
+        "duration_sec": phase.duration_sec,
+        "remaining_sec": remaining,
+        "investigation_locations": phase.investigation_locations,
+    }
+
+
 async def get_game_state_for_player(db: AsyncSession, room_code: str, player_id: str) -> dict:
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
@@ -87,6 +110,11 @@ async def get_game_state_for_player(db: AsyncSession, room_code: str, player_id:
         state["my_secret_info"] = current_player.secret_info
         state["my_objective"] = current_player.objective
         state["my_role"] = current_player.role
+
+    if game.current_phase_id:
+        phase_info = await _get_current_phase_dict(db, game.current_phase_id)
+        if phase_info:
+            state["current_phase"] = phase_info
 
     return state
 
@@ -131,6 +159,9 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
             data = await websocket.receive_json()
             msg_type = data.get("type", "")
             logger.info("WS message from %s: %s", player_id, msg_type)
+
+            if msg_type in ("phase.advance", "phase.extend"):
+                await _handle_host_command(db, room_code, player_id, msg_type, websocket)
     except WebSocketDisconnect:
         pass
     finally:
@@ -149,3 +180,30 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 data=PlayerDisconnectedData(player_id=player_id, display_name=display_name).model_dump(),
             ),
         )
+
+
+async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str, msg_type: str, websocket: WebSocket):
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        return
+
+    player = next((p for p in game.players if p.id == player_id), None)
+    if player is None or not player.is_host:
+        await websocket.send_json(
+            WSMessage(type="error", data={"message": "Only the host can control phases"}).model_dump()
+        )
+        return
+
+    if game.status not in (GameStatus.playing, GameStatus.voting):
+        await websocket.send_json(WSMessage(type="error", data={"message": "Game is not in progress"}).model_dump())
+        return
+
+    pm = getattr(websocket.app.state, "phase_manager", None)
+    if pm is None:
+        return
+
+    if msg_type == "phase.advance":
+        await pm.advance_phase(game.id, room_code)
+    elif msg_type == "phase.extend":
+        await pm.extend_phase(game.id, room_code)

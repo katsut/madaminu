@@ -1,11 +1,15 @@
+import os
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from madaminu.db.database import get_db
-from madaminu.main import app
-from madaminu.models import Base
+os.environ["MADAMINU_TESTING"] = "true"
+
+from madaminu.db.database import get_db  # noqa: E402
+from madaminu.main import app  # noqa: E402
+from madaminu.models import Base  # noqa: E402
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
 

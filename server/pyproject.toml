@@ -17,6 +17,7 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.25.0",
+    "pytest-timeout>=2.3.0",
     "httpx>=0.28.0",
     "ruff>=0.11.0",
 ]
@@ -36,3 +37,4 @@ ignore = ["B008", "B017"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+timeout = 30
