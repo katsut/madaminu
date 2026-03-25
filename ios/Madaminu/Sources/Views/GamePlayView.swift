@@ -10,31 +10,36 @@ struct GamePlayView: View {
             Color.mdBackground
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                phaseHeader
-                Divider().background(Color.mdSurface)
+            switch viewModel.screen {
+            case .intro:
+                IntroView(viewModel: viewModel)
+            case .playing:
+                VStack(spacing: 0) {
+                    phaseHeader
+                    Divider().background(Color.mdSurface)
 
-                Group {
-                    if viewModel.gameStatus == "ended" {
-                        endingView
-                    } else if let phase = viewModel.currentPhase {
-                        switch phase.phaseType {
-                        case "investigation":
-                            InvestigationPhaseView(viewModel: viewModel)
-                        case "discussion":
-                            DiscussionPhaseView(viewModel: viewModel)
-                        case "voting":
-                            VotingPhaseView(viewModel: viewModel)
-                        default:
+                    Group {
+                        if let phase = viewModel.currentPhase {
+                            switch phase.phaseType {
+                            case "investigation":
+                                InvestigationPhaseView(viewModel: viewModel)
+                            case "discussion":
+                                DiscussionPhaseView(viewModel: viewModel)
+                            case "voting":
+                                VotingPhaseView(viewModel: viewModel)
+                            default:
+                                waitingView
+                            }
+                        } else {
                             waitingView
                         }
-                    } else {
-                        waitingView
                     }
-                }
-                .frame(maxHeight: .infinity)
+                    .frame(maxHeight: .infinity)
 
-                bottomBar
+                    bottomBar
+                }
+            case .ended:
+                endingView
             }
         }
         .fullScreenCover(isPresented: $showNotebook) {

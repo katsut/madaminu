@@ -103,6 +103,8 @@ async def get_game_state_for_player(db: AsyncSession, room_code: str, player_id:
         "status": game.status,
         "host_player_id": game.host_player_id,
         "players": players_public,
+        "scenario_setting": game.scenario_skeleton.get("setting", {}) if game.scenario_skeleton else None,
+        "victim": game.scenario_skeleton.get("victim", {}) if game.scenario_skeleton else None,
     }
 
     current_player = next((p for p in game.players if p.id == player_id), None)
