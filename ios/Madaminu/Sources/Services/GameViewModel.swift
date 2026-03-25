@@ -29,7 +29,7 @@ final class GameViewModel {
     let isHost: Bool
 
     private let ws = WebSocketClient()
-    let speechRecognizer = SpeechRecognizer()
+    var speechRecognizer: SpeechRecognizer?
 
     init(roomCode: String, playerId: String, sessionToken: String, isHost: Bool) {
         self.roomCode = roomCode
@@ -63,9 +63,9 @@ final class GameViewModel {
 
     func releaseSpeech() {
         ws.send(type: "speech.release", data: [
-            "transcript": speechRecognizer.transcript,
+            "transcript": speechRecognizer?.transcript ?? "",
         ])
-        speechRecognizer.stopRecording()
+        speechRecognizer?.stopRecording()
         isSpeaking = false
     }
 
@@ -107,7 +107,7 @@ final class GameViewModel {
             currentPhase = nil
         case "speech.granted":
             isSpeaking = true
-            speechRecognizer.startRecording()
+            speechRecognizer?.startRecording()
         case "speech.denied":
             setError("他のプレイヤーが発言中です")
         case "speech.active":
