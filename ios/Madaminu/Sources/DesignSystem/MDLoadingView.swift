@@ -1,9 +1,13 @@
 import SwiftUI
 
-struct MDLoadingView: View {
+public struct MDLoadingView: View {
     var message: String = ""
 
-    var body: some View {
+    public init(message: String = "") {
+        self.message = message
+    }
+
+    public var body: some View {
         VStack(spacing: Spacing.md) {
             ProgressView()
                 .controlSize(.large)
