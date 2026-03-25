@@ -38,6 +38,20 @@ struct PlayerInfo: Codable, Identifiable {
     }
 }
 
+struct CharacterResponse: Codable {
+    let playerId: String
+    let characterName: String
+    let characterPersonality: String
+    let characterBackground: String
+
+    enum CodingKeys: String, CodingKey {
+        case playerId = "player_id"
+        case characterName = "character_name"
+        case characterPersonality = "character_personality"
+        case characterBackground = "character_background"
+    }
+}
+
 struct RoomInfoResponse: Codable {
     let roomCode: String
     let status: String

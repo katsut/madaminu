@@ -28,6 +28,25 @@ actor APIClient {
         return try await get("/api/v1/rooms/\(roomCode)")
     }
 
+    func createCharacter(
+        roomCode: String,
+        sessionToken: String,
+        name: String,
+        personality: String,
+        background: String
+    ) async throws -> CharacterResponse {
+        let body: [String: String] = [
+            "character_name": name,
+            "character_personality": personality,
+            "character_background": background,
+        ]
+        return try await post(
+            "/api/v1/rooms/\(roomCode)/characters",
+            body: body,
+            headers: ["X-Session-Token": sessionToken]
+        )
+    }
+
     private func get<T: Decodable>(_ path: String) async throws -> T {
         guard let url = URL(string: baseURL + path) else {
             throw APIError.invalidURL
@@ -38,7 +57,11 @@ actor APIClient {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    private func post<T: Decodable>(_ path: String, body: [String: String]) async throws -> T {
+    private func post<T: Decodable>(
+        _ path: String,
+        body: [String: String],
+        headers: [String: String] = [:]
+    ) async throws -> T {
         guard let url = URL(string: baseURL + path) else {
             throw APIError.invalidURL
         }
@@ -46,6 +69,9 @@ actor APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
