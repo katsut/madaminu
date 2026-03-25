@@ -58,7 +58,7 @@ MOCK_SCENARIO = {
 
 MOCK_VALIDATION = {"is_valid": True, "issues": [], "summary": "問題なし"}
 
-MOCK_USAGE = LLMUsage(model="claude-sonnet-4-20250514", input_tokens=2000, output_tokens=1500, duration_ms=3000)
+MOCK_USAGE = LLMUsage(model="gpt-5.4-mini", input_tokens=2000, output_tokens=1500, duration_ms=3000)
 
 
 def test_parse_scenario_json():

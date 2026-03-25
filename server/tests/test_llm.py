@@ -2,20 +2,18 @@ from madaminu.llm.client import LLMUsage
 from madaminu.llm.prompts import format_characters_for_prompt, render_template
 
 
-def test_llm_usage_cost_sonnet():
-    usage = LLMUsage(model="claude-sonnet-4-20250514", input_tokens=1000, output_tokens=500, duration_ms=2000)
+def test_llm_usage_cost_mini():
+    usage = LLMUsage(model="gpt-5.4-mini", input_tokens=1000, output_tokens=500, duration_ms=2000)
     assert usage.estimated_cost_usd > 0
-    assert "sonnet" in repr(usage)
+    assert "mini" in repr(usage)
 
 
-def test_llm_usage_cost_haiku():
-    usage = LLMUsage(model="claude-haiku-4-5-20251001", input_tokens=1000, output_tokens=500, duration_ms=1000)
+def test_llm_usage_cost_nano():
+    usage = LLMUsage(model="gpt-5.4-nano", input_tokens=1000, output_tokens=500, duration_ms=1000)
     assert usage.estimated_cost_usd > 0
     assert (
         usage.estimated_cost_usd
-        < LLMUsage(
-            model="claude-sonnet-4-20250514", input_tokens=1000, output_tokens=500, duration_ms=1000
-        ).estimated_cost_usd
+        < LLMUsage(model="gpt-5.4-mini", input_tokens=1000, output_tokens=500, duration_ms=1000).estimated_cost_usd
     )
 
 

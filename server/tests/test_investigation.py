@@ -14,7 +14,7 @@ MOCK_INVESTIGATION_RESULT = {
     "content": "書斎の引き出しの奥に、血痕のついた手紙が隠されていた。宛名は判読できない。",
 }
 
-MOCK_USAGE = LLMUsage(model="claude-haiku-4-5-20251001", input_tokens=1500, output_tokens=500, duration_ms=1000)
+MOCK_USAGE = LLMUsage(model="gpt-5.4-nano", input_tokens=1500, output_tokens=500, duration_ms=1000)
 
 INVESTIGATION_LOCATIONS = [
     {"id": "study", "name": "書斎", "description": "被害者の書斎"},
@@ -80,7 +80,7 @@ async def test_investigate_location_success(session_factory):
     assert evidence is not None
     assert evidence.title == "血のついた手紙"
     assert evidence.source == EvidenceSource.investigation
-    assert usage.model == "claude-haiku-4-5-20251001"
+    assert usage.model == "gpt-5.4-nano"
 
 
 async def test_investigate_invalid_location(session_factory):
@@ -185,4 +185,4 @@ async def test_investigate_uses_haiku_model(session_factory):
             await investigate_location(db, game_id, player_id, "study")
 
     call_kwargs = mock_generate.call_args
-    assert call_kwargs[1]["model"] == "claude-haiku-4-5-20251001"
+    assert call_kwargs[1]["model"] == "gpt-5.4-nano"
