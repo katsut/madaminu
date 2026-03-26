@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -33,8 +33,8 @@ class PhaseManager:
                 raise ValueError("No phases found for game")
 
             first_phase = phases[0]
-            first_phase.started_at = datetime.now(UTC)
-            first_phase.deadline_at = datetime.now(UTC) + timedelta(seconds=first_phase.duration_sec)
+            first_phase.started_at = datetime.utcnow()
+            first_phase.deadline_at = datetime.utcnow() + timedelta(seconds=first_phase.duration_sec)
 
             game_result = await db.execute(select(Game).where(Game.id == game_id))
             game = game_result.scalar_one()
@@ -57,7 +57,7 @@ class PhaseManager:
             if current_phase is None:
                 raise ValueError("No current phase")
 
-            current_phase.ended_at = datetime.now(UTC)
+            current_phase.ended_at = datetime.utcnow()
 
             sorted_phases = sorted(game.phases, key=lambda p: p.phase_order)
             current_idx = next(i for i, p in enumerate(sorted_phases) if p.id == current_phase.id)
@@ -69,8 +69,8 @@ class PhaseManager:
                 return None
 
             next_phase = sorted_phases[current_idx + 1]
-            next_phase.started_at = datetime.now(UTC)
-            next_phase.deadline_at = datetime.now(UTC) + timedelta(seconds=next_phase.duration_sec)
+            next_phase.started_at = datetime.utcnow()
+            next_phase.deadline_at = datetime.utcnow() + timedelta(seconds=next_phase.duration_sec)
             game.current_phase_id = next_phase.id
 
             if next_phase.phase_type == PhaseType.voting:
@@ -137,7 +137,7 @@ class PhaseManager:
 
         try:
             while True:
-                elapsed = (datetime.now(UTC) - started_at.replace(tzinfo=UTC)).total_seconds()
+                elapsed = (datetime.utcnow() - started_at).total_seconds()
                 remaining = max(0, duration_sec - int(elapsed))
 
                 await manager.broadcast(
