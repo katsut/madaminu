@@ -290,7 +290,7 @@ struct CharacterCreationView: View {
                 .disabled(!isCurrentStepValid)
             } else {
                 MDButton("作成", isLoading: viewModel.isLoading) {
-                    Task {
+                    Task { @MainActor in
                         await viewModel.createCharacter(
                             name: characterName,
                             personality: personality,

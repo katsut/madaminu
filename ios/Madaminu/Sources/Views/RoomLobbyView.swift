@@ -53,7 +53,7 @@ struct RoomLobbyView: View {
             Button {
                 UIPasteboard.general.string = viewModel.roomCode
                 copied = true
-                Task {
+                Task { @MainActor in
                     try? await Task.sleep(for: .seconds(2))
                     copied = false
                 }
@@ -136,7 +136,7 @@ struct RoomLobbyView: View {
                 }
             } else if viewModel.isHost {
                 MDButton("ゲーム開始", isLoading: viewModel.isLoading) {
-                    Task { await viewModel.startGame() }
+                    Task { @MainActor in await viewModel.startGame() }
                 }
 
                 let humanReady = viewModel.players.filter { $0.characterName != nil }.count

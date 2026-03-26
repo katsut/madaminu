@@ -27,7 +27,7 @@ struct JoinRoomSheet: View {
                 MDTextField(label: "参加コード", text: $viewModel.joinCode, placeholder: "6文字のコード")
 
                 MDButton("参加する", isLoading: viewModel.isLoading) {
-                    Task {
+                    Task { @MainActor in
                         await viewModel.joinRoom()
                         if viewModel.isInRoom {
                             isPresented = false
