@@ -2,8 +2,8 @@ import AVFoundation
 import Speech
 
 /// Speech recognition service.
-/// NOT @Observable — GameViewModel reads transcript directly.
-/// All methods must be called from MainActor (enforced by @MainActor on each method).
+/// All methods must be called from the main thread.
+/// Caller is responsible for ensuring main thread execution.
 final class SpeechRecognizer: @unchecked Sendable {
     private var _transcript = ""
     private var _isRecording = false
@@ -20,7 +20,6 @@ final class SpeechRecognizer: @unchecked Sendable {
     var permissionGranted: Bool { _permissionGranted }
     var errorMessage: String? { _errorMessage }
 
-    @MainActor
     func requestPermission() async {
         let speechStatus = await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
@@ -30,18 +29,19 @@ final class SpeechRecognizer: @unchecked Sendable {
 
         let audioGranted = await AVAudioApplication.requestRecordPermission()
 
-        _permissionGranted = speechStatus == .authorized && audioGranted
+        await MainActor.run {
+            _permissionGranted = speechStatus == .authorized && audioGranted
 
-        if !_permissionGranted {
-            _errorMessage = "マイクと音声認識の権限が必要です"
-        }
+            if !_permissionGranted {
+                _errorMessage = "マイクと音声認識の権限が必要です"
+            }
 
-        if _permissionGranted {
-            speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "ja-JP"))
+            if _permissionGranted {
+                speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "ja-JP"))
+            }
         }
     }
 
-    @MainActor
     func startRecording(onTranscriptUpdate: @escaping @Sendable (String) -> Void) {
         guard _permissionGranted else {
             _errorMessage = "権限が許可されていません"
@@ -86,21 +86,23 @@ final class SpeechRecognizer: @unchecked Sendable {
             return
         }
 
-        recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
-            Task { @MainActor [weak self] in
+        recognitionTask = speechRecognizer.recognitionTask(with: request) { result, error in
+            let transcription = result?.bestTranscription.formattedString
+            let isFinal = result?.isFinal ?? false
+            let hasError = error != nil
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                if let result {
-                    self._transcript = result.bestTranscription.formattedString
-                    onTranscriptUpdate(self._transcript)
+                if let transcription {
+                    self._transcript = transcription
+                    onTranscriptUpdate(transcription)
                 }
-                if error != nil || (result?.isFinal ?? false) {
+                if hasError || isFinal {
                     self.stopRecording()
                 }
             }
         }
     }
 
-    @MainActor
     func stopRecording() {
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
@@ -113,7 +115,6 @@ final class SpeechRecognizer: @unchecked Sendable {
         _isRecording = false
     }
 
-    @MainActor
     func setTranscript(_ value: String) {
         _transcript = value
     }

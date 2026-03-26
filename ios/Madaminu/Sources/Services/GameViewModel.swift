@@ -44,18 +44,21 @@ final class GameViewModel: @unchecked Sendable {
     // MARK: - Lifecycle
 
     /// Call from .task { } in GamePlayView (guaranteed MainActor context)
-    @MainActor
     func setup() async {
         let sr = SpeechRecognizer()
         _speechRecognizer = sr
         await sr.requestPermission()
 
         ws.setMessageHandler { [weak self] type, data in
-            self?.handleMessage(type: type, data: data)
+            DispatchQueue.main.async {
+                self?.handleMessage(type: type, data: data)
+            }
         }
         ws.setStateChangeHandler { [weak self] connected, error in
-            self?.isConnected = connected
-            self?.connectionError = error
+            DispatchQueue.main.async {
+                self?.isConnected = connected
+                self?.connectionError = error
+            }
         }
         ws.connect(roomCode: roomCode, token: sessionToken)
     }
@@ -74,9 +77,7 @@ final class GameViewModel: @unchecked Sendable {
         ws.send(type: "speech.release", data: [
             "transcript": currentTranscript,
         ])
-        Task { @MainActor [weak self] in
-            self?._speechRecognizer?.stopRecording()
-        }
+        _speechRecognizer?.stopRecording()
         isSpeaking = false
         currentTranscript = ""
     }
@@ -124,8 +125,8 @@ final class GameViewModel: @unchecked Sendable {
         case "speech.granted":
             isSpeaking = true
             let vm = self
-            Task { @MainActor in
-                vm._speechRecognizer?.startRecording { transcript in
+            _speechRecognizer?.startRecording { transcript in
+                DispatchQueue.main.async {
                     vm.currentTranscript = transcript
                 }
             }
@@ -156,9 +157,9 @@ final class GameViewModel: @unchecked Sendable {
 
     private func setError(_ message: String) {
         errorMessage = message
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(5))
-            if self?.errorMessage == message {
+        let msg = message
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            if self?.errorMessage == msg {
                 self?.errorMessage = nil
             }
         }
