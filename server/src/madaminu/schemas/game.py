@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,7 @@ async def _get_current_phase_dict(db: AsyncSession, current_phase_id: str) -> di
     remaining = 0
     if phase.started_at:
         started = phase.started_at
-        elapsed = (datetime.now(UTC) - started.replace(tzinfo=UTC)).total_seconds()
+        elapsed = (datetime.utcnow() - started).total_seconds()
         remaining = max(0, phase.duration_sec - int(elapsed))
 
     return {
