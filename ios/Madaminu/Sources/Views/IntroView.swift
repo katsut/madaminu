@@ -6,7 +6,7 @@ struct IntroView: View {
     @State private var currentPage = 0
     @State private var selectedPlayer: PlayerInfo?
 
-    private let pageCount = 3
+    private let pageCount = 8
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,13 +14,19 @@ struct IntroView: View {
 
             Group {
                 switch currentPage {
-                case 0: storyIntroPage
-                case 1: characterCardsPage
-                case 2: mySecretPage
+                case 0: openingPage
+                case 1: victimPage
+                case 2: myProfilePage
+                case 3: myPublicInfoPage
+                case 4: mySecretPage
+                case 5: myObjectivePage
+                case 6: allCharactersPage
+                case 7: readyPage
                 default: EmptyView()
                 }
             }
             .frame(maxHeight: .infinity)
+            .animation(.easeInOut(duration: 0.2), value: currentPage)
 
             navigationBar
         }
@@ -30,12 +36,14 @@ struct IntroView: View {
         }
     }
 
+    // MARK: - Navigation
+
     private var pageIndicator: some View {
-        HStack(spacing: Spacing.xs) {
+        HStack(spacing: 3) {
             ForEach(0..<pageCount, id: \.self) { i in
                 Capsule()
-                    .fill(i == currentPage ? Color.mdPrimary : Color.mdTextMuted.opacity(0.3))
-                    .frame(width: i == currentPage ? 24 : 8, height: 8)
+                    .fill(i <= currentPage ? Color.mdPrimary : Color.mdTextMuted.opacity(0.3))
+                    .frame(width: i == currentPage ? 20 : 6, height: 6)
             }
         }
         .padding(.top, Spacing.lg)
@@ -57,9 +65,9 @@ struct IntroView: View {
         .padding(.bottom, Spacing.lg)
     }
 
-    // MARK: - Page 1: Story
+    // MARK: - Page 1: Opening
 
-    private var storyIntroPage: some View {
+    private var openingPage: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
                 Text("物語の始まり")
@@ -80,9 +88,10 @@ struct IntroView: View {
                 }
 
                 if let setting = store.game.scenarioSetting.location {
-                    Text("舞台: \(setting)")
+                    Text(setting)
                         .font(.mdTitle2)
                         .foregroundStyle(Color.mdTextPrimary)
+                        .padding(.horizontal, Spacing.lg)
                 }
 
                 if let situation = store.game.scenarioSetting.situation {
@@ -93,34 +102,228 @@ struct IntroView: View {
                     }
                     .padding(.horizontal, Spacing.lg)
                 }
-
-                if let victim = store.game.scenarioSetting.victimName {
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            Label("被害者", systemImage: "person.slash")
-                                .font(.mdHeadline)
-                                .foregroundStyle(Color.mdAccent)
-                            Text(victim)
-                                .font(.mdTitle2)
-                                .foregroundStyle(Color.mdTextPrimary)
-                            if let desc = store.game.scenarioSetting.victimDescription {
-                                Text(desc)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextSecondary)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, Spacing.lg)
-                }
-
-                Spacer().frame(height: Spacing.xl)
             }
+            .padding(.bottom, Spacing.xl)
         }
     }
 
-    // MARK: - Page 2: Characters (simple cards, tap for detail)
+    // MARK: - Page 2: Victim
 
-    private var characterCardsPage: some View {
+    private var victimPage: some View {
+        ScrollView {
+            VStack(spacing: Spacing.lg) {
+                Text("被害者")
+                    .font(.mdLargeTitle)
+                    .foregroundStyle(Color.mdAccent)
+                    .padding(.top, Spacing.xl)
+
+                Image(systemName: "person.slash.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(Color.mdAccent.opacity(0.5))
+
+                if let name = store.game.scenarioSetting.victimName {
+                    Text(name)
+                        .font(.mdTitle)
+                        .foregroundStyle(Color.mdTextPrimary)
+                }
+
+                if let desc = store.game.scenarioSetting.victimDescription {
+                    MDCard {
+                        Text(desc)
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextPrimary)
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                }
+            }
+            .padding(.bottom, Spacing.xl)
+        }
+    }
+
+    // MARK: - Page 3: My Profile
+
+    private var myProfilePage: some View {
+        let me = store.room.players.first(where: { $0.id == store.room.playerId })
+        return ScrollView {
+            VStack(spacing: Spacing.lg) {
+                Text("あなたのキャラクター")
+                    .font(.mdLargeTitle)
+                    .foregroundStyle(Color.mdPrimary)
+                    .padding(.top, Spacing.xl)
+
+                if let me {
+                    if let urlString = me.portraitUrl,
+                       let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            ProgressView()
+                        }
+                        .frame(width: 150, height: 150)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                    }
+
+                    Text(me.characterName ?? me.displayName)
+                        .font(.mdTitle)
+                        .foregroundStyle(Color.mdTextPrimary)
+
+                    if let personality = me.characterPersonality {
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                Label("性格", systemImage: "brain.head.profile")
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdPrimary)
+                                Text(personality)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+                        .padding(.horizontal, Spacing.lg)
+                    }
+
+                    if let background = me.characterBackground {
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                Label("経歴", systemImage: "book")
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdPrimary)
+                                Text(background)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+                        .padding(.horizontal, Spacing.lg)
+                    }
+                }
+            }
+            .padding(.bottom, Spacing.xl)
+        }
+    }
+
+    // MARK: - Page 4: My Public Info
+
+    private var myPublicInfoPage: some View {
+        let me = store.room.players.first(where: { $0.id == store.room.playerId })
+        return VStack(spacing: Spacing.lg) {
+            Spacer()
+
+            Text("公開情報")
+                .font(.mdLargeTitle)
+                .foregroundStyle(Color.mdPrimary)
+
+            Text("他のプレイヤーが見れる情報")
+                .font(.mdCaption)
+                .foregroundStyle(Color.mdTextMuted)
+
+            if let me {
+                MDCard {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text(me.characterName ?? me.displayName)
+                            .font(.mdTitle2)
+                            .foregroundStyle(Color.mdTextPrimary)
+                        if let personality = me.characterPersonality {
+                            Text(personality)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextSecondary)
+                        }
+                        if let background = me.characterBackground {
+                            Text(background)
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextMuted)
+                        }
+                    }
+                }
+                .padding(.horizontal, Spacing.lg)
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Page 5: My Secret
+
+    private var mySecretPage: some View {
+        VStack(spacing: Spacing.lg) {
+            Spacer()
+
+            Text("秘密情報")
+                .font(.mdLargeTitle)
+                .foregroundStyle(Color.mdAccent)
+
+            Text("あなただけが知っている情報")
+                .font(.mdCaption)
+                .foregroundStyle(Color.mdTextMuted)
+
+            if let role = store.game.myRole {
+                MDCard {
+                    HStack {
+                        Label("役割", systemImage: "theatermask.and.paintbrush")
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdPrimary)
+                        Spacer()
+                        Text(roleDisplayName(role))
+                            .font(.mdTitle2)
+                            .foregroundStyle(Color.mdTextPrimary)
+                    }
+                }
+                .padding(.horizontal, Spacing.lg)
+            }
+
+            if let secret = store.game.mySecretInfo {
+                MDCard {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Label("秘密", systemImage: "lock.fill")
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdAccent)
+                        Text(secret)
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextPrimary)
+                    }
+                }
+                .padding(.horizontal, Spacing.lg)
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Page 6: My Objective
+
+    private var myObjectivePage: some View {
+        VStack(spacing: Spacing.lg) {
+            Spacer()
+
+            Text("あなたの目的")
+                .font(.mdLargeTitle)
+                .foregroundStyle(Color.mdWarning)
+
+            if let objective = store.game.myObjective {
+                MDCard {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Label("目的", systemImage: "target")
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdWarning)
+                        Text(objective)
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextPrimary)
+                    }
+                }
+                .padding(.horizontal, Spacing.lg)
+            }
+
+            Text("この目的の達成を目指しながらゲームを進めましょう")
+                .font(.mdCaption)
+                .foregroundStyle(Color.mdTextMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.lg)
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Page 7: All Characters
+
+    private var allCharactersPage: some View {
         VStack(spacing: 0) {
             Text("登場人物")
                 .font(.mdTitle)
@@ -134,9 +337,7 @@ struct IntroView: View {
             ScrollView(.vertical) {
                 VStack(spacing: Spacing.sm) {
                     ForEach(store.room.players) { player in
-                        Button {
-                            selectedPlayer = player
-                        } label: {
+                        Button { selectedPlayer = player } label: {
                             MDCard {
                                 HStack(spacing: Spacing.sm) {
                                     playerAvatar(player)
@@ -145,7 +346,6 @@ struct IntroView: View {
                                         Text(player.characterName ?? player.displayName)
                                             .font(.mdHeadline)
                                             .foregroundStyle(Color.mdTextPrimary)
-
                                         Text(player.displayName)
                                             .font(.mdCaption)
                                             .foregroundStyle(Color.mdTextMuted)
@@ -154,23 +354,10 @@ struct IntroView: View {
                                     Spacer()
 
                                     if player.id == store.room.playerId {
-                                        Text("あなた")
-                                            .font(.mdCaption2)
-                                            .foregroundStyle(Color.mdPrimary)
-                                            .padding(.horizontal, Spacing.xs)
-                                            .padding(.vertical, Spacing.xxs)
-                                            .background(Color.mdPrimary.opacity(0.15))
-                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                        badge("あなた", color: Color.mdPrimary)
                                     }
-
                                     if player.isAI {
-                                        Text("AI")
-                                            .font(.mdCaption2)
-                                            .foregroundStyle(Color.mdInfo)
-                                            .padding(.horizontal, Spacing.xs)
-                                            .padding(.vertical, Spacing.xxs)
-                                            .background(Color.mdInfo.opacity(0.15))
-                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                        badge("AI", color: Color.mdInfo)
                                     }
                                 }
                             }
@@ -184,66 +371,33 @@ struct IntroView: View {
         }
     }
 
-    // MARK: - Page 3: My Secret
+    // MARK: - Page 8: Ready
 
-    private var mySecretPage: some View {
-        ScrollView {
-            VStack(spacing: Spacing.lg) {
-                Text("あなたの秘密")
-                    .font(.mdTitle)
-                    .foregroundStyle(Color.mdAccent)
-                    .padding(.top, Spacing.xl)
+    private var readyPage: some View {
+        VStack(spacing: Spacing.lg) {
+            Spacer()
 
-                if let role = store.game.myRole {
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.xs) {
-                            Label("役割", systemImage: "theatermask.and.paintbrush")
-                                .font(.mdHeadline)
-                                .foregroundStyle(Color.mdPrimary)
-                            Text(roleDisplayName(role))
-                                .font(.mdTitle2)
-                                .foregroundStyle(Color.mdTextPrimary)
-                        }
-                    }
-                    .padding(.horizontal, Spacing.lg)
-                }
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 80))
+                .foregroundStyle(Color.mdPrimary)
 
-                if let secret = store.game.mySecretInfo {
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.xs) {
-                            Label("秘密情報", systemImage: "lock.fill")
-                                .font(.mdHeadline)
-                                .foregroundStyle(Color.mdAccent)
-                            Text(secret)
-                                .font(.mdBody)
-                                .foregroundStyle(Color.mdTextPrimary)
-                        }
-                    }
-                    .padding(.horizontal, Spacing.lg)
-                }
+            Text("準備完了")
+                .font(.mdLargeTitle)
+                .foregroundStyle(Color.mdPrimary)
 
-                if let objective = store.game.myObjective {
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.xs) {
-                            Label("あなたの目的", systemImage: "target")
-                                .font(.mdHeadline)
-                                .foregroundStyle(Color.mdWarning)
-                            Text(objective)
-                                .font(.mdBody)
-                                .foregroundStyle(Color.mdTextPrimary)
-                        }
-                    }
-                    .padding(.horizontal, Spacing.lg)
-                }
-
-                Spacer().frame(height: Spacing.md)
-
-                MDButton("ゲームを始める") {
-                    withAnimation { store.dispatch(.dismissIntro) }
-                }
+            Text("全員の情報を確認しましたか？\nゲームを始めると調査フェーズに入ります。")
+                .font(.mdBody)
+                .foregroundStyle(Color.mdTextSecondary)
+                .multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.lg)
-                .padding(.bottom, Spacing.md)
+
+            Spacer()
+
+            MDButton("ゲームを始める") {
+                withAnimation { store.dispatch(.dismissIntro) }
             }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.bottom, Spacing.md)
         }
     }
 
@@ -256,22 +410,32 @@ struct IntroView: View {
             AsyncImage(url: url) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
-                Image(systemName: "person.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Color.mdTextMuted)
-                    .frame(width: 50, height: 50)
-                    .background(Color.mdSurface)
+                avatarPlaceholder
             }
             .frame(width: 50, height: 50)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         } else {
-            Image(systemName: "person.fill")
-                .font(.system(size: 20))
-                .foregroundStyle(Color.mdTextMuted)
-                .frame(width: 50, height: 50)
-                .background(Color.mdSurface)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            avatarPlaceholder
         }
+    }
+
+    private var avatarPlaceholder: some View {
+        Image(systemName: "person.fill")
+            .font(.system(size: 20))
+            .foregroundStyle(Color.mdTextMuted)
+            .frame(width: 50, height: 50)
+            .background(Color.mdSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func badge(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.mdCaption2)
+            .foregroundStyle(color)
+            .padding(.horizontal, Spacing.xs)
+            .padding(.vertical, Spacing.xxs)
+            .background(color.opacity(0.15))
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
     }
 
     private func roleDisplayName(_ role: String) -> String {
@@ -334,16 +498,6 @@ struct PlayerDetailSheet: View {
                                 .padding(.horizontal, Spacing.xs)
                                 .padding(.vertical, Spacing.xxs)
                                 .background(Color.mdPrimary.opacity(0.15))
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                        }
-
-                        if player.isAI {
-                            Text("AI")
-                                .font(.mdCaption2)
-                                .foregroundStyle(Color.mdInfo)
-                                .padding(.horizontal, Spacing.xs)
-                                .padding(.vertical, Spacing.xxs)
-                                .background(Color.mdInfo.opacity(0.15))
                                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                         }
                     }
