@@ -100,16 +100,23 @@ final class AppStore: ObservableObject, @unchecked Sendable {
     // MARK: - WebSocket
 
     func connectWebSocket() {
-        guard let token = room.sessionToken else { return }
+        guard let token = room.sessionToken else {
+            print("[AppStore] connectWebSocket: no token")
+            return
+        }
+
+        print("[AppStore] connectWebSocket: room=\(room.roomCode)")
 
         ws.setMessageHandler { [weak self] type, data in
             DispatchQueue.main.async {
                 guard let self else { return }
+                print("[AppStore] WS message: \(type)")
                 WSMessageAdapter.apply(type: type, data: data, store: self)
             }
         }
         ws.setStateChangeHandler { [weak self] connected, error in
             DispatchQueue.main.async {
+                print("[AppStore] WS state: connected=\(connected) error=\(error ?? "nil")")
                 self?.game.isConnected = connected
                 if let error { self?.errorMessage = error }
             }
