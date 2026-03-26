@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct GamePlayView: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
     @State private var showNotebook = false
 
     var body: some View {
@@ -10,9 +10,9 @@ struct GamePlayView: View {
             Color.mdBackground
                 .ignoresSafeArea()
 
-            switch controller.screen {
+            switch store.screen {
             case .intro:
-                IntroView(controller: controller)
+                IntroView(store: store)
             case .playing:
                 VStack(spacing: 0) {
                     errorBanner
@@ -20,14 +20,14 @@ struct GamePlayView: View {
                     Divider().background(Color.mdSurface)
 
                     Group {
-                        if let phase = controller.currentPhase {
+                        if let phase = store.game.currentPhase {
                             switch phase.phaseType {
                             case "investigation":
-                                InvestigationPhaseView(controller: controller)
+                                InvestigationPhaseView(store: store)
                             case "discussion":
-                                DiscussionPhaseView(controller: controller)
+                                DiscussionPhaseView(store: store)
                             case "voting":
-                                VotingPhaseView(controller: controller)
+                                VotingPhaseView(store: store)
                             default:
                                 waitingView
                             }
@@ -46,13 +46,13 @@ struct GamePlayView: View {
             }
         }
         .fullScreenCover(isPresented: $showNotebook) {
-            NotebookView(controller: controller, isPresented: $showNotebook)
+            NotebookView(store: store, isPresented: $showNotebook)
         }
     }
 
     private var errorBanner: some View {
         Group {
-            if let error = controller.errorMessage {
+            if let error = store.errorMessage {
                 HStack(spacing: Spacing.xs) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(Color.mdBackground)
@@ -67,12 +67,12 @@ struct GamePlayView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: controller.errorMessage)
+        .animation(.easeInOut(duration: 0.3), value: store.errorMessage)
     }
 
     private var phaseHeader: some View {
         HStack {
-            if let phase = controller.currentPhase {
+            if let phase = store.game.currentPhase {
                 HStack(spacing: Spacing.xs) {
                     Circle()
                         .fill(phaseColor(phase.phaseType))
@@ -89,16 +89,16 @@ struct GamePlayView: View {
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundStyle(phase.remainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
             } else {
-                Text(controller.screen == .ended ? "ゲーム終了" : "準備中...")
+                Text(store.screen == .ended ? "ゲーム終了" : "準備中...")
                     .font(.mdHeadline)
                     .foregroundStyle(Color.mdTextSecondary)
                 Spacer()
             }
 
-            if controller.isHost, controller.screen != .ended {
+            if store.room.isHost, store.screen != .ended {
                 Menu {
-                    Button("フェーズを進める") { controller.advancePhase() }
-                    Button("時間を延長") { controller.extendPhase() }
+                    Button("フェーズを進める") { store.dispatch(.advancePhase) }
+                    Button("時間を延長") { store.dispatch(.extendPhase) }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.mdTitle2)
@@ -117,8 +117,8 @@ struct GamePlayView: View {
                 showNotebook = true
             }
 
-            if controller.currentPhase?.phaseType == "discussion" || controller.currentPhase?.phaseType == "investigation" {
-                SpeechButton(controller: controller)
+            if store.game.currentPhase?.phaseType == "discussion" || store.game.currentPhase?.phaseType == "investigation" {
+                SpeechButton(store: store)
             }
         }
         .padding(Spacing.md)
@@ -131,7 +131,7 @@ struct GamePlayView: View {
                 .tint(Color.mdPrimary)
                 .scaleEffect(1.5)
 
-            Text(controller.isConnected ? "ルーム準備中..." : "ルームに接続しています...")
+            Text(store.game.isConnected ? "ルーム準備中..." : "ルームに接続しています...")
                 .font(.mdBody)
                 .foregroundStyle(Color.mdTextSecondary)
         }
@@ -140,7 +140,7 @@ struct GamePlayView: View {
     private var endingView: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
-                if let error = controller.errorMessage {
+                if let error = store.errorMessage {
                     HStack(spacing: Spacing.xs) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(Color.mdBackground)
@@ -155,7 +155,7 @@ struct GamePlayView: View {
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                 }
 
-                if let ending = controller.ending {
+                if let ending = store.game.ending {
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.md) {
                             Text("真相")
@@ -225,44 +225,44 @@ struct GamePlayView: View {
     }
 
     private func playerName(_ playerId: String) -> String {
-        controller.players.first(where: { $0.id == playerId })?.characterName
-            ?? controller.players.first(where: { $0.id == playerId })?.displayName
+        store.room.players.first(where: { $0.id == playerId })?.characterName
+            ?? store.room.players.first(where: { $0.id == playerId })?.displayName
             ?? playerId
     }
 }
 
 struct SpeechButton: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
 
     var body: some View {
-        if controller.isSpeaking {
+        if store.game.isSpeaking {
             MDButton("発言終了", style: .danger) {
-                controller.releaseSpeech()
+                store.dispatch(.releaseSpeech)
             }
         } else {
             MDButton("発言する") {
-                controller.requestSpeech()
+                store.dispatch(.requestSpeech)
             }
-            .disabled(controller.currentSpeakerId != nil)
+            .disabled(store.game.currentSpeakerId != nil)
         }
     }
 }
 
 struct InvestigationPhaseView: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                if let speaker = controller.currentSpeakerId {
+                if let speaker = store.game.currentSpeakerId {
                     speakerBanner(speaker)
                 }
 
-                if controller.isSpeaking {
-                    TranscriptView(controller: controller)
+                if store.game.isSpeaking {
+                    TranscriptView(store: store)
                 }
 
-                if let locations = controller.currentPhase?.investigationLocations {
+                if let locations = store.game.currentPhase?.investigationLocations {
                     Text("調査可能な場所")
                         .font(.mdHeadline)
                         .foregroundStyle(Color.mdTextSecondary)
@@ -281,7 +281,7 @@ struct InvestigationPhaseView: View {
                                 }
                                 Spacer()
                                 MDButton("調べる", style: .secondary) {
-                                    controller.investigate(locationId: location.id)
+                                    store.dispatch(.investigate(locationId: location.id))
                                 }
                             }
                         }
@@ -293,7 +293,7 @@ struct InvestigationPhaseView: View {
     }
 
     private func speakerBanner(_ speakerId: String) -> some View {
-        let name = controller.players.first(where: { $0.id == speakerId })?.characterName ?? "誰か"
+        let name = store.room.players.first(where: { $0.id == speakerId })?.characterName ?? "誰か"
         return MDCard {
             HStack {
                 Image(systemName: "mic.fill")
@@ -308,13 +308,13 @@ struct InvestigationPhaseView: View {
 }
 
 struct DiscussionPhaseView: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                if let speaker = controller.currentSpeakerId {
-                    let name = controller.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
+                if let speaker = store.game.currentSpeakerId {
+                    let name = store.room.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
                     MDCard {
                         HStack {
                             Image(systemName: "mic.fill")
@@ -327,8 +327,8 @@ struct DiscussionPhaseView: View {
                     }
                 }
 
-                if controller.isSpeaking {
-                    TranscriptView(controller: controller)
+                if store.game.isSpeaking {
+                    TranscriptView(store: store)
                 }
 
                 MDCard {
@@ -348,7 +348,7 @@ struct DiscussionPhaseView: View {
 }
 
 struct VotingPhaseView: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
     @State private var selectedSuspect: String?
 
     var body: some View {
@@ -358,7 +358,7 @@ struct VotingPhaseView: View {
                     .font(.mdHeadline)
                     .foregroundStyle(Color.mdTextSecondary)
 
-                ForEach(controller.players) { player in
+                ForEach(store.room.players) { player in
                     MDCard {
                         HStack {
                             VStack(alignment: .leading) {
@@ -381,7 +381,7 @@ struct VotingPhaseView: View {
 
                 if let suspect = selectedSuspect {
                     MDButton("投票する", style: .danger) {
-                        controller.vote(suspectPlayerId: suspect)
+                        store.dispatch(.vote(suspectId: suspect))
                     }
                 }
             }
@@ -391,7 +391,7 @@ struct VotingPhaseView: View {
 }
 
 struct TranscriptView: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
 
     var body: some View {
         MDCard {
@@ -405,7 +405,7 @@ struct TranscriptView: View {
                     Spacer()
                 }
 
-                Text(controller.currentTranscript.isEmpty ? "話してください..." : controller.currentTranscript)
+                Text(store.game.currentTranscript.isEmpty ? "話してください..." : store.game.currentTranscript)
                     .font(.mdBody)
                     .foregroundStyle(Color.mdTextPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)

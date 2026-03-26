@@ -1,0 +1,182 @@
+import Foundation
+
+struct WSMessageAdapter {
+    static func apply(type: String, data: [String: String], store: AppStore) {
+        print("[WSMessageAdapter] Received: \(type), screen=\(store.screen)")
+        switch type {
+        case "game.state":
+            applyGameState(data, store: store)
+        case "game.generating":
+            if store.screen != .generating { store.screen = .generating }
+        case "game.ready":
+            store.screen = .intro
+        case "images.ready":
+            store.reconnectWebSocket()
+        case "phase.started":
+            applyPhaseStarted(data, store: store)
+        case "phase.timer":
+            applyPhaseTimer(data, store: store)
+        case "phase.ended":
+            store.game.currentPhase = nil
+        case "speech.granted":
+            store.game.isSpeaking = true
+            store.startRecording()
+        case "speech.denied":
+            store.setError("他のプレイヤーが発言中です", level: .transient)
+        case "speech.active":
+            store.game.currentSpeakerId = data["player_id"]
+        case "speech.released":
+            store.game.currentSpeakerId = nil
+        case "investigate.result":
+            let title = data["title"] ?? "調査結果"
+            let content = data["content"] ?? ""
+            store.notebook.evidences.append(EvidenceItem(title: title, content: content))
+        case "investigate.denied":
+            store.setError("調査できません", level: .transient)
+        case "evidence.received":
+            let title = data["title"] ?? "新しい手がかり"
+            let content = data["content"] ?? ""
+            store.notebook.evidences.append(EvidenceItem(title: title, content: content))
+        case "game.ending":
+            applyEnding(data, store: store)
+        case "error":
+            if let msg = data["message"] {
+                if msg.contains("Scenario") || msg.contains("generation") || msg.contains("failed") {
+                    store.setError(msg, level: .fatal)
+                } else {
+                    store.setError(msg, level: .transient)
+                }
+            }
+        default:
+            break
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    private static func applyGameState(_ data: [String: String], store: AppStore) {
+        let status = data["status"] ?? ""
+
+        store.game.mySecretInfo = data["my_secret_info"]
+        store.game.myObjective = data["my_objective"]
+        store.game.myRole = data["my_role"]
+        store.game.currentSpeakerId = data["current_speaker_id"]
+
+        if let settingJSON = data["scenario_setting"],
+           let settingData = settingJSON.data(using: .utf8),
+           let setting = try? JSONSerialization.jsonObject(with: settingData) as? [String: Any] {
+            store.game.scenarioSetting.location = setting["location"] as? String
+            store.game.scenarioSetting.situation = setting["situation"] as? String
+        }
+
+        store.game.scenarioSetting.sceneImageUrl = data["scene_image_url"]
+
+        if let victimJSON = data["victim"],
+           let victimData = victimJSON.data(using: .utf8),
+           let victim = try? JSONSerialization.jsonObject(with: victimData) as? [String: Any] {
+            store.game.scenarioSetting.victimName = victim["name"] as? String
+            store.game.scenarioSetting.victimDescription = victim["description"] as? String
+        }
+
+        if let playersJSON = data["players"],
+           let playersData = playersJSON.data(using: .utf8),
+           let playersArray = try? JSONSerialization.jsonObject(with: playersData) as? [[String: Any]] {
+            store.room.players = playersArray.compactMap { dict in
+                guard let id = dict["id"] as? String,
+                      let displayName = dict["display_name"] as? String else { return nil }
+                return PlayerInfo(
+                    id: id,
+                    displayName: displayName,
+                    characterName: dict["character_name"] as? String,
+                    characterPersonality: dict["character_personality"] as? String,
+                    characterBackground: dict["character_background"] as? String,
+                    portraitUrl: dict["portrait_url"] as? String,
+                    isHost: dict["is_host"] as? Bool ?? false,
+                    isAI: dict["is_ai"] as? Bool ?? false,
+                    connectionStatus: dict["connection_status"] as? String ?? "offline"
+                )
+            }
+        }
+
+        if let phaseJSON = data["current_phase"],
+           let phaseData = phaseJSON.data(using: .utf8),
+           let phaseDict = try? JSONSerialization.jsonObject(with: phaseData) as? [String: Any] {
+            store.game.currentPhase = parsePhaseInfo(phaseDict)
+        }
+
+        if status == "playing" && (store.screen == .generating || store.screen == .lobby) {
+            store.screen = .intro
+        } else if status == "ended" {
+            store.screen = .ended
+        }
+    }
+
+    private static func applyPhaseStarted(_ data: [String: String], store: AppStore) {
+        store.game.currentPhase = parsePhaseInfo(stringDataToDict(data))
+    }
+
+    private static func applyPhaseTimer(_ data: [String: String], store: AppStore) {
+        guard let remainingStr = data["remaining_sec"], let remaining = Int(remainingStr) else { return }
+        if let phase = store.game.currentPhase {
+            store.game.currentPhase = PhaseInfo(
+                phaseId: phase.phaseId,
+                phaseType: phase.phaseType,
+                phaseOrder: phase.phaseOrder,
+                durationSec: phase.durationSec,
+                remainingSec: remaining,
+                investigationLocations: phase.investigationLocations
+            )
+        }
+    }
+
+    private static func applyEnding(_ data: [String: String], store: AppStore) {
+        let dict = stringDataToDict(data)
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: dict),
+              let endingData = try? JSONDecoder().decode(EndingData.self, from: jsonData) else {
+            store.setError("エンディングデータの解析に失敗しました", level: .transient)
+            return
+        }
+        store.game.ending = endingData
+        store.screen = .ended
+    }
+
+    private static func parsePhaseInfo(_ data: [String: Any]) -> PhaseInfo? {
+        guard let phaseId = data["phase_id"] as? String,
+              let phaseType = data["phase_type"] as? String,
+              let phaseOrder = data["phase_order"] as? Int,
+              let durationSec = data["duration_sec"] as? Int else { return nil }
+
+        var locations: [InvestigationLocation]?
+        if let locsData = data["investigation_locations"] as? [[String: Any]] {
+            locations = locsData.compactMap { loc in
+                guard let id = loc["id"] as? String,
+                      let name = loc["name"] as? String else { return nil }
+                return InvestigationLocation(id: id, name: name, description: loc["description"] as? String ?? "")
+            }
+        }
+
+        return PhaseInfo(
+            phaseId: phaseId,
+            phaseType: phaseType,
+            phaseOrder: phaseOrder,
+            durationSec: durationSec,
+            remainingSec: data["remaining_sec"] as? Int ?? durationSec,
+            investigationLocations: locations
+        )
+    }
+
+    private static func stringDataToDict(_ data: [String: String]) -> [String: Any] {
+        var result: [String: Any] = [:]
+        for (key, value) in data {
+            if let intVal = Int(value) {
+                result[key] = intVal
+            } else if let d = value.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: d) {
+                result[key] = json
+            } else {
+                result[key] = value
+            }
+        }
+        return result
+    }
+}

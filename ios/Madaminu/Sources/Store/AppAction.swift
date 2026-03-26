@@ -1,0 +1,18 @@
+enum AppAction {
+    case createRoom(password: String?)
+    case joinRoom(code: String, password: String?)
+    case leaveRoom
+    case showCharacterCreation
+    case dismissCharacterCreation
+    case createCharacter(name: String, personality: String, background: String)
+    case startGame
+    case dismissIntro
+    case requestSpeech
+    case releaseSpeech
+    case investigate(locationId: String)
+    case vote(suspectId: String)
+    case advancePhase
+    case extendPhase
+    case fetchRooms
+    case refreshRoom
+}
