@@ -21,7 +21,7 @@ async def generate_character_portrait(
     response = await client.images.generate(
         model="gpt-image-1",
         prompt=prompt,
-        size="1024x1024",
+        size="256x256",
         quality="low",
         n=1,
     )
