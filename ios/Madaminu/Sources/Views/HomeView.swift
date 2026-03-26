@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 public struct HomeView: View {
-    @State private var viewModel = RoomViewModel()
+    @StateObject private var viewModel = RoomViewModel()
     @State private var showJoinSheet = false
     @State private var showCreateSheet = false
     @State private var joinPassword = ""
@@ -144,7 +144,7 @@ public struct HomeView: View {
 }
 
 struct CreateRoomSheet: View {
-    @Bindable var viewModel: RoomViewModel
+    @ObservedObject var viewModel: RoomViewModel
     @Binding var isPresented: Bool
     @State private var usePassword = false
 

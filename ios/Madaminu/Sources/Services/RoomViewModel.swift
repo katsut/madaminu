@@ -1,29 +1,28 @@
+import Combine
 import Foundation
-import Observation
 
-@Observable
-final class RoomViewModel: @unchecked Sendable {
+final class RoomViewModel: ObservableObject {
     // MARK: - User input (persisted)
-    var displayName: String = "" {
+    @Published var displayName: String = "" {
         didSet { UserDefaults.standard.set(displayName, forKey: "displayName") }
     }
 
     // MARK: - Room state
-    var roomCode = ""
-    var joinCode = ""
-    var password = ""
-    var availableRooms: [RoomListItem] = []
-    var players: [PlayerInfo] = []
-    var isHost = false
-    var isLoading = false
-    var errorMessage: String?
-    var playerId: String?
-    var sessionToken: String?
-    var isInRoom = false
-    var showCharacterCreation = false
-    var hasCreatedCharacter = false
-    var isGameStarted = false
-    var progressMessage: String?
+    @Published var roomCode = ""
+    @Published var joinCode = ""
+    @Published var password = ""
+    @Published var availableRooms: [RoomListItem] = []
+    @Published var players: [PlayerInfo] = []
+    @Published var isHost = false
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    @Published var playerId: String?
+    @Published var sessionToken: String?
+    @Published var isInRoom = false
+    @Published var showCharacterCreation = false
+    @Published var hasCreatedCharacter = false
+    @Published var isGameStarted = false
+    @Published var progressMessage: String?
 
     private let api = APIClient()
 

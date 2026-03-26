@@ -1,28 +1,27 @@
+import Combine
 import Foundation
-import Observation
 
-@Observable
-final class GameViewModel: @unchecked Sendable {
+final class GameViewModel: ObservableObject {
     enum GameScreen { case intro, playing, ended }
 
     // MARK: - Game state
-    var screen: GameScreen = .intro
-    var gameStatus = ""
-    var currentPhase: PhaseInfo?
-    var currentSpeakerId: String?
-    var mySecretInfo: String?
-    var myObjective: String?
-    var myRole: String?
-    var players: [PlayerInfo] = []
-    var evidences: [EvidenceItem] = []
-    var notes = ""
-    var ending: EndingData?
-    var isSpeaking = false
-    var errorMessage: String?
-    var isConnected = false
-    var connectionError: String?
-    var scenarioSetting = ScenarioSettingData()
-    var currentTranscript = ""
+    @Published var screen: GameScreen = .intro
+    @Published var gameStatus = ""
+    @Published var currentPhase: PhaseInfo?
+    @Published var currentSpeakerId: String?
+    @Published var mySecretInfo: String?
+    @Published var myObjective: String?
+    @Published var myRole: String?
+    @Published var players: [PlayerInfo] = []
+    @Published var evidences: [EvidenceItem] = []
+    @Published var notes = ""
+    @Published var ending: EndingData?
+    @Published var isSpeaking = false
+    @Published var errorMessage: String?
+    @Published var isConnected = false
+    @Published var connectionError: String?
+    @Published var scenarioSetting = ScenarioSettingData()
+    @Published var currentTranscript = ""
 
     // MARK: - Identity
     let roomCode: String
@@ -286,11 +285,4 @@ final class GameViewModel: @unchecked Sendable {
         }
         return result
     }
-}
-
-struct ScenarioSettingData {
-    var location: String?
-    var situation: String?
-    var victimName: String?
-    var victimDescription: String?
 }
