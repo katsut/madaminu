@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct GamePlayView: View {
-    @ObservedObject var viewModel: GameViewModel
+    @ObservedObject var controller: GameController
     @State private var showNotebook = false
 
     var body: some View {
@@ -10,9 +10,9 @@ struct GamePlayView: View {
             Color.mdBackground
                 .ignoresSafeArea()
 
-            switch viewModel.screen {
+            switch controller.screen {
             case .intro:
-                IntroView(viewModel: viewModel)
+                IntroView(controller: controller)
             case .playing:
                 VStack(spacing: 0) {
                     errorBanner
@@ -20,14 +20,14 @@ struct GamePlayView: View {
                     Divider().background(Color.mdSurface)
 
                     Group {
-                        if let phase = viewModel.currentPhase {
+                        if let phase = controller.currentPhase {
                             switch phase.phaseType {
                             case "investigation":
-                                InvestigationPhaseView(viewModel: viewModel)
+                                InvestigationPhaseView(controller: controller)
                             case "discussion":
-                                DiscussionPhaseView(viewModel: viewModel)
+                                DiscussionPhaseView(controller: controller)
                             case "voting":
-                                VotingPhaseView(viewModel: viewModel)
+                                VotingPhaseView(controller: controller)
                             default:
                                 waitingView
                             }
@@ -41,22 +41,18 @@ struct GamePlayView: View {
                 }
             case .ended:
                 endingView
+            default:
+                EmptyView()
             }
         }
         .fullScreenCover(isPresented: $showNotebook) {
-            NotebookView(viewModel: viewModel, isPresented: $showNotebook)
-        }
-        .task {
-            await viewModel.setup()
-        }
-        .onDisappear {
-            viewModel.disconnect()
+            NotebookView(controller: controller, isPresented: $showNotebook)
         }
     }
 
     private var errorBanner: some View {
         Group {
-            if let error = viewModel.errorMessage {
+            if let error = controller.errorMessage {
                 HStack(spacing: Spacing.xs) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(Color.mdBackground)
@@ -71,12 +67,12 @@ struct GamePlayView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
+        .animation(.easeInOut(duration: 0.3), value: controller.errorMessage)
     }
 
     private var phaseHeader: some View {
         HStack {
-            if let phase = viewModel.currentPhase {
+            if let phase = controller.currentPhase {
                 HStack(spacing: Spacing.xs) {
                     Circle()
                         .fill(phaseColor(phase.phaseType))
@@ -93,16 +89,16 @@ struct GamePlayView: View {
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundStyle(phase.remainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
             } else {
-                Text(viewModel.gameStatus == "ended" ? "ゲーム終了" : "準備中...")
+                Text(controller.screen == .ended ? "ゲーム終了" : "準備中...")
                     .font(.mdHeadline)
                     .foregroundStyle(Color.mdTextSecondary)
                 Spacer()
             }
 
-            if viewModel.isHost, viewModel.gameStatus != "ended" {
+            if controller.isHost, controller.screen != .ended {
                 Menu {
-                    Button("フェーズを進める") { viewModel.advancePhase() }
-                    Button("時間を延長") { viewModel.extendPhase() }
+                    Button("フェーズを進める") { controller.advancePhase() }
+                    Button("時間を延長") { controller.extendPhase() }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.mdTitle2)
@@ -121,8 +117,8 @@ struct GamePlayView: View {
                 showNotebook = true
             }
 
-            if viewModel.currentPhase?.phaseType == "discussion" || viewModel.currentPhase?.phaseType == "investigation" {
-                SpeechButton(viewModel: viewModel)
+            if controller.currentPhase?.phaseType == "discussion" || controller.currentPhase?.phaseType == "investigation" {
+                SpeechButton(controller: controller)
             }
         }
         .padding(Spacing.md)
@@ -135,7 +131,7 @@ struct GamePlayView: View {
                 .tint(Color.mdPrimary)
                 .scaleEffect(1.5)
 
-            Text(viewModel.gameStatus.isEmpty ? "ルームに接続しています..." : "ルーム準備中...")
+            Text(controller.isConnected ? "ルーム準備中..." : "ルームに接続しています...")
                 .font(.mdBody)
                 .foregroundStyle(Color.mdTextSecondary)
         }
@@ -144,7 +140,7 @@ struct GamePlayView: View {
     private var endingView: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
-                if let error = viewModel.errorMessage {
+                if let error = controller.errorMessage {
                     HStack(spacing: Spacing.xs) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(Color.mdBackground)
@@ -159,7 +155,7 @@ struct GamePlayView: View {
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                 }
 
-                if let ending = viewModel.ending {
+                if let ending = controller.ending {
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.md) {
                             Text("真相")
@@ -229,44 +225,44 @@ struct GamePlayView: View {
     }
 
     private func playerName(_ playerId: String) -> String {
-        viewModel.players.first(where: { $0.id == playerId })?.characterName
-            ?? viewModel.players.first(where: { $0.id == playerId })?.displayName
+        controller.players.first(where: { $0.id == playerId })?.characterName
+            ?? controller.players.first(where: { $0.id == playerId })?.displayName
             ?? playerId
     }
 }
 
 struct SpeechButton: View {
-    @ObservedObject var viewModel: GameViewModel
+    @ObservedObject var controller: GameController
 
     var body: some View {
-        if viewModel.isSpeaking {
+        if controller.isSpeaking {
             MDButton("発言終了", style: .danger) {
-                viewModel.releaseSpeech()
+                controller.releaseSpeech()
             }
         } else {
             MDButton("発言する") {
-                viewModel.requestSpeech()
+                controller.requestSpeech()
             }
-            .disabled(viewModel.currentSpeakerId != nil)
+            .disabled(controller.currentSpeakerId != nil)
         }
     }
 }
 
 struct InvestigationPhaseView: View {
-    @ObservedObject var viewModel: GameViewModel
+    @ObservedObject var controller: GameController
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                if let speaker = viewModel.currentSpeakerId {
+                if let speaker = controller.currentSpeakerId {
                     speakerBanner(speaker)
                 }
 
-                if viewModel.isSpeaking {
-                    TranscriptView(viewModel: viewModel)
+                if controller.isSpeaking {
+                    TranscriptView(controller: controller)
                 }
 
-                if let locations = viewModel.currentPhase?.investigationLocations {
+                if let locations = controller.currentPhase?.investigationLocations {
                     Text("調査可能な場所")
                         .font(.mdHeadline)
                         .foregroundStyle(Color.mdTextSecondary)
@@ -285,7 +281,7 @@ struct InvestigationPhaseView: View {
                                 }
                                 Spacer()
                                 MDButton("調べる", style: .secondary) {
-                                    viewModel.investigate(locationId: location.id)
+                                    controller.investigate(locationId: location.id)
                                 }
                             }
                         }
@@ -297,7 +293,7 @@ struct InvestigationPhaseView: View {
     }
 
     private func speakerBanner(_ speakerId: String) -> some View {
-        let name = viewModel.players.first(where: { $0.id == speakerId })?.characterName ?? "誰か"
+        let name = controller.players.first(where: { $0.id == speakerId })?.characterName ?? "誰か"
         return MDCard {
             HStack {
                 Image(systemName: "mic.fill")
@@ -312,13 +308,13 @@ struct InvestigationPhaseView: View {
 }
 
 struct DiscussionPhaseView: View {
-    @ObservedObject var viewModel: GameViewModel
+    @ObservedObject var controller: GameController
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                if let speaker = viewModel.currentSpeakerId {
-                    let name = viewModel.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
+                if let speaker = controller.currentSpeakerId {
+                    let name = controller.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
                     MDCard {
                         HStack {
                             Image(systemName: "mic.fill")
@@ -331,8 +327,8 @@ struct DiscussionPhaseView: View {
                     }
                 }
 
-                if viewModel.isSpeaking {
-                    TranscriptView(viewModel: viewModel)
+                if controller.isSpeaking {
+                    TranscriptView(controller: controller)
                 }
 
                 MDCard {
@@ -352,7 +348,7 @@ struct DiscussionPhaseView: View {
 }
 
 struct VotingPhaseView: View {
-    @ObservedObject var viewModel: GameViewModel
+    @ObservedObject var controller: GameController
     @State private var selectedSuspect: String?
 
     var body: some View {
@@ -362,7 +358,7 @@ struct VotingPhaseView: View {
                     .font(.mdHeadline)
                     .foregroundStyle(Color.mdTextSecondary)
 
-                ForEach(viewModel.players) { player in
+                ForEach(controller.players) { player in
                     MDCard {
                         HStack {
                             VStack(alignment: .leading) {
@@ -385,7 +381,7 @@ struct VotingPhaseView: View {
 
                 if let suspect = selectedSuspect {
                     MDButton("投票する", style: .danger) {
-                        viewModel.vote(suspectPlayerId: suspect)
+                        controller.vote(suspectPlayerId: suspect)
                     }
                 }
             }
@@ -395,7 +391,7 @@ struct VotingPhaseView: View {
 }
 
 struct TranscriptView: View {
-    @ObservedObject var viewModel: GameViewModel
+    @ObservedObject var controller: GameController
 
     var body: some View {
         MDCard {
@@ -409,7 +405,7 @@ struct TranscriptView: View {
                     Spacer()
                 }
 
-                Text(viewModel.currentTranscript.isEmpty ? "話してください..." : viewModel.currentTranscript)
+                Text(controller.currentTranscript.isEmpty ? "話してください..." : controller.currentTranscript)
                     .font(.mdBody)
                     .foregroundStyle(Color.mdTextPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)

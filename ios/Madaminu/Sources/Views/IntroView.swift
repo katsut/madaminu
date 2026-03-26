@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct IntroView: View {
-    @ObservedObject var viewModel: GameViewModel
+    @ObservedObject var controller: GameController
     @State private var currentPage = 0
 
     private let pageCount = 3
@@ -68,13 +68,13 @@ struct IntroView: View {
                 .font(.mdLargeTitle)
                 .foregroundStyle(Color.mdPrimary)
 
-            if let setting = viewModel.scenarioSetting.location {
+            if let setting = controller.scenarioSetting.location {
                 Text("舞台: \(setting)")
                     .font(.mdTitle2)
                     .foregroundStyle(Color.mdTextPrimary)
             }
 
-            if let situation = viewModel.scenarioSetting.situation {
+            if let situation = controller.scenarioSetting.situation {
                 MDCard {
                     Text(situation)
                         .font(.mdBody)
@@ -83,7 +83,7 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
             }
 
-            if let victim = viewModel.scenarioSetting.victimName {
+            if let victim = controller.scenarioSetting.victimName {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Label("被害者", systemImage: "person.slash")
@@ -110,7 +110,7 @@ struct IntroView: View {
 
             ScrollView(.vertical) {
                 VStack(spacing: Spacing.sm) {
-                    ForEach(viewModel.players) { player in
+                    ForEach(controller.players) { player in
                         MDCard {
                             HStack {
                                 VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -122,7 +122,7 @@ struct IntroView: View {
                                         .foregroundStyle(Color.mdTextMuted)
                                 }
                                 Spacer()
-                                if player.id == viewModel.playerId {
+                                if player.id == controller.playerId {
                                     Text("あなた")
                                         .font(.mdCaption2)
                                         .foregroundStyle(Color.mdPrimary)
@@ -149,7 +149,7 @@ struct IntroView: View {
                 .font(.mdTitle)
                 .foregroundStyle(Color.mdAccent)
 
-            if let role = viewModel.myRole {
+            if let role = controller.myRole {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Label("役割", systemImage: "theatermask.and.paintbrush")
@@ -163,7 +163,7 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
             }
 
-            if let secret = viewModel.mySecretInfo {
+            if let secret = controller.mySecretInfo {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Label("秘密情報", systemImage: "lock.fill")
@@ -177,7 +177,7 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
             }
 
-            if let objective = viewModel.myObjective {
+            if let objective = controller.myObjective {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Label("あなたの目的", systemImage: "target")
@@ -194,7 +194,7 @@ struct IntroView: View {
             Spacer()
 
             MDButton("ゲームを始める") {
-                withAnimation { viewModel.dismissIntro() }
+                withAnimation { controller.dismissIntro() }
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.md)

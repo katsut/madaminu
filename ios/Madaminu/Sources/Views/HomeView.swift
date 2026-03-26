@@ -2,43 +2,43 @@ import DesignSystem
 import SwiftUI
 
 public struct HomeView: View {
-    @StateObject private var viewModel = RoomViewModel()
-    @State private var showJoinSheet = false
-    @State private var showCreateSheet = false
-    @State private var joinPassword = ""
-    @State private var joiningRoomCode: String?
-    @State private var gameViewModel: GameViewModel?
+    @StateObject private var controller = GameController()
 
     public init() {}
 
     public var body: some View {
-        if let gvm = gameViewModel {
-            GamePlayView(viewModel: gvm)
-                .onChange(of: gvm.hasFatalError) { _, hasFatal in
-                    if hasFatal {
-                        gameViewModel?.disconnect()
-                        gameViewModel = nil
-                        viewModel.isGameStarted = false
-                        viewModel.errorMessage = "シナリオ生成に失敗しました。もう一度お試しください。"
-                    }
-                }
-        } else if viewModel.isGameStarted, let pid = viewModel.playerId, let token = viewModel.sessionToken {
-            Color.clear.onAppear {
-                gameViewModel = GameViewModel(
-                    roomCode: viewModel.roomCode,
-                    playerId: pid,
-                    sessionToken: token,
-                    isHost: viewModel.isHost
-                )
+        ZStack {
+            switch controller.screen {
+            case .home:
+                HomeScreen(controller: controller)
+            case .lobby:
+                RoomLobbyView(controller: controller)
+            case .characterCreation:
+                CharacterCreationView(controller: controller)
+            case .generating:
+                GeneratingView(controller: controller)
+            case .intro:
+                IntroView(controller: controller)
+            case .playing:
+                GamePlayView(controller: controller)
+            case .ended:
+                GamePlayView(controller: controller)
             }
-        } else if viewModel.isInRoom {
-            RoomLobbyView(viewModel: viewModel)
-        } else {
-            homeContent
         }
+        .animation(.easeInOut(duration: 0.3), value: controller.screen)
     }
+}
 
-    private var homeContent: some View {
+// MARK: - Home Screen
+
+struct HomeScreen: View {
+    @ObservedObject var controller: GameController
+    @State private var showCreateSheet = false
+    @State private var showJoinSheet = false
+    @State private var joinCode = ""
+    @State private var password = ""
+
+    var body: some View {
         ZStack {
             Color.mdBackground
                 .ignoresSafeArea()
@@ -53,15 +53,16 @@ public struct HomeView: View {
                 .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.lg)
 
-                MDTextField(label: "あなたの名前", text: $viewModel.displayName, placeholder: "名前を入力")
+                MDTextField(label: "あなたの名前", text: $controller.displayName, placeholder: "名前を入力")
                     .padding(.horizontal, Spacing.lg)
                     .padding(.top, Spacing.md)
 
-                if let error = viewModel.errorMessage {
+                if let error = controller.errorMessage {
                     Text(error)
                         .font(.mdCaption)
                         .foregroundStyle(Color.mdError)
                         .padding(.horizontal, Spacing.lg)
+                        .padding(.top, Spacing.xs)
                 }
 
                 HStack(spacing: Spacing.sm) {
@@ -70,7 +71,7 @@ public struct HomeView: View {
                         .foregroundStyle(Color.mdTextSecondary)
                     Spacer()
                     Button {
-                        Task { @MainActor in await viewModel.fetchRooms() }
+                        Task { @MainActor in await controller.fetchRooms() }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .foregroundStyle(Color.mdTextMuted)
@@ -81,14 +82,14 @@ public struct HomeView: View {
 
                 ScrollView {
                     LazyVStack(spacing: Spacing.xs) {
-                        if viewModel.availableRooms.isEmpty {
+                        if controller.availableRooms.isEmpty {
                             Text("ルームがありません")
                                 .font(.mdBody)
                                 .foregroundStyle(Color.mdTextMuted)
                                 .padding(Spacing.xl)
                         }
 
-                        ForEach(viewModel.availableRooms) { room in
+                        ForEach(controller.availableRooms) { room in
                             MDCard {
                                 HStack {
                                     VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -108,13 +109,7 @@ public struct HomeView: View {
                                     }
                                     Spacer()
                                     MDButton("参加", style: .secondary) {
-                                        if room.hasPassword {
-                                            joiningRoomCode = room.roomCode
-                                            joinPassword = ""
-                                            showJoinSheet = true
-                                        } else {
-                                            Task { @MainActor in await viewModel.joinFromList(roomCode: room.roomCode) }
-                                        }
+                                        Task { @MainActor in await controller.joinRoom(roomCode: room.roomCode) }
                                     }
                                 }
                             }
@@ -130,7 +125,6 @@ public struct HomeView: View {
                     }
                     MDButton("コードで参加", style: .secondary) {
                         showJoinSheet = true
-                        joiningRoomCode = nil
                     }
                 }
                 .padding(Spacing.lg)
@@ -139,27 +133,27 @@ public struct HomeView: View {
         .onTapGesture {
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
-        .task {
-            await viewModel.fetchRooms()
-        }
+        .task { await controller.fetchRooms() }
         .sheet(isPresented: $showCreateSheet) {
-            CreateRoomSheet(viewModel: viewModel, isPresented: $showCreateSheet)
+            CreateRoomSheet(controller: controller, isPresented: $showCreateSheet)
         }
         .sheet(isPresented: $showJoinSheet) {
-            JoinRoomSheet(viewModel: viewModel, isPresented: $showJoinSheet)
+            JoinRoomSheet(controller: controller, isPresented: $showJoinSheet, joinCode: $joinCode, password: $password)
         }
     }
 }
 
+// MARK: - Create Room Sheet
+
 struct CreateRoomSheet: View {
-    @ObservedObject var viewModel: RoomViewModel
+    @ObservedObject var controller: GameController
     @Binding var isPresented: Bool
     @State private var usePassword = false
+    @State private var password = ""
 
     var body: some View {
         ZStack {
-            Color.mdBackground
-                .ignoresSafeArea()
+            Color.mdBackground.ignoresSafeArea()
 
             VStack(spacing: Spacing.md) {
                 HStack {
@@ -168,8 +162,7 @@ struct CreateRoomSheet: View {
                         .foregroundStyle(Color.mdPrimary)
                     Spacer()
                     Button { isPresented = false } label: {
-                        Image(systemName: "xmark")
-                            .foregroundStyle(Color.mdTextSecondary)
+                        Image(systemName: "xmark").foregroundStyle(Color.mdTextSecondary)
                     }
                 }
 
@@ -181,19 +174,90 @@ struct CreateRoomSheet: View {
                 .tint(Color.mdPrimary)
 
                 if usePassword {
-                    MDTextField(label: "パスワード", text: $viewModel.password, placeholder: "パスワードを入力")
+                    MDTextField(label: "パスワード", text: $password, placeholder: "パスワードを入力")
                 }
 
                 Spacer()
 
-                MDButton("作成", isLoading: viewModel.isLoading) {
+                MDButton("作成", isLoading: controller.isLoading) {
                     Task { @MainActor in
-                        await viewModel.createRoom()
-                        if viewModel.isInRoom { isPresented = false }
+                        await controller.createRoom(password: usePassword ? password : nil)
+                        if controller.screen == .lobby { isPresented = false }
                     }
                 }
             }
             .padding(Spacing.lg)
+        }
+    }
+}
+
+// MARK: - Join Room Sheet
+
+struct JoinRoomSheet: View {
+    @ObservedObject var controller: GameController
+    @Binding var isPresented: Bool
+    @Binding var joinCode: String
+    @Binding var password: String
+
+    var body: some View {
+        ZStack {
+            Color.mdBackground.ignoresSafeArea()
+
+            VStack(spacing: Spacing.md) {
+                HStack {
+                    Text("ルームに参加")
+                        .font(.mdTitle2)
+                        .foregroundStyle(Color.mdPrimary)
+                    Spacer()
+                    Button { isPresented = false } label: {
+                        Image(systemName: "xmark").foregroundStyle(Color.mdTextSecondary)
+                    }
+                }
+
+                MDTextField(label: "参加コード", text: $joinCode, placeholder: "6文字のコード")
+                MDTextField(label: "パスワード（任意）", text: $password, placeholder: "パスワード")
+
+                Spacer()
+
+                MDButton("参加する", isLoading: controller.isLoading) {
+                    Task { @MainActor in
+                        await controller.joinRoom(roomCode: joinCode, password: password.isEmpty ? nil : password)
+                        if controller.screen == .lobby { isPresented = false }
+                    }
+                }
+            }
+            .padding(Spacing.lg)
+        }
+    }
+}
+
+// MARK: - Generating View
+
+struct GeneratingView: View {
+    @ObservedObject var controller: GameController
+
+    var body: some View {
+        ZStack {
+            Color.mdBackground.ignoresSafeArea()
+
+            VStack(spacing: Spacing.md) {
+                ProgressView()
+                    .tint(Color.mdPrimary)
+                    .scaleEffect(1.5)
+
+                Text(controller.progressMessage ?? "シナリオを生成中...")
+                    .font(.mdBody)
+                    .foregroundStyle(Color.mdTextSecondary)
+
+                if let error = controller.errorMessage {
+                    Text(error)
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdError)
+                }
+            }
+        }
+        .task {
+            await controller.setupSpeech()
         }
     }
 }
