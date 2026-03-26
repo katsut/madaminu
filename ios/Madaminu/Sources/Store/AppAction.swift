@@ -4,7 +4,7 @@ enum AppAction {
     case leaveRoom
     case showCharacterCreation
     case dismissCharacterCreation
-    case createCharacter(name: String, personality: String, background: String)
+    case createCharacter(name: String, gender: String, age: String, occupation: String, appearance: String, personality: String, background: String)
     case startGame
     case dismissIntro
     case requestSpeech

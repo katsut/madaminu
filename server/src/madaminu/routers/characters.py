@@ -40,6 +40,10 @@ async def create_character(
     player = await _get_player_by_token(db, room_code, x_session_token)
 
     player.character_name = req.character_name
+    player.character_gender = req.character_gender
+    player.character_age = req.character_age
+    player.character_occupation = req.character_occupation
+    player.character_appearance = req.character_appearance
     player.character_personality = req.character_personality
     player.character_background = req.character_background
     await db.commit()
@@ -48,6 +52,10 @@ async def create_character(
     return CharacterResponse(
         player_id=player.id,
         character_name=player.character_name,
+        character_gender=player.character_gender,
+        character_age=player.character_age,
+        character_occupation=player.character_occupation,
+        character_appearance=player.character_appearance,
         character_personality=player.character_personality,
         character_background=player.character_background,
     )
