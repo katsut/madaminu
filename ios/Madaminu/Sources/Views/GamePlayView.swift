@@ -4,6 +4,7 @@ import SwiftUI
 struct GamePlayView: View {
     @ObservedObject var store: AppStore
     @State private var showNotebook = false
+    @State private var showDebug = false
 
     var body: some View {
         ZStack {
@@ -47,6 +48,9 @@ struct GamePlayView: View {
         }
         .fullScreenCover(isPresented: $showNotebook) {
             NotebookView(store: store, isPresented: $showNotebook)
+        }
+        .sheet(isPresented: $showDebug) {
+            DebugInfoView(store: store)
         }
     }
 
@@ -103,6 +107,7 @@ struct GamePlayView: View {
                 Menu {
                     Button("フェーズを進める") { store.dispatch(.advancePhase) }
                     Button("時間を延長") { store.dispatch(.extendPhase) }
+                    Button("デバッグ情報") { showDebug = true }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.mdTitle2)
@@ -415,5 +420,107 @@ struct TranscriptView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+}
+
+struct DebugInfoView: View {
+    @ObservedObject var store: AppStore
+    @State private var players: [DebugPlayerInfo] = []
+    @State private var isLoading = true
+    @State private var errorText: String?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.mdBackground.ignoresSafeArea()
+
+                if isLoading {
+                    ProgressView()
+                        .tint(Color.mdPrimary)
+                } else if let error = errorText {
+                    Text(error)
+                        .font(.mdBody)
+                        .foregroundStyle(Color.mdError)
+                } else {
+                    ScrollView {
+                        VStack(spacing: Spacing.md) {
+                            ForEach(players) { player in
+                                MDCard {
+                                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                                        HStack {
+                                            Text(player.characterName ?? player.displayName)
+                                                .font(.mdHeadline)
+                                                .foregroundStyle(Color.mdTextPrimary)
+                                            if player.isAI {
+                                                Text("AI")
+                                                    .font(.mdCaption)
+                                                    .foregroundStyle(Color.mdInfo)
+                                            }
+                                            Spacer()
+                                            if let role = player.role {
+                                                Text(role)
+                                                    .font(.mdCaption)
+                                                    .foregroundStyle(Color.mdAccent)
+                                            }
+                                        }
+
+                                        if let secret = player.secretInfo {
+                                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                                Text("秘密情報")
+                                                    .font(.mdCaption)
+                                                    .foregroundStyle(Color.mdTextMuted)
+                                                Text(secret)
+                                                    .font(.mdBody)
+                                                    .foregroundStyle(Color.mdTextSecondary)
+                                            }
+                                        }
+
+                                        if let objective = player.objective {
+                                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                                Text("目的")
+                                                    .font(.mdCaption)
+                                                    .foregroundStyle(Color.mdTextMuted)
+                                                Text(objective)
+                                                    .font(.mdBody)
+                                                    .foregroundStyle(Color.mdTextSecondary)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(Spacing.lg)
+                    }
+                }
+            }
+            .navigationTitle("デバッグ情報")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+        }
+        .task {
+            await loadDebugInfo()
+        }
+    }
+
+    @MainActor private func loadDebugInfo() async {
+        guard let token = store.room.sessionToken else {
+            errorText = "セッションがありません"
+            isLoading = false
+            return
+        }
+
+        do {
+            let api = APIClient()
+            let response = try await api.getDebugInfo(roomCode: store.room.roomCode, sessionToken: token)
+            players = response.players
+        } catch {
+            errorText = "デバッグ情報の取得に失敗しました"
+        }
+        isLoading = false
     }
 }

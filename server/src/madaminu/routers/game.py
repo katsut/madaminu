@@ -315,6 +315,37 @@ async def start_game(
     )
 
 
+@router.get("/{room_code}/debug")
+async def get_debug_info(
+    room_code: str,
+    x_session_token: str = Header(...),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        raise HTTPException(status_code=404) from None
+
+    player = next((p for p in game.players if p.session_token == x_session_token), None)
+    if player is None or not player.is_host:
+        raise HTTPException(status_code=403, detail="Host only") from None
+
+    return {
+        "players": [
+            {
+                "id": p.id,
+                "display_name": p.display_name,
+                "character_name": p.character_name,
+                "role": p.role,
+                "secret_info": p.secret_info,
+                "objective": p.objective,
+                "is_ai": p.is_ai,
+            }
+            for p in game.players
+        ],
+    }
+
+
 @router.get("/{room_code}/state")
 async def get_game_state(
     room_code: str,
