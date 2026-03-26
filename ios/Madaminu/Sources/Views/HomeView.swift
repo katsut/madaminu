@@ -243,24 +243,53 @@ struct GeneratingView: View {
         ZStack {
             Color.mdBackground.ignoresSafeArea()
 
-            VStack(spacing: Spacing.md) {
-                ProgressView()
-                    .tint(Color.mdPrimary)
-                    .scaleEffect(1.5)
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                Spacer()
 
-                Text(store.room.progressMessage ?? "シナリオを生成中...")
-                    .font(.mdBody)
-                    .foregroundStyle(Color.mdTextSecondary)
+                Text("ゲームを準備中")
+                    .font(.mdTitle)
+                    .foregroundStyle(Color.mdPrimary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    checkItem("AIプレイヤーの補充", done: store.game.aiPlayersReady)
+                    checkItem("シナリオの生成", done: store.game.scenarioReady)
+                    checkItem("キャラクター画像の生成", done: store.game.imagesReady)
+                    checkItem("ゲームの準備完了", done: store.game.allReady)
+                }
+                .padding(Spacing.lg)
+
+                if !store.game.allReady {
+                    ProgressView()
+                        .tint(Color.mdPrimary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
 
                 if let error = store.errorMessage {
                     Text(error)
                         .font(.mdCaption)
                         .foregroundStyle(Color.mdError)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
+
+                Spacer()
             }
+            .padding(Spacing.lg)
         }
         .task {
             await store.setupSpeech()
+        }
+    }
+
+    private func checkItem(_ label: String, done: Bool) -> some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(done ? Color.mdSuccess : Color.mdTextMuted)
+                .font(.mdTitle2)
+
+            Text(label)
+                .font(.mdBody)
+                .foregroundStyle(done ? Color.mdTextPrimary : Color.mdTextSecondary)
         }
     }
 }

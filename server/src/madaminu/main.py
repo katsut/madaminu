@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from madaminu.config import settings
 from madaminu.db import get_db
 from madaminu.db.database import async_session, engine
+from madaminu.models import Base
 from madaminu.events import EventBus, ImagesReady, ScenarioReady
 from madaminu.routers.characters import router as characters_router
 from madaminu.routers.game import router as game_router

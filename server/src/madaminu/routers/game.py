@@ -133,16 +133,28 @@ async def _generate_scenario_background(
     from madaminu.ws.messages import WSMessage
 
     try:
+        # Step 1: Scenario generation
+        if ws_manager:
+            await ws_manager.broadcast(
+                room_code, WSMessage(type="progress", data={"step": "scenario", "status": "in_progress"})
+            )
+
         async with session_factory() as db:
             scenario, gen_usages = await generate_scenario(db, game_id)
             total_cost = sum(u.estimated_cost_usd for u in gen_usages)
             logger.info("Scenario generated for %s, cost: $%.4f", room_code, total_cost)
 
+        if ws_manager:
+            await ws_manager.broadcast(
+                room_code, WSMessage(type="progress", data={"step": "scenario", "status": "done"})
+            )
+
+        # Step 2: Start first phase
         if phase_manager:
             await phase_manager.start_first_phase(game_id, room_code)
 
+        # Step 3: Send full game state to all players
         if ws_manager:
-            # Send game.state to each connected player with their personal data
             async with session_factory() as db:
                 from madaminu.schemas.game import build_game_state
 
@@ -154,17 +166,40 @@ async def _generate_scenario_background(
                     for player in game.players:
                         state = await build_game_state(db, game, player.id)
                         await ws_manager.send_to_player(
-                            room_code,
-                            player.id,
-                            WSMessage(type="game.state", data=state),
+                            room_code, player.id, WSMessage(type="game.state", data=state)
+                        )
+
+        # Step 4: Generate images (parallel, async)
+        if ws_manager:
+            await ws_manager.broadcast(
+                room_code, WSMessage(type="progress", data={"step": "images", "status": "in_progress"})
+            )
+
+        await _generate_images_background(game_id, room_code, session_factory, ws_manager)
+
+        # Step 5: Send updated game state with image URLs
+        if ws_manager:
+            await ws_manager.broadcast(
+                room_code, WSMessage(type="progress", data={"step": "images", "status": "done"})
+            )
+
+            async with session_factory() as db:
+                from madaminu.schemas.game import build_game_state
+
+                game_result = await db.execute(
+                    select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+                )
+                game = game_result.scalar_one_or_none()
+                if game:
+                    for player in game.players:
+                        state = await build_game_state(db, game, player.id)
+                        await ws_manager.send_to_player(
+                            room_code, player.id, WSMessage(type="game.state", data=state)
                         )
 
             await ws_manager.broadcast(
-                room_code,
-                WSMessage(type="game.ready", data={"room_code": room_code}),
+                room_code, WSMessage(type="game.ready", data={"room_code": room_code})
             )
-
-        asyncio.create_task(_generate_images_background(game_id, room_code, session_factory, ws_manager))
     except Exception:
         logger.exception("Background scenario generation failed for game %s", game_id)
         if ws_manager:
