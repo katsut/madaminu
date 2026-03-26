@@ -16,7 +16,8 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     // Preparation checklist
     @Published var aiPlayersReady = false
     @Published var scenarioReady = false
-    @Published var imagesReady = false
+    @Published var sceneImageReady = false
+    @Published var portraitsReady = false
     @Published var allReady = false
 
     func reset() {
@@ -32,7 +33,8 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         isConnected = false
         aiPlayersReady = false
         scenarioReady = false
-        imagesReady = false
+        sceneImageReady = false
+        portraitsReady = false
         allReady = false
     }
 }
