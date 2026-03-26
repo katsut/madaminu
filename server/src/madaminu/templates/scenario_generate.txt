@@ -18,6 +18,23 @@ Create a complete scenario with the following structure (respond in JSON):
     "name": "被害者の名前",
     "description": "被害者の説明"
   },
+  "map": {
+    "locations": [
+      {
+        "id": "living_room",
+        "name": "リビング",
+        "description": "広いリビングルーム。暖炉がある。",
+        "features": ["暖炉", "大きな窓", "本棚"]
+      }
+    ],
+    "connections": [
+      {
+        "from": "living_room",
+        "to": "kitchen",
+        "type": "door"
+      }
+    ]
+  },
   "relationships": [
     {
       "player1": "プレイヤー名",
@@ -39,17 +56,22 @@ Create a complete scenario with the following structure (respond in JSON):
       "phase_type": "investigation",
       "duration_sec": 300,
       "description": "このフェーズの説明",
-      "investigation_locations": [
-        {
-          "id": "location_1",
-          "name": "場所名",
-          "description": "場所の説明"
-        }
-      ]
+      "investigation_locations": ["living_room", "kitchen", "study"]
     }
   ],
   "gm_strategy": "GMがゲーム全体をどう展開させるかの戦略メモ"
 }
+
+## Map Guidelines
+
+- Generate 6-10 locations that form a coherent floor plan
+- Each location must have 2-4 features (objects, furniture, notable details)
+- Connections define how locations are linked: "door", "corridor", "stairs", "window", "hidden_passage"
+- The map must be spatially consistent (no impossible layouts)
+- Include at least one location that is lockable or restricted
+- The crime scene should be connected to at least 2 other locations
+- Consider sight lines and sound: adjacent rooms can hear loud noises
+- investigation_locations in phases reference location IDs from the map
 
 ## Constraints
 
@@ -58,5 +80,6 @@ Create a complete scenario with the following structure (respond in JSON):
 - Each player must have a unique secret and objective
 - The mystery must be solvable through the clues provided
 - Include 3 phases: investigation, discussion, voting
-- Investigation phase should have 4-6 locations to explore
+- Investigation phase should reference 4-6 locations from the map
 - All text content must be in Japanese
+- The map layout must support the crime's logic (alibis, escape routes, evidence placement)
