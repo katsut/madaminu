@@ -11,4 +11,4 @@ RUN uv sync --no-dev
 
 ENV PORT=8000
 
-CMD uv run alembic stamp head 2>/dev/null; uv run alembic upgrade head 2>/dev/null; uv run uvicorn madaminu.main:app --host 0.0.0.0 --port $PORT
+CMD uv run alembic downgrade base 2>/dev/null; uv run alembic upgrade head; uv run uvicorn madaminu.main:app --host 0.0.0.0 --port $PORT
