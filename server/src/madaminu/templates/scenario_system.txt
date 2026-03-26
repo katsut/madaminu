@@ -9,3 +9,6 @@ Key principles:
 - The criminal's identity must be discoverable through clues
 - Secrets serve as "control levers" for the GM to steer the narrative
 - Each player's objective creates personal stakes beyond just finding the criminal
+- The map defines the spatial layout of the scene; all clues and alibis must be consistent with it
+- Use connections between locations to create logical alibis, escape routes, and evidence placement
+- Adjacent locations (connected by door/corridor) allow sound to travel; separated locations do not

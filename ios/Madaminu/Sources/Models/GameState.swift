@@ -22,6 +22,7 @@ struct InvestigationLocation: Codable, Identifiable, Sendable {
     let id: String
     let name: String
     let description: String
+    let features: [String]?
 }
 
 struct EvidenceItem: Codable, Identifiable, Sendable {
