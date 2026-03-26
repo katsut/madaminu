@@ -112,24 +112,44 @@ struct IntroView: View {
                 VStack(spacing: Spacing.sm) {
                     ForEach(controller.players) { player in
                         MDCard {
-                            HStack {
-                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                            VStack(alignment: .leading, spacing: Spacing.sm) {
+                                HStack {
                                     Text(player.characterName ?? player.displayName)
-                                        .font(.mdHeadline)
+                                        .font(.mdTitle2)
                                         .foregroundStyle(Color.mdTextPrimary)
-                                    Text(player.displayName)
+                                    Spacer()
+                                    if player.id == controller.playerId {
+                                        Text("あなた")
+                                            .font(.mdCaption2)
+                                            .foregroundStyle(Color.mdPrimary)
+                                            .padding(.horizontal, Spacing.xs)
+                                            .padding(.vertical, Spacing.xxs)
+                                            .background(Color.mdPrimary.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                    }
+                                    if player.isAI {
+                                        Text("AI")
+                                            .font(.mdCaption2)
+                                            .foregroundStyle(Color.mdInfo)
+                                            .padding(.horizontal, Spacing.xs)
+                                            .padding(.vertical, Spacing.xxs)
+                                            .background(Color.mdInfo.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                    }
+                                }
+
+                                if let personality = player.characterPersonality {
+                                    Text(personality)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                        .lineLimit(3)
+                                }
+
+                                if let background = player.characterBackground {
+                                    Text(background)
                                         .font(.mdCaption)
                                         .foregroundStyle(Color.mdTextMuted)
-                                }
-                                Spacer()
-                                if player.id == controller.playerId {
-                                    Text("あなた")
-                                        .font(.mdCaption2)
-                                        .foregroundStyle(Color.mdPrimary)
-                                        .padding(.horizontal, Spacing.xs)
-                                        .padding(.vertical, Spacing.xxs)
-                                        .background(Color.mdPrimary.opacity(0.15))
-                                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                        .lineLimit(3)
                                 }
                             }
                         }

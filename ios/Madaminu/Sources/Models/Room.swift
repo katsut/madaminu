@@ -26,15 +26,32 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
     let id: String
     let displayName: String
     let characterName: String?
+    let characterPersonality: String?
+    let characterBackground: String?
     let isHost: Bool
+    let isAI: Bool
     let connectionStatus: String
 
     enum CodingKeys: String, CodingKey {
         case id
         case displayName = "display_name"
         case characterName = "character_name"
+        case characterPersonality = "character_personality"
+        case characterBackground = "character_background"
         case isHost = "is_host"
+        case isAI = "is_ai"
         case connectionStatus = "connection_status"
+    }
+
+    init(id: String, displayName: String, characterName: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, isHost: Bool = false, isAI: Bool = false, connectionStatus: String = "offline") {
+        self.id = id
+        self.displayName = displayName
+        self.characterName = characterName
+        self.characterPersonality = characterPersonality
+        self.characterBackground = characterBackground
+        self.isHost = isHost
+        self.isAI = isAI
+        self.connectionStatus = connectionStatus
     }
 }
 
