@@ -178,11 +178,20 @@ final class GameStore: ObservableObject, @unchecked Sendable {
         errorMessage = nil
         progressMessage = "AIプレイヤーを準備中..."
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             if self?.isLoading == true { self?.progressMessage = "シナリオを生成中..." }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 13) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+            if self?.isLoading == true { self?.progressMessage = "キャラクターを生成中..." }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+            if self?.isLoading == true { self?.progressMessage = "イラストを生成中..." }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self] in
             if self?.isLoading == true { self?.progressMessage = "物語を組み立てています..." }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 40) { [weak self] in
+            if self?.isLoading == true { self?.progressMessage = "もう少しお待ちください..." }
         }
 
         do {
@@ -289,6 +298,12 @@ final class GameStore: ObservableObject, @unchecked Sendable {
             if screen != .generating { screen = .generating }
         case "game.ready":
             screen = .intro
+        case "images.ready":
+            // Reconnect to get updated game.state with image URLs
+            ws.disconnect()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                self?.connectWebSocket()
+            }
         case "phase.started":
             handlePhaseStarted(data)
         case "phase.timer":
