@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, String, func
+from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from madaminu.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -34,6 +34,7 @@ class Game(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     template_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     scenario_skeleton: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     gm_internal_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    scene_image: Mapped[str | None] = mapped_column(Text, nullable=True)
     total_llm_cost_usd: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     updated_at: Mapped[str | None] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

@@ -97,6 +97,7 @@ async def get_game_state_for_player(db: AsyncSession, room_code: str, player_id:
             "is_host": p.is_host,
             "is_ai": p.is_ai,
             "connection_status": p.connection_status,
+            "portrait_url": f"/api/v1/images/player/{p.id}" if p.portrait_image else None,
         }
         for p in game.players
     ]
@@ -108,6 +109,7 @@ async def get_game_state_for_player(db: AsyncSession, room_code: str, player_id:
         "players": players_public,
         "scenario_setting": game.scenario_skeleton.get("setting", {}) if game.scenario_skeleton else None,
         "victim": game.scenario_skeleton.get("victim", {}) if game.scenario_skeleton else None,
+        "scene_image_url": f"/api/v1/images/game/{game.room_code}/scene" if game.scene_image else None,
     }
 
     current_player = next((p for p in game.players if p.id == player_id), None)

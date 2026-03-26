@@ -68,6 +68,18 @@ struct IntroView: View {
                 .font(.mdLargeTitle)
                 .foregroundStyle(Color.mdPrimary)
 
+            if let urlString = controller.scenarioSetting.sceneImageUrl,
+               let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                AsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(height: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, Spacing.lg)
+            }
+
             if let setting = controller.scenarioSetting.location {
                 Text("舞台: \(setting)")
                     .font(.mdTitle2)
@@ -112,44 +124,64 @@ struct IntroView: View {
                 VStack(spacing: Spacing.sm) {
                     ForEach(controller.players) { player in
                         MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.sm) {
-                                HStack {
-                                    Text(player.characterName ?? player.displayName)
-                                        .font(.mdTitle2)
-                                        .foregroundStyle(Color.mdTextPrimary)
-                                    Spacer()
-                                    if player.id == controller.playerId {
-                                        Text("あなた")
-                                            .font(.mdCaption2)
-                                            .foregroundStyle(Color.mdPrimary)
-                                            .padding(.horizontal, Spacing.xs)
-                                            .padding(.vertical, Spacing.xxs)
-                                            .background(Color.mdPrimary.opacity(0.15))
-                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                            HStack(alignment: .top, spacing: Spacing.sm) {
+                                if let urlString = player.portraitUrl,
+                                   let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Image(systemName: "person.circle.fill")
+                                            .font(.system(size: 40))
+                                            .foregroundStyle(Color.mdTextMuted)
                                     }
-                                    if player.isAI {
-                                        Text("AI")
-                                            .font(.mdCaption2)
-                                            .foregroundStyle(Color.mdInfo)
-                                            .padding(.horizontal, Spacing.xs)
-                                            .padding(.vertical, Spacing.xxs)
-                                            .background(Color.mdInfo.opacity(0.15))
-                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                                    }
-                                }
-
-                                if let personality = player.characterPersonality {
-                                    Text(personality)
-                                        .font(.mdCaption)
-                                        .foregroundStyle(Color.mdTextSecondary)
-                                        .lineLimit(3)
-                                }
-
-                                if let background = player.characterBackground {
-                                    Text(background)
-                                        .font(.mdCaption)
+                                    .frame(width: 60, height: 60)
+                                    .clipShape(Circle())
+                                } else {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 40))
                                         .foregroundStyle(Color.mdTextMuted)
-                                        .lineLimit(3)
+                                        .frame(width: 60, height: 60)
+                                }
+
+                                VStack(alignment: .leading, spacing: Spacing.sm) {
+                                    HStack {
+                                        Text(player.characterName ?? player.displayName)
+                                            .font(.mdTitle2)
+                                            .foregroundStyle(Color.mdTextPrimary)
+                                        Spacer()
+                                        if player.id == controller.playerId {
+                                            Text("あなた")
+                                                .font(.mdCaption2)
+                                                .foregroundStyle(Color.mdPrimary)
+                                                .padding(.horizontal, Spacing.xs)
+                                                .padding(.vertical, Spacing.xxs)
+                                                .background(Color.mdPrimary.opacity(0.15))
+                                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                        }
+                                        if player.isAI {
+                                            Text("AI")
+                                                .font(.mdCaption2)
+                                                .foregroundStyle(Color.mdInfo)
+                                                .padding(.horizontal, Spacing.xs)
+                                                .padding(.vertical, Spacing.xxs)
+                                                .background(Color.mdInfo.opacity(0.15))
+                                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                        }
+                                    }
+
+                                    if let personality = player.characterPersonality {
+                                        Text(personality)
+                                            .font(.mdCaption)
+                                            .foregroundStyle(Color.mdTextSecondary)
+                                            .lineLimit(3)
+                                    }
+
+                                    if let background = player.characterBackground {
+                                        Text(background)
+                                            .font(.mdCaption)
+                                            .foregroundStyle(Color.mdTextMuted)
+                                            .lineLimit(3)
+                                    }
                                 }
                             }
                         }

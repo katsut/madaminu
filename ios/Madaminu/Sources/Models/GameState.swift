@@ -56,4 +56,5 @@ struct ScenarioSettingData {
     var situation: String?
     var victimName: String?
     var victimDescription: String?
+    var sceneImageUrl: String?
 }

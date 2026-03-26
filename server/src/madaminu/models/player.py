@@ -40,6 +40,7 @@ class Player(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     role: Mapped[PlayerRole | None] = mapped_column(Enum(PlayerRole), nullable=True)
     is_host: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    portrait_image: Mapped[str | None] = mapped_column(Text, nullable=True)
     connection_status: Mapped[ConnectionStatus] = mapped_column(
         Enum(ConnectionStatus), default=ConnectionStatus.offline, nullable=False
     )

@@ -279,6 +279,7 @@ final class GameStore: ObservableObject, @unchecked Sendable {
     // MARK: - Message Handling
 
     private func handleMessage(type: String, data: [String: String]) {
+        print("[GameStore] Received: \(type), screen=\(screen)")
         switch type {
         case "game.state":
             handleGameState(data)
@@ -354,6 +355,8 @@ final class GameStore: ObservableObject, @unchecked Sendable {
             scenarioSetting.situation = setting["situation"] as? String
         }
 
+        scenarioSetting.sceneImageUrl = data["scene_image_url"]
+
         if let victimJSON = data["victim"],
            let victimData = victimJSON.data(using: .utf8),
            let victim = try? JSONSerialization.jsonObject(with: victimData) as? [String: Any] {
@@ -373,6 +376,7 @@ final class GameStore: ObservableObject, @unchecked Sendable {
                     characterName: dict["character_name"] as? String,
                     characterPersonality: dict["character_personality"] as? String,
                     characterBackground: dict["character_background"] as? String,
+                    portraitUrl: dict["portrait_url"] as? String,
                     isHost: dict["is_host"] as? Bool ?? false,
                     isAI: dict["is_ai"] as? Bool ?? false,
                     connectionStatus: dict["connection_status"] as? String ?? "offline"

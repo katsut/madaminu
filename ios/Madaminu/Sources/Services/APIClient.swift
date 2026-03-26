@@ -8,9 +8,11 @@ enum APIError: Error {
 }
 
 actor APIClient {
+    static let defaultBaseURL = "https://murder-production.up.railway.app"
+
     let baseURL: String
 
-    init(baseURL: String = "https://murder-production.up.railway.app") {
+    init(baseURL: String = APIClient.defaultBaseURL) {
         self.baseURL = baseURL
     }
 
