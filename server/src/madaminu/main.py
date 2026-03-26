@@ -9,6 +9,7 @@ from madaminu.db.database import async_session, engine
 from madaminu.models import Base
 from madaminu.routers.characters import router as characters_router
 from madaminu.routers.game import router as game_router
+from madaminu.routers.images import router as images_router
 from madaminu.routers.rooms import router as rooms_router
 from madaminu.services.phase_manager import PhaseManager
 from madaminu.services.speech_manager import SpeechManager
@@ -33,6 +34,7 @@ app = FastAPI(title="Madaminu API", version="0.1.0", lifespan=lifespan)
 app.include_router(rooms_router)
 app.include_router(characters_router)
 app.include_router(game_router)
+app.include_router(images_router)
 
 
 @app.get("/health")

@@ -27,6 +27,51 @@ class StartGameResponse(BaseModel):
     total_cost_usd: float
 
 
+async def _generate_images_background(game_id: str, room_code: str, session_factory):
+    from madaminu.llm.client import llm_client
+    from madaminu.services.image_generator import generate_character_portrait, generate_scene_image
+
+    client = llm_client._client
+
+    try:
+        async with session_factory() as db:
+            result = await db.execute(
+                select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+            )
+            game = result.scalar_one_or_none()
+            if game is None:
+                return
+
+            if game.scenario_skeleton:
+                setting = game.scenario_skeleton.get("setting", {})
+                setting_desc = setting.get("description", "") or setting.get("name", "")
+                if setting_desc:
+                    try:
+                        scene_b64 = await generate_scene_image(client, setting_desc)
+                        game.scene_image = scene_b64
+                        await db.commit()
+                        logger.info("Scene image generated for game %s", room_code)
+                    except Exception:
+                        logger.exception("Scene image generation failed for game %s", room_code)
+
+            for player in game.players:
+                if player.character_name:
+                    try:
+                        portrait_b64 = await generate_character_portrait(
+                            client,
+                            player.character_name,
+                            player.character_personality or "",
+                            player.character_background or "",
+                        )
+                        player.portrait_image = portrait_b64
+                        await db.commit()
+                        logger.info("Portrait generated for player %s", player.id)
+                    except Exception:
+                        logger.exception("Portrait generation failed for player %s", player.id)
+    except Exception:
+        logger.exception("Image generation background task failed for game %s", game_id)
+
+
 async def _generate_scenario_background(
     game_id: str,
     room_code: str,
@@ -50,6 +95,8 @@ async def _generate_scenario_background(
                 room_code,
                 WSMessage(type="game.ready", data={"room_code": room_code}),
             )
+
+        asyncio.create_task(_generate_images_background(game_id, room_code, session_factory))
     except Exception:
         logger.exception("Background scenario generation failed for game %s", game_id)
         if ws_manager:

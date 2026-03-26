@@ -28,6 +28,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
     let characterName: String?
     let characterPersonality: String?
     let characterBackground: String?
+    let portraitUrl: String?
     let isHost: Bool
     let isAI: Bool
     let connectionStatus: String
@@ -38,17 +39,19 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         case characterName = "character_name"
         case characterPersonality = "character_personality"
         case characterBackground = "character_background"
+        case portraitUrl = "portrait_url"
         case isHost = "is_host"
         case isAI = "is_ai"
         case connectionStatus = "connection_status"
     }
 
-    init(id: String, displayName: String, characterName: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, isHost: Bool = false, isAI: Bool = false, connectionStatus: String = "offline") {
+    init(id: String, displayName: String, characterName: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, connectionStatus: String = "offline") {
         self.id = id
         self.displayName = displayName
         self.characterName = characterName
         self.characterPersonality = characterPersonality
         self.characterBackground = characterBackground
+        self.portraitUrl = portraitUrl
         self.isHost = isHost
         self.isAI = isAI
         self.connectionStatus = connectionStatus
