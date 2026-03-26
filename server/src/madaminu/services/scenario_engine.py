@@ -68,6 +68,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     game.scenario_skeleton = {
         "setting": scenario["setting"],
         "victim": scenario["victim"],
+        "map": scenario.get("map"),
         "relationships": scenario["relationships"],
     }
     game.gm_internal_state = {
@@ -86,16 +87,21 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         player.objective = sp["objective"]
         player.role = ROLE_MAP.get(sp["role"], PlayerRole.innocent)
 
+    map_locations = {loc["id"]: loc for loc in (scenario.get("map", {}).get("locations", []))}
+
     for i, phase_data in enumerate(scenario.get("phases", [])):
         phase_type_str = phase_data.get("phase_type", "investigation")
         phase_type = PhaseType(phase_type_str) if phase_type_str in PhaseType.__members__ else PhaseType.investigation
+
+        raw_locations = phase_data.get("investigation_locations", [])
+        resolved_locations = _resolve_investigation_locations(raw_locations, map_locations)
 
         phase = Phase(
             game_id=game.id,
             phase_type=phase_type,
             phase_order=i,
             duration_sec=phase_data.get("duration_sec", 300),
-            investigation_locations=phase_data.get("investigation_locations"),
+            investigation_locations=resolved_locations,
         )
         db.add(phase)
 
@@ -355,6 +361,28 @@ def _format_speech_logs(logs, id_to_name: dict[str, str]) -> str:
         name = id_to_name.get(log.player_id, "Unknown")
         lines.append(f"[{name}]: {log.transcript}")
     return "\n".join(lines)
+
+
+def _resolve_investigation_locations(raw_locations: list, map_locations: dict) -> list[dict]:
+    """Resolve investigation locations from either ID strings or dicts."""
+    resolved = []
+    for loc in raw_locations:
+        if isinstance(loc, str):
+            map_loc = map_locations.get(loc)
+            if map_loc:
+                resolved.append({
+                    "id": map_loc["id"],
+                    "name": map_loc["name"],
+                    "description": map_loc.get("description", ""),
+                    "features": map_loc.get("features", []),
+                })
+        elif isinstance(loc, dict) and "id" in loc:
+            resolved.append({
+                "id": loc["id"],
+                "name": loc.get("name", loc["id"]),
+                "description": loc.get("description", ""),
+            })
+    return resolved
 
 
 def _parse_scenario_json(raw: str) -> dict:
