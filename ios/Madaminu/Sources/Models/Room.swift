@@ -102,6 +102,41 @@ struct RoomListItem: Codable, Identifiable, Sendable {
     }
 }
 
+struct DebugInfoResponse: Codable, Sendable {
+    let players: [DebugPlayerInfo]
+}
+
+struct DebugPlayerInfo: Codable, Identifiable, Sendable {
+    let id: String
+    let displayName: String
+    let characterName: String?
+    let role: String?
+    let secretInfo: String?
+    let objective: String?
+    let isAI: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+        case characterName = "character_name"
+        case role
+        case secretInfo = "secret_info"
+        case objective
+        case isAI = "is_ai"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        characterName = try container.decodeIfPresent(String.self, forKey: .characterName)
+        role = try container.decodeIfPresent(String.self, forKey: .role)
+        secretInfo = try container.decodeIfPresent(String.self, forKey: .secretInfo)
+        objective = try container.decodeIfPresent(String.self, forKey: .objective)
+        isAI = try container.decodeIfPresent(Bool.self, forKey: .isAI) ?? false
+    }
+}
+
 struct RoomInfoResponse: Codable, Sendable {
     let roomCode: String
     let status: String
