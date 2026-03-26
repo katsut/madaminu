@@ -371,7 +371,10 @@ final class GameStore: ObservableObject, @unchecked Sendable {
                     id: id,
                     displayName: displayName,
                     characterName: dict["character_name"] as? String,
+                    characterPersonality: dict["character_personality"] as? String,
+                    characterBackground: dict["character_background"] as? String,
                     isHost: dict["is_host"] as? Bool ?? false,
+                    isAI: dict["is_ai"] as? Bool ?? false,
                     connectionStatus: dict["connection_status"] as? String ?? "offline"
                 )
             }

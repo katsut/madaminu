@@ -92,7 +92,10 @@ async def get_game_state_for_player(db: AsyncSession, room_code: str, player_id:
             "id": p.id,
             "display_name": p.display_name,
             "character_name": p.character_name,
+            "character_personality": p.character_personality,
+            "character_background": p.character_background,
             "is_host": p.is_host,
+            "is_ai": p.is_ai,
             "connection_status": p.connection_status,
         }
         for p in game.players
