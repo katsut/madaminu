@@ -142,6 +142,23 @@ async def _generate_scenario_background(
             await phase_manager.start_first_phase(game_id, room_code)
 
         if ws_manager:
+            # Send game.state to each connected player with their personal data
+            async with session_factory() as db:
+                from madaminu.schemas.game import build_game_state
+
+                game_result = await db.execute(
+                    select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+                )
+                game = game_result.scalar_one_or_none()
+                if game:
+                    for player in game.players:
+                        state = await build_game_state(db, game, player.id)
+                        await ws_manager.send_to_player(
+                            room_code,
+                            player.id,
+                            WSMessage(type="game.state", data=state),
+                        )
+
             await ws_manager.broadcast(
                 room_code,
                 WSMessage(type="game.ready", data={"room_code": room_code}),
