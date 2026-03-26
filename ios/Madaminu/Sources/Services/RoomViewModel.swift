@@ -36,7 +36,7 @@ final class RoomViewModel: ObservableObject, @unchecked Sendable {
 
     // MARK: - Room actions
 
-    func createRoom() async {
+    @MainActor func createRoom() async {
         guard !displayName.isEmpty else {
             errorMessage = "名前を入力してください"
             return
@@ -60,7 +60,7 @@ final class RoomViewModel: ObservableObject, @unchecked Sendable {
         isLoading = false
     }
 
-    func joinRoom() async {
+    @MainActor func joinRoom() async {
         guard !displayName.isEmpty else {
             errorMessage = "名前を入力してください"
             return
@@ -88,7 +88,7 @@ final class RoomViewModel: ObservableObject, @unchecked Sendable {
         isLoading = false
     }
 
-    func fetchRooms() async {
+    @MainActor func fetchRooms() async {
         do {
             availableRooms = try await api.listRooms()
         } catch {
@@ -96,7 +96,7 @@ final class RoomViewModel: ObservableObject, @unchecked Sendable {
         }
     }
 
-    func joinFromList(roomCode: String, password: String? = nil) async {
+    @MainActor func joinFromList(roomCode: String, password: String? = nil) async {
         guard !displayName.isEmpty else {
             errorMessage = "名前を入力してください"
             return
@@ -132,7 +132,7 @@ final class RoomViewModel: ObservableObject, @unchecked Sendable {
         errorMessage = nil
     }
 
-    func refreshRoom() async {
+    @MainActor func refreshRoom() async {
         guard !roomCode.isEmpty else { return }
 
         do {
@@ -147,24 +147,27 @@ final class RoomViewModel: ObservableObject, @unchecked Sendable {
         }
     }
 
-    func startGame() async {
+    @MainActor func startGame() async {
         guard let token = sessionToken else { return }
 
         isLoading = true
         errorMessage = nil
         progressMessage = "AIプレイヤーを準備中..."
 
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             if self?.isLoading == true { self?.progressMessage = "シナリオを生成中..." }
-            try? await Task.sleep(for: .seconds(10))
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 13) { [weak self] in
             if self?.isLoading == true { self?.progressMessage = "物語を組み立てています..." }
-            try? await Task.sleep(for: .seconds(15))
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 28) { [weak self] in
             if self?.isLoading == true { self?.progressMessage = "もう少しお待ちください..." }
         }
 
         do {
             try await api.startGame(roomCode: roomCode, sessionToken: token)
+            // isGameStarted はここではセットしない
+            // GamePlayView の WebSocket で game.ready/game.state(playing) を受信してからイントロに遷移
             isGameStarted = true
         } catch let apiError as APIError {
             switch apiError {
@@ -181,7 +184,7 @@ final class RoomViewModel: ObservableObject, @unchecked Sendable {
         isLoading = false
     }
 
-    func createCharacter(name: String, personality: String, background: String) async {
+    @MainActor func createCharacter(name: String, personality: String, background: String) async {
         guard let token = sessionToken else { return }
 
         isLoading = true

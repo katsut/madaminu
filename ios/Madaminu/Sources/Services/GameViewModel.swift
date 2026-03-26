@@ -20,6 +20,7 @@ final class GameViewModel: ObservableObject, @unchecked Sendable {
     @Published var errorMessage: String?
     @Published var isConnected = false
     @Published var connectionError: String?
+    @Published var hasFatalError = false
     @Published var scenarioSetting = ScenarioSettingData()
     @Published var currentTranscript = ""
 
@@ -42,11 +43,14 @@ final class GameViewModel: ObservableObject, @unchecked Sendable {
 
     // MARK: - Lifecycle
 
-    /// Call from .task { } in GamePlayView (guaranteed MainActor context)
-    func setup() async {
+    /// Call from .task { } in GamePlayView
+    @MainActor func setup() async {
         let sr = SpeechRecognizer()
         _speechRecognizer = sr
         await sr.requestPermission()
+
+        let roomCode = self.roomCode
+        let token = self.sessionToken
 
         ws.setMessageHandler { [weak self] type, data in
             DispatchQueue.main.async {
@@ -59,7 +63,10 @@ final class GameViewModel: ObservableObject, @unchecked Sendable {
                 self?.connectionError = error
             }
         }
-        ws.connect(roomCode: roomCode, token: sessionToken)
+
+        DispatchQueue.main.async { [weak self] in
+            self?.ws.connect(roomCode: roomCode, token: token)
+        }
     }
 
     func disconnect() {
@@ -148,6 +155,9 @@ final class GameViewModel: ObservableObject, @unchecked Sendable {
         case "error":
             if let message = data["message"] {
                 setError(message)
+                if message.contains("Scenario") || message.contains("generation") {
+                    hasFatalError = true
+                }
             }
         default:
             break
