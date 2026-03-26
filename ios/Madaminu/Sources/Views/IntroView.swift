@@ -97,13 +97,18 @@ struct IntroView: View {
 
             if let victim = controller.scenarioSetting.victimName {
                 MDCard {
-                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
                         Label("被害者", systemImage: "person.slash")
                             .font(.mdHeadline)
                             .foregroundStyle(Color.mdAccent)
                         Text(victim)
-                            .font(.mdBody)
+                            .font(.mdTitle2)
                             .foregroundStyle(Color.mdTextPrimary)
+                        if let desc = controller.scenarioSetting.victimDescription {
+                            Text(desc)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextSecondary)
+                        }
                     }
                 }
                 .padding(.horizontal, Spacing.lg)

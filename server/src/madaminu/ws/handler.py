@@ -1,5 +1,5 @@
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 
 from fastapi import WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -67,8 +67,8 @@ async def _get_current_phase_dict(db: AsyncSession, current_phase_id: str) -> di
 
     remaining = 0
     if phase.started_at:
-        started = phase.started_at if phase.started_at.tzinfo else phase.started_at.replace(tzinfo=UTC)
-        elapsed = (datetime.now(UTC) - started).total_seconds()
+        started = phase.started_at
+        elapsed = (datetime.utcnow() - started).total_seconds()
         remaining = max(0, phase.duration_sec - int(elapsed))
 
     return {
