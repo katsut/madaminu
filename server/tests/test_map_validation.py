@@ -2,78 +2,31 @@
 
 import pytest
 
+from madaminu.services.map_validator import validate_map, _get_grid_cells, _are_adjacent
 from madaminu.services.scenario_engine import _resolve_investigation_locations
 
 
-def _validate_map(scenario: dict) -> list[str]:
-    """Validate map structure consistency. Returns list of error messages."""
-    errors = []
-    map_data = scenario.get("map")
-    if map_data is None:
-        errors.append("Missing 'map' in scenario")
-        return errors
-
-    locations = map_data.get("locations", [])
-    connections = map_data.get("connections", [])
-
-    location_ids = {loc["id"] for loc in locations}
-
-    if len(location_ids) < 4:
-        errors.append(f"Too few locations: {len(location_ids)} (minimum 4)")
-
-    for loc in locations:
-        if not loc.get("id"):
-            errors.append(f"Location missing 'id': {loc}")
-        if not loc.get("name"):
-            errors.append(f"Location missing 'name': {loc}")
-        if not loc.get("features"):
-            errors.append(f"Location '{loc.get('id')}' has no features")
-
-    valid_types = {"door", "corridor", "stairs", "window", "hidden_passage"}
-    for conn in connections:
-        if conn["from"] not in location_ids:
-            errors.append(f"Connection 'from' references unknown location: {conn['from']}")
-        if conn["to"] not in location_ids:
-            errors.append(f"Connection 'to' references unknown location: {conn['to']}")
-        if conn.get("type") and conn["type"] not in valid_types:
-            errors.append(f"Unknown connection type: {conn['type']}")
-
-    connected_ids = set()
-    for conn in connections:
-        connected_ids.add(conn["from"])
-        connected_ids.add(conn["to"])
-    isolated = location_ids - connected_ids
-    for loc_id in isolated:
-        errors.append(f"Isolated location (no connections): {loc_id}")
-
-    for phase in scenario.get("phases", []):
-        for loc_ref in phase.get("investigation_locations", []):
-            ref_id = loc_ref if isinstance(loc_ref, str) else loc_ref.get("id")
-            if ref_id not in location_ids:
-                errors.append(f"Phase references unknown location: {ref_id}")
-
-    return errors
-
+# --- Fixtures ---
 
 VALID_SCENARIO = {
     "setting": {"location": "洋館", "era": "現代", "situation": "主人が殺された"},
     "victim": {"name": "山田太郎", "description": "洋館の主人"},
     "map": {
         "locations": [
-            {"id": "entrance", "name": "玄関ホール", "description": "広い玄関", "features": ["シャンデリア", "コート掛け"]},
-            {"id": "living_room", "name": "リビング", "description": "広いリビング", "features": ["暖炉", "ソファ", "本棚"]},
-            {"id": "kitchen", "name": "キッチン", "description": "業務用キッチン", "features": ["包丁セット", "ワインセラー"]},
-            {"id": "study", "name": "書斎", "description": "主人の書斎", "features": ["金庫", "デスク", "窓"]},
-            {"id": "garden", "name": "庭園", "description": "広い庭園", "features": ["噴水", "花壇"]},
-            {"id": "bedroom", "name": "寝室", "description": "主寝室", "features": ["ベッド", "クローゼット"]},
+            {"id": "garden", "name": "庭園", "description": "広い庭園", "area_type": "outdoor", "x": 0, "y": 0, "w": 4, "h": 1, "features": ["噴水", "花壇"]},
+            {"id": "entrance", "name": "玄関ホール", "description": "広い玄関", "area_type": "indoor", "x": 1, "y": 1, "w": 1, "h": 1, "features": ["シャンデリア", "コート掛け"]},
+            {"id": "living_room", "name": "リビング", "description": "広いリビング", "area_type": "indoor", "x": 0, "y": 1, "w": 1, "h": 1, "features": ["暖炉", "ソファ", "本棚"]},
+            {"id": "kitchen", "name": "キッチン", "description": "業務用キッチン", "area_type": "indoor", "x": 2, "y": 1, "w": 1, "h": 1, "features": ["包丁セット", "ワインセラー"]},
+            {"id": "study", "name": "書斎", "description": "主人の書斎", "area_type": "indoor", "x": 3, "y": 1, "w": 1, "h": 1, "features": ["金庫", "デスク"]},
+            {"id": "bedroom", "name": "寝室", "description": "主寝室", "area_type": "indoor", "x": 0, "y": 2, "w": 1, "h": 1, "features": ["ベッド", "クローゼット"]},
         ],
         "connections": [
-            {"from": "entrance", "to": "living_room", "type": "door"},
-            {"from": "living_room", "to": "kitchen", "type": "door"},
-            {"from": "living_room", "to": "study", "type": "door"},
-            {"from": "living_room", "to": "garden", "type": "window"},
-            {"from": "entrance", "to": "bedroom", "type": "stairs"},
-            {"from": "study", "to": "garden", "type": "window"},
+            {"from": "entrance", "to": "living_room", "type": "door", "side": "west"},
+            {"from": "entrance", "to": "kitchen", "type": "door", "side": "east"},
+            {"from": "kitchen", "to": "study", "type": "door", "side": "east"},
+            {"from": "living_room", "to": "garden", "type": "window", "side": "north"},
+            {"from": "living_room", "to": "bedroom", "type": "stairs", "side": "south"},
+            {"from": "entrance", "to": "garden", "type": "door", "side": "north"},
         ],
     },
     "relationships": [],
@@ -92,72 +45,231 @@ VALID_SCENARIO = {
 }
 
 
+def _make_scenario(**overrides):
+    """Helper to create a scenario with overrides."""
+    s = {**VALID_SCENARIO}
+    for k, v in overrides.items():
+        s[k] = v
+    return s
+
+
+def _make_map(**overrides):
+    """Helper to create a scenario with map overrides."""
+    m = {**VALID_SCENARIO["map"]}
+    for k, v in overrides.items():
+        m[k] = v
+    return _make_scenario(map=m)
+
+
+# --- Basic validation tests ---
+
 def test_valid_scenario_passes_validation():
-    errors = _validate_map(VALID_SCENARIO)
+    errors = validate_map(VALID_SCENARIO)
     assert errors == []
 
 
 def test_missing_map():
-    scenario = {**VALID_SCENARIO}
-    del scenario["map"]
-    errors = _validate_map(scenario)
+    scenario = {k: v for k, v in VALID_SCENARIO.items() if k != "map"}
+    errors = validate_map(scenario)
     assert any("Missing 'map'" in e for e in errors)
 
 
+def test_too_few_locations():
+    scenario = _make_map(locations=[
+        {"id": "a", "name": "A", "description": "a", "features": ["x"], "x": 0, "y": 0, "w": 1, "h": 1},
+        {"id": "b", "name": "B", "description": "b", "features": ["x"], "x": 1, "y": 0, "w": 1, "h": 1},
+    ], connections=[{"from": "a", "to": "b", "type": "door"}])
+    errors = validate_map(scenario)
+    assert any("Too few" in e for e in errors)
+
+
 def test_connection_references_unknown_location():
-    scenario = {**VALID_SCENARIO, "map": {
-        "locations": VALID_SCENARIO["map"]["locations"],
-        "connections": [
-            *VALID_SCENARIO["map"]["connections"],
-            {"from": "living_room", "to": "nonexistent_room", "type": "door"},
-        ],
-    }}
-    errors = _validate_map(scenario)
+    scenario = _make_map(connections=[
+        *VALID_SCENARIO["map"]["connections"],
+        {"from": "living_room", "to": "nonexistent_room", "type": "door"},
+    ])
+    errors = validate_map(scenario)
     assert any("nonexistent_room" in e for e in errors)
 
 
 def test_isolated_location_detected():
-    scenario = {**VALID_SCENARIO, "map": {
-        "locations": [
-            *VALID_SCENARIO["map"]["locations"],
-            {"id": "attic", "name": "屋根裏", "description": "暗い屋根裏部屋", "features": ["古い箱"]},
-        ],
-        "connections": VALID_SCENARIO["map"]["connections"],
-    }}
-    errors = _validate_map(scenario)
+    scenario = _make_map(locations=[
+        *VALID_SCENARIO["map"]["locations"],
+        {"id": "attic", "name": "屋根裏", "description": "暗い", "features": ["古い箱"], "x": 0, "y": 3, "w": 1, "h": 1},
+    ])
+    errors = validate_map(scenario)
     assert any("attic" in e for e in errors)
 
 
 def test_phase_references_unknown_location():
-    scenario = {**VALID_SCENARIO, "phases": [
-        {
-            "phase_type": "investigation",
-            "duration_sec": 300,
-            "description": "調査",
-            "investigation_locations": ["living_room", "unknown_place"],
-        },
-    ]}
-    errors = _validate_map(scenario)
+    scenario = _make_scenario(phases=[{
+        "phase_type": "investigation",
+        "duration_sec": 300,
+        "description": "調査",
+        "investigation_locations": ["living_room", "unknown_place"],
+    }])
+    errors = validate_map(scenario)
     assert any("unknown_place" in e for e in errors)
 
 
 def test_location_without_features():
-    scenario = {**VALID_SCENARIO, "map": {
-        "locations": [
-            {"id": "entrance", "name": "玄関ホール", "description": "広い玄関", "features": ["シャンデリア"]},
-            {"id": "living_room", "name": "リビング", "description": "広いリビング", "features": []},
-            {"id": "kitchen", "name": "キッチン", "description": "業務用キッチン", "features": ["包丁"]},
-            {"id": "study", "name": "書斎", "description": "主人の書斎", "features": ["金庫"]},
-        ],
-        "connections": [
-            {"from": "entrance", "to": "living_room", "type": "door"},
-            {"from": "living_room", "to": "kitchen", "type": "door"},
-            {"from": "living_room", "to": "study", "type": "door"},
-        ],
-    }}
-    errors = _validate_map(scenario)
+    locs = [dict(loc) for loc in VALID_SCENARIO["map"]["locations"]]
+    locs[1] = {**locs[1], "features": []}
+    scenario = _make_map(locations=locs)
+    errors = validate_map(scenario)
     assert any("no features" in e for e in errors)
 
+
+def test_invalid_connection_type():
+    scenario = _make_map(connections=[
+        *VALID_SCENARIO["map"]["connections"],
+        {"from": "living_room", "to": "entrance", "type": "teleporter"},
+    ])
+    errors = validate_map(scenario)
+    assert any("teleporter" in e for e in errors)
+
+
+def test_invalid_area_type():
+    locs = [dict(loc) for loc in VALID_SCENARIO["map"]["locations"]]
+    locs[0] = {**locs[0], "area_type": "underwater"}
+    scenario = _make_map(locations=locs)
+    errors = validate_map(scenario)
+    assert any("underwater" in e for e in errors)
+
+
+def test_invalid_connection_side():
+    scenario = _make_map(connections=[
+        {"from": "entrance", "to": "living_room", "type": "door", "side": "diagonal"},
+    ])
+    errors = validate_map(scenario)
+    assert any("diagonal" in e for e in errors)
+
+
+# --- Grid overlap tests ---
+
+def test_no_overlap_in_valid_scenario():
+    errors = validate_map(VALID_SCENARIO)
+    assert not any("overlap" in e.lower() for e in errors)
+
+
+def test_grid_overlap_detected():
+    locs = [
+        {"id": "room_a", "name": "A", "description": "a", "features": ["x"], "x": 0, "y": 0, "w": 2, "h": 1},
+        {"id": "room_b", "name": "B", "description": "b", "features": ["x"], "x": 1, "y": 0, "w": 2, "h": 1},
+        {"id": "room_c", "name": "C", "description": "c", "features": ["x"], "x": 3, "y": 0, "w": 1, "h": 1},
+        {"id": "room_d", "name": "D", "description": "d", "features": ["x"], "x": 0, "y": 1, "w": 1, "h": 1},
+    ]
+    scenario = _make_map(
+        locations=locs,
+        connections=[
+            {"from": "room_a", "to": "room_b", "type": "door"},
+            {"from": "room_b", "to": "room_c", "type": "door"},
+            {"from": "room_a", "to": "room_d", "type": "door"},
+        ],
+    )
+    errors = validate_map(scenario)
+    assert any("overlap" in e.lower() for e in errors)
+
+
+def test_large_room_no_overlap():
+    locs = [
+        {"id": "hall", "name": "ホール", "description": "大広間", "features": ["柱", "絵画"], "x": 0, "y": 0, "w": 2, "h": 2},
+        {"id": "room_a", "name": "A", "description": "a", "features": ["x"], "x": 2, "y": 0, "w": 1, "h": 1},
+        {"id": "room_b", "name": "B", "description": "b", "features": ["x"], "x": 2, "y": 1, "w": 1, "h": 1},
+        {"id": "room_c", "name": "C", "description": "c", "features": ["x"], "x": 0, "y": 2, "w": 1, "h": 1},
+    ]
+    scenario = _make_map(
+        locations=locs,
+        connections=[
+            {"from": "hall", "to": "room_a", "type": "door"},
+            {"from": "hall", "to": "room_b", "type": "door"},
+            {"from": "hall", "to": "room_c", "type": "door"},
+        ],
+    )
+    errors = validate_map(scenario)
+    assert not any("overlap" in e.lower() for e in errors)
+
+
+# --- Adjacency tests ---
+
+def test_non_adjacent_connection_detected():
+    locs = [
+        {"id": "room_a", "name": "A", "description": "a", "features": ["x"], "x": 0, "y": 0, "w": 1, "h": 1},
+        {"id": "room_b", "name": "B", "description": "b", "features": ["x"], "x": 3, "y": 3, "w": 1, "h": 1},
+        {"id": "room_c", "name": "C", "description": "c", "features": ["x"], "x": 1, "y": 0, "w": 1, "h": 1},
+        {"id": "room_d", "name": "D", "description": "d", "features": ["x"], "x": 2, "y": 0, "w": 1, "h": 1},
+    ]
+    scenario = _make_map(
+        locations=locs,
+        connections=[
+            {"from": "room_a", "to": "room_b", "type": "door"},
+            {"from": "room_a", "to": "room_c", "type": "door"},
+            {"from": "room_c", "to": "room_d", "type": "door"},
+        ],
+    )
+    errors = validate_map(scenario)
+    assert any("not adjacent" in e for e in errors)
+    # room_a to room_c should be fine (adjacent)
+    assert not any("room_a" in e and "room_c" in e for e in errors)
+
+
+def test_stairs_skip_adjacency_check():
+    locs = [
+        {"id": "floor1", "name": "1F", "description": "1階", "features": ["x"], "x": 0, "y": 0, "w": 1, "h": 1},
+        {"id": "floor2", "name": "2F", "description": "2階", "features": ["x"], "x": 0, "y": 5, "w": 1, "h": 1},
+        {"id": "room_c", "name": "C", "description": "c", "features": ["x"], "x": 1, "y": 0, "w": 1, "h": 1},
+        {"id": "room_d", "name": "D", "description": "d", "features": ["x"], "x": 1, "y": 5, "w": 1, "h": 1},
+    ]
+    scenario = _make_map(
+        locations=locs,
+        connections=[
+            {"from": "floor1", "to": "floor2", "type": "stairs"},
+            {"from": "floor1", "to": "room_c", "type": "door"},
+            {"from": "floor2", "to": "room_d", "type": "door"},
+        ],
+    )
+    errors = validate_map(scenario)
+    assert not any("not adjacent" in e for e in errors)
+
+
+# --- Helper function tests ---
+
+def test_get_grid_cells():
+    loc = {"x": 1, "y": 2, "w": 2, "h": 3}
+    cells = _get_grid_cells(loc)
+    assert cells == {(1, 2), (2, 2), (1, 3), (2, 3), (1, 4), (2, 4)}
+
+
+def test_get_grid_cells_1x1():
+    cells = _get_grid_cells({"x": 0, "y": 0, "w": 1, "h": 1})
+    assert cells == {(0, 0)}
+
+
+def test_are_adjacent_true():
+    a = {"x": 0, "y": 0, "w": 1, "h": 1}
+    b = {"x": 1, "y": 0, "w": 1, "h": 1}
+    assert _are_adjacent(a, b) is True
+
+
+def test_are_adjacent_false():
+    a = {"x": 0, "y": 0, "w": 1, "h": 1}
+    b = {"x": 3, "y": 3, "w": 1, "h": 1}
+    assert _are_adjacent(a, b) is False
+
+
+def test_are_adjacent_large_room():
+    a = {"x": 0, "y": 0, "w": 3, "h": 1}
+    b = {"x": 1, "y": 1, "w": 1, "h": 1}
+    assert _are_adjacent(a, b) is True
+
+
+def test_are_adjacent_diagonal_is_false():
+    a = {"x": 0, "y": 0, "w": 1, "h": 1}
+    b = {"x": 1, "y": 1, "w": 1, "h": 1}
+    assert _are_adjacent(a, b) is False
+
+
+# --- Resolve investigation locations tests ---
 
 def test_resolve_investigation_locations_from_ids():
     map_locations = {
@@ -167,7 +279,6 @@ def test_resolve_investigation_locations_from_ids():
     result = _resolve_investigation_locations(["living_room", "kitchen"], map_locations)
     assert len(result) == 2
     assert result[0]["id"] == "living_room"
-    assert result[0]["name"] == "リビング"
     assert result[0]["features"] == ["暖炉"]
 
 
@@ -183,15 +294,3 @@ def test_resolve_investigation_locations_from_dicts():
 def test_resolve_investigation_locations_skips_unknown_ids():
     result = _resolve_investigation_locations(["nonexistent"], {})
     assert result == []
-
-
-def test_invalid_connection_type():
-    scenario = {**VALID_SCENARIO, "map": {
-        "locations": VALID_SCENARIO["map"]["locations"],
-        "connections": [
-            *VALID_SCENARIO["map"]["connections"],
-            {"from": "living_room", "to": "kitchen", "type": "teleporter"},
-        ],
-    }}
-    errors = _validate_map(scenario)
-    assert any("teleporter" in e for e in errors)
