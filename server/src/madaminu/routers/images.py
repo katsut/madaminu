@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from madaminu.db import get_db
 from madaminu.models import Game, Player
+from madaminu.services.map_renderer import render_map_svg
 
 router = APIRouter(prefix="/api/v1/images", tags=["images"])
 
@@ -49,3 +50,16 @@ async def get_victim_image(room_code: str, db: AsyncSession = Depends(get_db)):
 
     image_bytes = base64.b64decode(game.victim_image)
     return Response(content=image_bytes, media_type="image/png")
+
+
+@router.get("/game/{room_code}/map")
+async def get_map_svg(room_code: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Game).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found") from None
+    if not game.scenario_skeleton or "map" not in game.scenario_skeleton:
+        raise HTTPException(status_code=404, detail="Map not yet generated") from None
+
+    svg = render_map_svg(game.scenario_skeleton["map"])
+    return Response(content=svg, media_type="image/svg+xml")

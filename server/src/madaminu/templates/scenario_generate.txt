@@ -24,14 +24,37 @@ Create a complete scenario with the following structure (respond in JSON):
         "id": "living_room",
         "name": "リビング",
         "description": "広いリビングルーム。暖炉がある。",
+        "area_type": "indoor",
+        "x": 1,
+        "y": 1,
+        "w": 2,
+        "h": 1,
         "features": ["暖炉", "大きな窓", "本棚"]
+      },
+      {
+        "id": "garden",
+        "name": "庭園",
+        "description": "手入れされた広い庭。",
+        "area_type": "outdoor",
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 1,
+        "features": ["噴水", "花壇", "ベンチ"]
       }
     ],
     "connections": [
       {
         "from": "living_room",
         "to": "kitchen",
-        "type": "door"
+        "type": "door",
+        "side": "east"
+      },
+      {
+        "from": "living_room",
+        "to": "garden",
+        "type": "window",
+        "side": "north"
       }
     ]
   },
@@ -61,6 +84,22 @@ Create a complete scenario with the following structure (respond in JSON):
   ],
   "gm_strategy": "GMがゲーム全体をどう展開させるかの戦略メモ"
 }
+
+## Map Layout Rules
+
+Think of the map as a grid (graph paper). Each location occupies a rectangle on this grid.
+
+- **x, y**: top-left corner of the location on the grid (integers, 0-based)
+- **w, h**: width and height in grid cells (minimum 1)
+- **area_type**: "indoor", "outdoor", or "semi_outdoor"
+- **Locations MUST NOT overlap** on the grid
+- Place locations so that connected rooms are adjacent on the grid
+- Use y=0 row for outdoor areas (garden, parking, etc.)
+- Use y=1+ rows for indoor areas (1F, 2F, etc.)
+- Total grid should fit within roughly 6x5 cells
+
+Connection side indicates where the passage is on the "from" room:
+- "north", "south", "east", "west" (which wall the door/window is on)
 
 ## Map Guidelines
 

@@ -93,6 +93,9 @@ struct WSMessageAdapter {
         if let victimUrl = data["victim_image_url"] {
             store.game.scenarioSetting.victimImageUrl = victimUrl
         }
+        if let mapUrl = data["map_url"] {
+            store.game.scenarioSetting.mapUrl = mapUrl
+        }
 
         if let victimJSON = data["victim"],
            let victimData = victimJSON.data(using: .utf8),
@@ -178,7 +181,7 @@ struct WSMessageAdapter {
             locations = locsData.compactMap { loc in
                 guard let id = loc["id"] as? String,
                       let name = loc["name"] as? String else { return nil }
-                return InvestigationLocation(id: id, name: name, description: loc["description"] as? String ?? "")
+                return InvestigationLocation(id: id, name: name, description: loc["description"] as? String ?? "", features: loc["features"] as? [String])
             }
         }
 
