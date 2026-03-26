@@ -1,6 +1,8 @@
+import contextlib
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, WebSocket
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from madaminu.config import settings
@@ -22,6 +24,16 @@ async def lifespan(app: FastAPI):
     if not settings.testing:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            for sql in [
+                "ALTER TABLE games ADD COLUMN IF NOT EXISTS scene_image TEXT",
+                "ALTER TABLE games ADD COLUMN IF NOT EXISTS total_llm_cost_usd DOUBLE PRECISION DEFAULT 0.0",
+                "ALTER TABLE games ADD COLUMN IF NOT EXISTS password VARCHAR(100)",
+                "ALTER TABLE players ADD COLUMN IF NOT EXISTS portrait_image TEXT",
+                "ALTER TABLE players ADD COLUMN IF NOT EXISTS is_ai BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE phases ADD COLUMN IF NOT EXISTS deadline_at TIMESTAMP",
+            ]:
+                with contextlib.suppress(Exception):
+                    await conn.execute(text(sql))
 
         event_bus = EventBus()
         app.state.event_bus = event_bus
