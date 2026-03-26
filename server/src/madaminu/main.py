@@ -1,3 +1,4 @@
+import contextlib
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, WebSocket
@@ -30,10 +31,8 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE players ADD COLUMN IF NOT EXISTS portrait_image TEXT",
                 "ALTER TABLE players ADD COLUMN IF NOT EXISTS is_ai BOOLEAN DEFAULT FALSE",
             ]:
-                try:
+                with contextlib.suppress(Exception):
                     await conn.execute(text(sql))
-                except Exception:
-                    pass
         app.state.phase_manager = PhaseManager(async_session)
         app.state.speech_manager = SpeechManager(async_session)
 
