@@ -61,7 +61,7 @@ private let characterTemplates: [CharacterTemplate] = [
 ]
 
 struct CharacterCreationView: View {
-    @ObservedObject var viewModel: RoomViewModel
+    @ObservedObject var controller: GameStore
     @State private var currentStep = 0
     @State private var characterName = ""
     @State private var personality = ""
@@ -94,7 +94,7 @@ struct CharacterCreationView: View {
     private var header: some View {
         HStack {
             Button {
-                viewModel.showCharacterCreation = false
+                controller.dismissCharacterCreation()
             } label: {
                 Image(systemName: "xmark")
                     .font(.mdHeadline)
@@ -289,9 +289,9 @@ struct CharacterCreationView: View {
                 }
                 .disabled(!isCurrentStepValid)
             } else {
-                MDButton("作成", isLoading: viewModel.isLoading) {
+                MDButton("作成", isLoading: controller.isLoading) {
                     Task { @MainActor in
-                        await viewModel.createCharacter(
+                        await controller.createCharacter(
                             name: characterName,
                             personality: personality,
                             background: background

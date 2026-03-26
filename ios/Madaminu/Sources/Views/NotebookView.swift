@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct NotebookView: View {
-    @ObservedObject var viewModel: GameViewModel
+    @ObservedObject var controller: GameStore
     @Binding var isPresented: Bool
 
     var body: some View {
@@ -44,7 +44,7 @@ struct NotebookView: View {
                     .font(.mdHeadline)
                     .foregroundStyle(Color.mdPrimary)
 
-                if let role = viewModel.myRole {
+                if let role = controller.myRole {
                     HStack {
                         Text("役割")
                             .font(.mdCaption)
@@ -56,7 +56,7 @@ struct NotebookView: View {
                     }
                 }
 
-                if let secret = viewModel.mySecretInfo {
+                if let secret = controller.mySecretInfo {
                     VStack(alignment: .leading, spacing: Spacing.xxs) {
                         Text("秘密")
                             .font(.mdCaption)
@@ -72,7 +72,7 @@ struct NotebookView: View {
 
     private var objectiveSection: some View {
         Group {
-            if let objective = viewModel.myObjective {
+            if let objective = controller.myObjective {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Label("個人目的", systemImage: "target")
@@ -97,12 +97,12 @@ struct NotebookView: View {
 
                 Spacer()
 
-                Text("\(viewModel.evidences.count)件")
+                Text("\(controller.evidences.count)件")
                     .font(.mdCaption)
                     .foregroundStyle(Color.mdTextMuted)
             }
 
-            if viewModel.evidences.isEmpty {
+            if controller.evidences.isEmpty {
                 MDCard {
                     Text("まだ証拠はありません")
                         .font(.mdBody)
@@ -110,7 +110,7 @@ struct NotebookView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
             } else {
-                ForEach(viewModel.evidences) { evidence in
+                ForEach(controller.evidences) { evidence in
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.xxs) {
                             Text(evidence.title)
@@ -125,7 +125,7 @@ struct NotebookView: View {
                 }
             }
         }
-        .animation(.easeInOut, value: viewModel.evidences.count)
+        .animation(.easeInOut, value: controller.evidences.count)
     }
 
     private var notesSection: some View {
@@ -134,7 +134,7 @@ struct NotebookView: View {
                 .font(.mdHeadline)
                 .foregroundStyle(Color.mdTextSecondary)
 
-            MDTextEditor(label: "", text: $viewModel.notes, minHeight: 120)
+            MDTextEditor(label: "", text: $controller.notes, minHeight: 120)
         }
     }
 
