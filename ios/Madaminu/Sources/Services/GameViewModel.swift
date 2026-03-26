@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-final class GameViewModel: ObservableObject {
+final class GameViewModel: ObservableObject, @unchecked Sendable {
     enum GameScreen { case intro, playing, ended }
 
     // MARK: - Game state

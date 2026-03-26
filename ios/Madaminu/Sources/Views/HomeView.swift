@@ -62,7 +62,7 @@ public struct HomeView: View {
                         .foregroundStyle(Color.mdTextSecondary)
                     Spacer()
                     Button {
-                        Task { await viewModel.fetchRooms() }
+                        Task { @MainActor in await viewModel.fetchRooms() }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .foregroundStyle(Color.mdTextMuted)
@@ -105,7 +105,7 @@ public struct HomeView: View {
                                             joinPassword = ""
                                             showJoinSheet = true
                                         } else {
-                                            Task { await viewModel.joinFromList(roomCode: room.roomCode) }
+                                            Task { @MainActor in await viewModel.joinFromList(roomCode: room.roomCode) }
                                         }
                                     }
                                 }
@@ -179,7 +179,7 @@ struct CreateRoomSheet: View {
                 Spacer()
 
                 MDButton("作成", isLoading: viewModel.isLoading) {
-                    Task {
+                    Task { @MainActor in
                         await viewModel.createRoom()
                         if viewModel.isInRoom { isPresented = false }
                     }

@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-final class RoomViewModel: ObservableObject {
+final class RoomViewModel: ObservableObject, @unchecked Sendable {
     // MARK: - User input (persisted)
     @Published var displayName: String = "" {
         didSet { UserDefaults.standard.set(displayName, forKey: "displayName") }
