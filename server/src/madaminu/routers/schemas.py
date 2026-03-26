@@ -32,6 +32,10 @@ class PlayerInfo(BaseModel):
 
 class CreateCharacterRequest(BaseModel):
     character_name: str = Field(..., min_length=1, max_length=50)
+    character_gender: str = Field(default="不明", max_length=10)
+    character_age: str = Field(default="不明", max_length=10)
+    character_occupation: str = Field(default="", max_length=100)
+    character_appearance: str = Field(default="", max_length=500)
     character_personality: str = Field(..., min_length=1, max_length=500)
     character_background: str = Field(..., min_length=1, max_length=1000)
 
@@ -39,6 +43,10 @@ class CreateCharacterRequest(BaseModel):
 class CharacterResponse(BaseModel):
     player_id: str
     character_name: str
+    character_gender: str | None = None
+    character_age: str | None = None
+    character_occupation: str | None = None
+    character_appearance: str | None = None
     character_personality: str
     character_background: str
 
