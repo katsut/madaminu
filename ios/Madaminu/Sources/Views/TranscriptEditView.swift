@@ -29,7 +29,7 @@ struct TranscriptEditView: View {
                     }
 
                     MDButton("確定して送信") {
-                        viewModel.speechRecognizer?.transcript = editedTranscript
+                        viewModel.updateTranscript(editedTranscript)
                         viewModel.releaseSpeech()
                         dismiss()
                     }
@@ -38,7 +38,7 @@ struct TranscriptEditView: View {
             .padding(Spacing.lg)
         }
         .onAppear {
-            editedTranscript = viewModel.speechRecognizer?.transcript ?? ""
+            editedTranscript = viewModel.currentTranscript
         }
     }
 }
