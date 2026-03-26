@@ -1,5 +1,6 @@
 import DesignSystem
 import SwiftUI
+import WebKit
 
 struct GamePlayView: View {
     @ObservedObject var store: AppStore
@@ -259,6 +260,7 @@ struct SpeechButton: View {
 
 struct InvestigationPhaseView: View {
     @ObservedObject var store: AppStore
+    @State private var showMap = false
 
     var body: some View {
         ScrollView {
@@ -269,6 +271,12 @@ struct InvestigationPhaseView: View {
 
                 if store.game.isSpeaking {
                     TranscriptView(store: store)
+                }
+
+                if store.game.scenarioSetting.mapUrl != nil {
+                    MDButton("マップを見る", style: .ghost) {
+                        showMap = true
+                    }
                 }
 
                 if let locations = store.game.currentPhase?.investigationLocations {
@@ -287,6 +295,11 @@ struct InvestigationPhaseView: View {
                                     Text(location.description)
                                         .font(.mdCaption)
                                         .foregroundStyle(Color.mdTextSecondary)
+                                    if let features = location.features, !features.isEmpty {
+                                        Text(features.joined(separator: "・"))
+                                            .font(.mdCaption)
+                                            .foregroundStyle(Color.mdTextMuted)
+                                    }
                                 }
                                 Spacer()
                                 MDButton("調べる", style: .secondary) {
@@ -298,6 +311,9 @@ struct InvestigationPhaseView: View {
                 }
             }
             .padding(Spacing.lg)
+        }
+        .sheet(isPresented: $showMap) {
+            MapSheetView(store: store)
         }
     }
 
@@ -522,5 +538,95 @@ struct DebugInfoView: View {
             errorText = "デバッグ情報の取得に失敗しました"
         }
         isLoading = false
+    }
+}
+
+struct MapSheetView: View {
+    @ObservedObject var store: AppStore
+    @State private var svgData: String?
+    @State private var isLoading = true
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.mdBackground.ignoresSafeArea()
+
+                if isLoading {
+                    ProgressView()
+                        .tint(Color.mdPrimary)
+                } else if let svg = svgData {
+                    SVGWebView(svgContent: svg)
+                        .ignoresSafeArea(edges: .bottom)
+                } else {
+                    Text("マップを読み込めませんでした")
+                        .font(.mdBody)
+                        .foregroundStyle(Color.mdTextSecondary)
+                }
+            }
+            .navigationTitle("マップ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+        }
+        .task {
+            await loadMap()
+        }
+    }
+
+    @MainActor private func loadMap() async {
+        guard let mapPath = store.game.scenarioSetting.mapUrl else {
+            isLoading = false
+            return
+        }
+
+        let urlString = APIClient.defaultBaseURL + mapPath
+        guard let url = URL(string: urlString) else {
+            isLoading = false
+            return
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            svgData = String(data: data, encoding: .utf8)
+        } catch {
+            svgData = nil
+        }
+        isLoading = false
+    }
+}
+
+struct SVGWebView: UIViewRepresentable {
+    let svgContent: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        let html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+        <style>
+            body { margin: 0; background: #111118; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+            svg { max-width: 100%; height: auto; }
+        </style>
+        </head>
+        <body>
+        \(svgContent)
+        </body>
+        </html>
+        """
+        webView.loadHTMLString(html, baseURL: nil)
     }
 }

@@ -57,6 +57,7 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
         "victim": game.scenario_skeleton.get("victim", {}) if game.scenario_skeleton else None,
         "scene_image_url": f"/api/v1/images/game/{game.room_code}/scene" if game.scene_image else None,
         "victim_image_url": f"/api/v1/images/game/{game.room_code}/victim" if game.victim_image else None,
+        "map_url": f"/api/v1/images/game/{game.room_code}/map" if game.scenario_skeleton and "map" in game.scenario_skeleton else None,
     }
 
     current_player = next((p for p in game.players if p.id == player_id), None)
