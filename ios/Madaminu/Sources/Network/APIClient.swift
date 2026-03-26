@@ -74,12 +74,21 @@ actor APIClient {
         )
     }
 
-    private func get<T: Decodable>(_ path: String) async throws -> T {
+    func getDebugInfo(roomCode: String, sessionToken: String) async throws -> DebugInfoResponse {
+        return try await get("/api/v1/rooms/\(roomCode)/debug", headers: ["X-Session-Token": sessionToken])
+    }
+
+    private func get<T: Decodable>(_ path: String, headers: [String: String] = [:]) async throws -> T {
         guard let url = URL(string: baseURL + path) else {
             throw APIError.invalidURL
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        var request = URLRequest(url: url)
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
         try validateResponse(response, data: data)
         return try JSONDecoder().decode(T.self, from: data)
     }
