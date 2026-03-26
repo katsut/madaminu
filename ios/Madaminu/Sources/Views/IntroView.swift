@@ -117,9 +117,22 @@ struct IntroView: View {
                     .foregroundStyle(Color.mdAccent)
                     .padding(.top, Spacing.xl)
 
-                Image(systemName: "person.slash.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(Color.mdAccent.opacity(0.5))
+                if let urlString = store.game.scenarioSetting.victimImageUrl,
+                   let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Image(systemName: "person.slash.fill")
+                            .font(.system(size: 60))
+                            .foregroundStyle(Color.mdAccent.opacity(0.5))
+                    }
+                    .frame(width: 120, height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    Image(systemName: "person.slash.fill")
+                        .font(.system(size: 60))
+                        .foregroundStyle(Color.mdAccent.opacity(0.5))
+                }
 
                 if let name = store.game.scenarioSetting.victimName {
                     Text(name)

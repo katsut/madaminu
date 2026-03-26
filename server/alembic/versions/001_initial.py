@@ -30,6 +30,7 @@ def upgrade() -> None:
         sa.Column("scenario_skeleton", sa.JSON(), nullable=True),
         sa.Column("gm_internal_state", sa.JSON(), nullable=True),
         sa.Column("scene_image", sa.Text(), nullable=True),
+        sa.Column("victim_image", sa.Text(), nullable=True),
         sa.Column("total_llm_cost_usd", sa.Float(), nullable=False, server_default="0.0"),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),

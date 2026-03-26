@@ -19,9 +19,9 @@ async def generate_character_portrait(
     )
 
     response = await client.images.generate(
-        model="gpt-image-1",
+        model="gpt-image-1-mini",
         prompt=prompt,
-        size="256x256",
+        size="1024x1024",
         quality="low",
         n=1,
     )
@@ -52,9 +52,43 @@ async def generate_scene_image(
     )
 
     response = await client.images.generate(
-        model="gpt-image-1",
+        model="gpt-image-1-mini",
         prompt=prompt,
-        size="1536x1024",
+        size="1024x1024",
+        quality="low",
+        n=1,
+    )
+
+    image_b64 = response.data[0].b64_json
+    if image_b64 is None:
+        url = response.data[0].url
+        if url:
+            import httpx
+
+            async with httpx.AsyncClient() as http:
+                resp = await http.get(url)
+                resp.raise_for_status()
+                image_b64 = base64.b64encode(resp.content).decode()
+        else:
+            raise ValueError("No image data returned from API")
+
+    return image_b64
+
+async def generate_victim_portrait(
+    client: AsyncOpenAI,
+    victim_name: str,
+    victim_description: str,
+) -> str:
+    prompt = (
+        f"A portrait of a murder victim named {victim_name} for a mystery game. "
+        f"Description: {victim_description}. "
+        "Somber, memorial-style portrait. Semi-realistic illustration."
+    )
+
+    response = await client.images.generate(
+        model="gpt-image-1-mini",
+        prompt=prompt,
+        size="1024x1024",
         quality="low",
         n=1,
     )
