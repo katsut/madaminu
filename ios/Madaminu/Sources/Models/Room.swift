@@ -26,6 +26,10 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
     let id: String
     let displayName: String
     let characterName: String?
+    let characterGender: String?
+    let characterAge: String?
+    let characterOccupation: String?
+    let characterAppearance: String?
     let characterPersonality: String?
     let characterBackground: String?
     let portraitUrl: String?
@@ -37,6 +41,10 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         case id
         case displayName = "display_name"
         case characterName = "character_name"
+        case characterGender = "character_gender"
+        case characterAge = "character_age"
+        case characterOccupation = "character_occupation"
+        case characterAppearance = "character_appearance"
         case characterPersonality = "character_personality"
         case characterBackground = "character_background"
         case portraitUrl = "portrait_url"
@@ -45,10 +53,14 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         case connectionStatus = "connection_status"
     }
 
-    init(id: String, displayName: String, characterName: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, connectionStatus: String = "offline") {
+    init(id: String, displayName: String, characterName: String? = nil, characterGender: String? = nil, characterAge: String? = nil, characterOccupation: String? = nil, characterAppearance: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, connectionStatus: String = "offline") {
         self.id = id
         self.displayName = displayName
         self.characterName = characterName
+        self.characterGender = characterGender
+        self.characterAge = characterAge
+        self.characterOccupation = characterOccupation
+        self.characterAppearance = characterAppearance
         self.characterPersonality = characterPersonality
         self.characterBackground = characterBackground
         self.portraitUrl = portraitUrl
@@ -62,6 +74,10 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         id = try container.decode(String.self, forKey: .id)
         displayName = try container.decode(String.self, forKey: .displayName)
         characterName = try container.decodeIfPresent(String.self, forKey: .characterName)
+        characterGender = try container.decodeIfPresent(String.self, forKey: .characterGender)
+        characterAge = try container.decodeIfPresent(String.self, forKey: .characterAge)
+        characterOccupation = try container.decodeIfPresent(String.self, forKey: .characterOccupation)
+        characterAppearance = try container.decodeIfPresent(String.self, forKey: .characterAppearance)
         characterPersonality = try container.decodeIfPresent(String.self, forKey: .characterPersonality)
         characterBackground = try container.decodeIfPresent(String.self, forKey: .characterBackground)
         portraitUrl = try container.decodeIfPresent(String.self, forKey: .portraitUrl)
