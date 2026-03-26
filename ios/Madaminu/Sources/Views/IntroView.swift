@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct IntroView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @State private var currentPage = 0
 
     private let pageCount = 3

@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct NotebookView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @Binding var isPresented: Bool
 
     var body: some View {

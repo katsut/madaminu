@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct GamePlayView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @State private var showNotebook = false
 
     var body: some View {
@@ -232,7 +232,7 @@ struct GamePlayView: View {
 }
 
 struct SpeechButton: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
 
     var body: some View {
         if controller.isSpeaking {
@@ -249,7 +249,7 @@ struct SpeechButton: View {
 }
 
 struct InvestigationPhaseView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
 
     var body: some View {
         ScrollView {
@@ -308,7 +308,7 @@ struct InvestigationPhaseView: View {
 }
 
 struct DiscussionPhaseView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
 
     var body: some View {
         ScrollView {
@@ -348,7 +348,7 @@ struct DiscussionPhaseView: View {
 }
 
 struct VotingPhaseView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @State private var selectedSuspect: String?
 
     var body: some View {
@@ -391,7 +391,7 @@ struct VotingPhaseView: View {
 }
 
 struct TranscriptView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
 
     var body: some View {
         MDCard {

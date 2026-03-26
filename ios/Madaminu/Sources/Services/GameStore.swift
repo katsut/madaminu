@@ -3,7 +3,7 @@ import Foundation
 
 /// Central state machine managing the entire game lifecycle.
 /// Single source of truth for all game state and screen transitions.
-final class GameController: ObservableObject, @unchecked Sendable {
+final class GameStore: ObservableObject, @unchecked Sendable {
 
     // MARK: - State Machine
 

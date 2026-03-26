@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct RoomLobbyView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @State private var copied = false
 
     var body: some View {

@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 public struct HomeView: View {
-    @StateObject private var controller = GameController()
+    @StateObject private var controller = GameStore()
 
     public init() {}
 
@@ -32,7 +32,7 @@ public struct HomeView: View {
 // MARK: - Home Screen
 
 struct HomeScreen: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @State private var showCreateSheet = false
     @State private var showJoinSheet = false
     @State private var joinCode = ""
@@ -146,7 +146,7 @@ struct HomeScreen: View {
 // MARK: - Create Room Sheet
 
 struct CreateRoomSheet: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @Binding var isPresented: Bool
     @State private var usePassword = false
     @State private var password = ""
@@ -194,7 +194,7 @@ struct CreateRoomSheet: View {
 // MARK: - Join Room Sheet
 
 struct JoinRoomSheet: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @Binding var isPresented: Bool
     @Binding var joinCode: String
     @Binding var password: String
@@ -234,7 +234,7 @@ struct JoinRoomSheet: View {
 // MARK: - Generating View
 
 struct GeneratingView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
 
     var body: some View {
         ZStack {

@@ -61,7 +61,7 @@ private let characterTemplates: [CharacterTemplate] = [
 ]
 
 struct CharacterCreationView: View {
-    @ObservedObject var controller: GameController
+    @ObservedObject var controller: GameStore
     @State private var currentStep = 0
     @State private var characterName = ""
     @State private var personality = ""
