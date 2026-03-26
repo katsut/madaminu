@@ -47,9 +47,7 @@ struct GamePlayView: View {
             NotebookView(viewModel: viewModel, isPresented: $showNotebook)
         }
         .task {
-            viewModel.speechRecognizer = SpeechRecognizer()
-            await viewModel.speechRecognizer?.requestPermission()
-            viewModel.connect()
+            await viewModel.setup()
         }
         .onDisappear {
             viewModel.disconnect()
@@ -411,7 +409,7 @@ struct TranscriptView: View {
                     Spacer()
                 }
 
-                Text((viewModel.speechRecognizer?.transcript ?? "").isEmpty ? "話してください..." : (viewModel.speechRecognizer?.transcript ?? ""))
+                Text(viewModel.currentTranscript.isEmpty ? "話してください..." : viewModel.currentTranscript)
                     .font(.mdBody)
                     .foregroundStyle(Color.mdTextPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
