@@ -254,7 +254,8 @@ struct GeneratingView: View {
                 VStack(alignment: .leading, spacing: Spacing.md) {
                     checkItem("AIプレイヤーの補充", done: store.game.aiPlayersReady)
                     checkItem("シナリオの生成", done: store.game.scenarioReady)
-                    checkItem("キャラクター画像の生成", done: store.game.imagesReady)
+                    checkItem("舞台画像の生成", done: store.game.sceneImageReady)
+                    checkItem("キャラクター画像の生成", done: store.game.portraitsReady)
                     checkItem("ゲームの準備完了", done: store.game.allReady)
                 }
                 .padding(Spacing.lg)

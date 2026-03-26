@@ -46,7 +46,11 @@ def validate_transition(current: GameStatus, target: GameStatus) -> None:
 
 async def _generate_images_background(game_id: str, room_code: str, session_factory, ws_manager=None):
     from madaminu.llm.client import llm_client
-    from madaminu.services.image_generator import generate_character_portrait, generate_scene_image, generate_victim_portrait
+    from madaminu.services.image_generator import (
+        generate_character_portrait,
+        generate_scene_image,
+        generate_victim_portrait,
+    )
     from madaminu.ws.messages import WSMessage
 
     client = llm_client._client
@@ -156,7 +160,9 @@ async def _generate_scenario_background(
                 async with session_factory() as db:
                     scenario, gen_usages = await generate_scenario(db, game_id)
                     total_cost = sum(u.estimated_cost_usd for u in gen_usages)
-                    logger.info("Scenario generated for %s (attempt %d), cost: $%.4f", room_code, attempt + 1, total_cost)
+                    logger.info(
+                        "Scenario generated for %s (attempt %d), cost: $%.4f", room_code, attempt + 1, total_cost
+                    )
                     break
             except Exception:
                 logger.warning("Scenario generation attempt %d failed for %s", attempt + 1, room_code)
@@ -184,14 +190,15 @@ async def _generate_scenario_background(
                 if game:
                     for player in game.players:
                         state = await build_game_state(db, game, player.id)
-                        await ws_manager.send_to_player(
-                            room_code, player.id, WSMessage(type="game.state", data=state)
-                        )
+                        await ws_manager.send_to_player(room_code, player.id, WSMessage(type="game.state", data=state))
 
         # Step 4: Generate images (parallel, async)
         if ws_manager:
             await ws_manager.broadcast(
-                room_code, WSMessage(type="progress", data={"step": "images", "status": "in_progress"})
+                room_code, WSMessage(type="progress", data={"step": "scene_image", "status": "in_progress"})
+            )
+            await ws_manager.broadcast(
+                room_code, WSMessage(type="progress", data={"step": "portraits", "status": "in_progress"})
             )
 
         await _generate_images_background(game_id, room_code, session_factory, ws_manager)
@@ -199,7 +206,10 @@ async def _generate_scenario_background(
         # Step 5: Send updated game state with image URLs
         if ws_manager:
             await ws_manager.broadcast(
-                room_code, WSMessage(type="progress", data={"step": "images", "status": "done"})
+                room_code, WSMessage(type="progress", data={"step": "scene_image", "status": "done"})
+            )
+            await ws_manager.broadcast(
+                room_code, WSMessage(type="progress", data={"step": "portraits", "status": "done"})
             )
 
             async with session_factory() as db:
@@ -212,13 +222,9 @@ async def _generate_scenario_background(
                 if game:
                     for player in game.players:
                         state = await build_game_state(db, game, player.id)
-                        await ws_manager.send_to_player(
-                            room_code, player.id, WSMessage(type="game.state", data=state)
-                        )
+                        await ws_manager.send_to_player(room_code, player.id, WSMessage(type="game.state", data=state))
 
-            await ws_manager.broadcast(
-                room_code, WSMessage(type="game.ready", data={"room_code": room_code})
-            )
+            await ws_manager.broadcast(room_code, WSMessage(type="game.ready", data={"room_code": room_code}))
     except Exception:
         logger.exception("Background scenario generation failed for game %s", game_id)
         if ws_manager:

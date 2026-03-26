@@ -14,8 +14,10 @@ struct WSMessageAdapter {
             let status = data["status"] ?? ""
             if step == "scenario" && status == "done" {
                 store.game.scenarioReady = true
-            } else if step == "images" && status == "done" {
-                store.game.imagesReady = true
+            } else if step == "scene_image" && status == "done" {
+                store.game.sceneImageReady = true
+            } else if step == "portraits" && status == "done" {
+                store.game.portraitsReady = true
             }
         case "game.ready":
             store.game.allReady = true
@@ -64,10 +66,18 @@ struct WSMessageAdapter {
 
     private static func applyGameState(_ data: [String: String], store: AppStore) {
         let status = data["status"] ?? ""
+        print("[WSMessageAdapter] applyGameState: status=\(status), keys=\(data.keys.sorted())")
+        print("[WSMessageAdapter] mySecretInfo=\(data["my_secret_info"] ?? "nil"), myObjective=\(data["my_objective"] ?? "nil"), myRole=\(data["my_role"] ?? "nil")")
 
-        store.game.mySecretInfo = data["my_secret_info"]
-        store.game.myObjective = data["my_objective"]
-        store.game.myRole = data["my_role"]
+        if let secret = data["my_secret_info"] {
+            store.game.mySecretInfo = secret
+        }
+        if let objective = data["my_objective"] {
+            store.game.myObjective = objective
+        }
+        if let role = data["my_role"] {
+            store.game.myRole = role
+        }
         store.game.currentSpeakerId = data["current_speaker_id"]
 
         if let settingJSON = data["scenario_setting"],
@@ -77,8 +87,12 @@ struct WSMessageAdapter {
             store.game.scenarioSetting.situation = setting["situation"] as? String
         }
 
-        store.game.scenarioSetting.sceneImageUrl = data["scene_image_url"]
-        store.game.scenarioSetting.victimImageUrl = data["victim_image_url"]
+        if let sceneUrl = data["scene_image_url"] {
+            store.game.scenarioSetting.sceneImageUrl = sceneUrl
+        }
+        if let victimUrl = data["victim_image_url"] {
+            store.game.scenarioSetting.victimImageUrl = victimUrl
+        }
 
         if let victimJSON = data["victim"],
            let victimData = victimJSON.data(using: .utf8),
