@@ -46,7 +46,7 @@ def validate_transition(current: GameStatus, target: GameStatus) -> None:
 
 async def _generate_images_background(game_id: str, room_code: str, session_factory, ws_manager=None):
     from madaminu.llm.client import llm_client
-    from madaminu.services.image_generator import generate_character_portrait, generate_scene_image
+    from madaminu.services.image_generator import generate_character_portrait, generate_scene_image, generate_victim_portrait
     from madaminu.ws.messages import WSMessage
 
     client = llm_client._client
@@ -71,6 +71,14 @@ async def _generate_images_background(game_id: str, room_code: str, session_fact
 
             if setting_desc:
                 tasks.append(("scene", None, generate_scene_image(client, setting_desc)))
+
+            # Victim portrait
+            if game.scenario_skeleton:
+                victim = game.scenario_skeleton.get("victim", {})
+                victim_name = victim.get("name", "")
+                victim_desc = victim.get("description", "")
+                if victim_name:
+                    tasks.append(("victim", None, generate_victim_portrait(client, victim_name, victim_desc)))
 
             # Character portraits
             for player in game.players:
@@ -103,6 +111,9 @@ async def _generate_images_background(game_id: str, room_code: str, session_fact
                 if task_type == "scene":
                     game.scene_image = result_or_error
                     logger.info("Scene image generated for game %s", room_code)
+                elif task_type == "victim":
+                    game.victim_image = result_or_error
+                    logger.info("Victim image generated for game %s", room_code)
                 elif task_type == "portrait":
                     for p in game.players:
                         if p.id == player_id:

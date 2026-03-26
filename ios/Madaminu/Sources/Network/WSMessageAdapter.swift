@@ -78,6 +78,7 @@ struct WSMessageAdapter {
         }
 
         store.game.scenarioSetting.sceneImageUrl = data["scene_image_url"]
+        store.game.scenarioSetting.victimImageUrl = data["victim_image_url"]
 
         if let victimJSON = data["victim"],
            let victimData = victimJSON.data(using: .utf8),

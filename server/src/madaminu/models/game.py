@@ -35,6 +35,7 @@ class Game(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     scenario_skeleton: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     gm_internal_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     scene_image: Mapped[str | None] = mapped_column(Text, nullable=True)
+    victim_image: Mapped[str | None] = mapped_column(Text, nullable=True)
     total_llm_cost_usd: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     updated_at: Mapped[str | None] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

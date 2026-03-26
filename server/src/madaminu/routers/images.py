@@ -36,3 +36,16 @@ async def get_scene_image(room_code: str, db: AsyncSession = Depends(get_db)):
 
     image_bytes = base64.b64decode(game.scene_image)
     return Response(content=image_bytes, media_type="image/png")
+
+
+@router.get("/game/{room_code}/victim")
+async def get_victim_image(room_code: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Game).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found") from None
+    if game.victim_image is None:
+        raise HTTPException(status_code=404, detail="Victim image not yet generated") from None
+
+    image_bytes = base64.b64decode(game.victim_image)
+    return Response(content=image_bytes, media_type="image/png")
