@@ -139,10 +139,18 @@ async def _generate_scenario_background(
                 room_code, WSMessage(type="progress", data={"step": "scenario", "status": "in_progress"})
             )
 
-        async with session_factory() as db:
-            scenario, gen_usages = await generate_scenario(db, game_id)
-            total_cost = sum(u.estimated_cost_usd for u in gen_usages)
-            logger.info("Scenario generated for %s, cost: $%.4f", room_code, total_cost)
+        scenario = None
+        for attempt in range(3):
+            try:
+                async with session_factory() as db:
+                    scenario, gen_usages = await generate_scenario(db, game_id)
+                    total_cost = sum(u.estimated_cost_usd for u in gen_usages)
+                    logger.info("Scenario generated for %s (attempt %d), cost: $%.4f", room_code, attempt + 1, total_cost)
+                    break
+            except Exception:
+                logger.warning("Scenario generation attempt %d failed for %s", attempt + 1, room_code)
+                if attempt == 2:
+                    raise
 
         if ws_manager:
             await ws_manager.broadcast(
