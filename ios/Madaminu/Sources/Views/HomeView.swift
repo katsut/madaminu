@@ -14,6 +14,14 @@ public struct HomeView: View {
     public var body: some View {
         if let gvm = gameViewModel {
             GamePlayView(viewModel: gvm)
+                .onChange(of: gvm.hasFatalError) { _, hasFatal in
+                    if hasFatal {
+                        gameViewModel?.disconnect()
+                        gameViewModel = nil
+                        viewModel.isGameStarted = false
+                        viewModel.errorMessage = "シナリオ生成に失敗しました。もう一度お試しください。"
+                    }
+                }
         } else if viewModel.isGameStarted, let pid = viewModel.playerId, let token = viewModel.sessionToken {
             Color.clear.onAppear {
                 gameViewModel = GameViewModel(
