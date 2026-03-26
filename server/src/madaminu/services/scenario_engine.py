@@ -362,4 +362,18 @@ def _parse_scenario_json(raw: str) -> dict:
             lines = lines[:-1]
         cleaned = "\n".join(lines)
 
-    return json.loads(cleaned)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Try to fix common issues: trailing commas, truncated JSON
+        import re
+
+        fixed = re.sub(r",\s*([}\]])", r"\1", cleaned)
+        try:
+            return json.loads(fixed)
+        except json.JSONDecodeError:
+            # Try to close unclosed braces
+            open_braces = fixed.count("{") - fixed.count("}")
+            open_brackets = fixed.count("[") - fixed.count("]")
+            fixed += "]" * open_brackets + "}" * open_braces
+            return json.loads(fixed)
