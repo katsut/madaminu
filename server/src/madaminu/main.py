@@ -19,6 +19,9 @@ from madaminu.ws.handler import handle_websocket
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not settings.testing:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
         event_bus = EventBus()
         app.state.event_bus = event_bus
         app.state.phase_manager = PhaseManager(async_session)
