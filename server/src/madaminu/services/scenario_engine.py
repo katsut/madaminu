@@ -42,8 +42,12 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     characters = [
         {
             "character_name": p.character_name,
-            "character_personality": p.character_personality,
-            "character_background": p.character_background,
+            "character_gender": p.character_gender or "不明",
+            "character_age": p.character_age or "不明",
+            "character_occupation": p.character_occupation or "",
+            "character_appearance": p.character_appearance or "",
+            "character_personality": p.character_personality or "",
+            "character_background": p.character_background or "",
         }
         for p in game.players
         if p.character_name
