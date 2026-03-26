@@ -214,6 +214,8 @@ final class GameStore: ObservableObject, @unchecked Sendable {
         sessionToken = nil
         isHost = false
         hasCreatedCharacter = false
+        isLoading = false
+        progressMessage = nil
         errorMessage = nil
         resetGameState()
     }
