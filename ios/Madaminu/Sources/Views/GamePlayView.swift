@@ -95,6 +95,10 @@ struct GamePlayView: View {
                 Spacer()
             }
 
+            Circle()
+                .fill(store.game.isConnected ? Color.mdSuccess : Color.mdAccent)
+                .frame(width: 8, height: 8)
+
             if store.room.isHost, store.screen != .ended {
                 Menu {
                     Button("フェーズを進める") { store.dispatch(.advancePhase) }
