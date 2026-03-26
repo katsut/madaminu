@@ -10,8 +10,6 @@ struct WSMessageAdapter {
             if store.screen != .generating { store.screen = .generating }
         case "game.ready":
             store.screen = .intro
-            // Reconnect to get fresh game.state with scenario data
-            store.reconnectWebSocket()
         case "images.ready":
             store.reconnectWebSocket()
         case "phase.started":
