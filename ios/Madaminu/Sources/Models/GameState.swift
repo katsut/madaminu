@@ -50,3 +50,10 @@ struct ObjectiveResult: Codable, Sendable {
     let achieved: Bool
     let description: String
 }
+
+struct ScenarioSettingData {
+    var location: String?
+    var situation: String?
+    var victimName: String?
+    var victimDescription: String?
+}

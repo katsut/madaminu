@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct TranscriptEditView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     @State private var editedTranscript = ""
     @Environment(\.dismiss) private var dismiss
 

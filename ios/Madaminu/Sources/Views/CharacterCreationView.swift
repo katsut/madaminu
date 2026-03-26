@@ -61,7 +61,7 @@ private let characterTemplates: [CharacterTemplate] = [
 ]
 
 struct CharacterCreationView: View {
-    @Bindable var viewModel: RoomViewModel
+    @ObservedObject var viewModel: RoomViewModel
     @State private var currentStep = 0
     @State private var characterName = ""
     @State private var personality = ""

@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct JoinRoomSheet: View {
-    @Bindable var viewModel: RoomViewModel
+    @ObservedObject var viewModel: RoomViewModel
     @Binding var isPresented: Bool
 
     var body: some View {

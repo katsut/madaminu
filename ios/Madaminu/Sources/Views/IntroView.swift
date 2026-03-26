@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct IntroView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     @State private var currentPage = 0
 
     private let pageCount = 3
@@ -11,13 +11,18 @@ struct IntroView: View {
         VStack(spacing: 0) {
             pageIndicator
 
-            TabView(selection: $currentPage) {
-                storyIntroPage.tag(0)
-                characterCardsPage.tag(1)
-                mySecretPage.tag(2)
+            Group {
+                switch currentPage {
+                case 0: storyIntroPage
+                case 1: characterCardsPage
+                case 2: mySecretPage
+                default: EmptyView()
+                }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .animation(.easeInOut, value: currentPage)
+            .frame(maxHeight: .infinity)
+            .animation(.easeInOut(duration: 0.3), value: currentPage)
+
+            navigationBar
         }
         .background(Color.mdBackground.ignoresSafeArea())
     }
@@ -28,11 +33,31 @@ struct IntroView: View {
                 Capsule()
                     .fill(i == currentPage ? Color.mdPrimary : Color.mdTextMuted.opacity(0.3))
                     .frame(width: i == currentPage ? 24 : 8, height: 8)
-                    .animation(.easeInOut(duration: 0.2), value: currentPage)
             }
         }
         .padding(.top, Spacing.lg)
         .padding(.bottom, Spacing.sm)
+        .animation(.easeInOut(duration: 0.2), value: currentPage)
+    }
+
+    private var navigationBar: some View {
+        HStack(spacing: Spacing.md) {
+            if currentPage > 0 {
+                MDButton("← 戻る", style: .secondary) {
+                    currentPage -= 1
+                }
+            }
+
+            Spacer()
+
+            if currentPage < pageCount - 1 {
+                MDButton("次へ →") {
+                    currentPage += 1
+                }
+            }
+        }
+        .padding(.horizontal, Spacing.lg)
+        .padding(.bottom, Spacing.lg)
     }
 
     private var storyIntroPage: some View {
@@ -55,6 +80,7 @@ struct IntroView: View {
                         .font(.mdBody)
                         .foregroundStyle(Color.mdTextPrimary)
                 }
+                .padding(.horizontal, Spacing.lg)
             }
 
             if let victim = viewModel.scenarioSetting.victimName {
@@ -68,16 +94,11 @@ struct IntroView: View {
                             .foregroundStyle(Color.mdTextPrimary)
                     }
                 }
+                .padding(.horizontal, Spacing.lg)
             }
 
             Spacer()
-
-            Text("スワイプして続きを読む →")
-                .font(.mdCaption)
-                .foregroundStyle(Color.mdTextMuted)
-                .padding(.bottom, Spacing.xl)
         }
-        .padding(.horizontal, Spacing.lg)
     }
 
     private var characterCardsPage: some View {
@@ -117,11 +138,6 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
                 .padding(.vertical, Spacing.sm)
             }
-
-            Text("スワイプして続きを読む →")
-                .font(.mdCaption)
-                .foregroundStyle(Color.mdTextMuted)
-                .padding(.bottom, Spacing.xl)
         }
     }
 
@@ -144,6 +160,7 @@ struct IntroView: View {
                             .foregroundStyle(Color.mdTextPrimary)
                     }
                 }
+                .padding(.horizontal, Spacing.lg)
             }
 
             if let secret = viewModel.mySecretInfo {
@@ -157,6 +174,7 @@ struct IntroView: View {
                             .foregroundStyle(Color.mdTextPrimary)
                     }
                 }
+                .padding(.horizontal, Spacing.lg)
             }
 
             if let objective = viewModel.myObjective {
@@ -170,6 +188,7 @@ struct IntroView: View {
                             .foregroundStyle(Color.mdTextPrimary)
                     }
                 }
+                .padding(.horizontal, Spacing.lg)
             }
 
             Spacer()
@@ -177,9 +196,9 @@ struct IntroView: View {
             MDButton("ゲームを始める") {
                 withAnimation { viewModel.dismissIntro() }
             }
-            .padding(.bottom, Spacing.xl)
+            .padding(.horizontal, Spacing.lg)
+            .padding(.bottom, Spacing.md)
         }
-        .padding(.horizontal, Spacing.lg)
     }
 
     private func roleDisplayName(_ role: String) -> String {

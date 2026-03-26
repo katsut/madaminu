@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct NotebookView: View {
-    @Bindable var viewModel: GameViewModel
+    @ObservedObject var viewModel: GameViewModel
     @Binding var isPresented: Bool
 
     var body: some View {

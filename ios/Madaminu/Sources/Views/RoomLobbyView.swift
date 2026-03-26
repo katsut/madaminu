@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct RoomLobbyView: View {
-    @Bindable var viewModel: RoomViewModel
+    @ObservedObject var viewModel: RoomViewModel
 
     var body: some View {
         ZStack {
