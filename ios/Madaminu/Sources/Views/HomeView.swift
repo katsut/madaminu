@@ -2,37 +2,37 @@ import DesignSystem
 import SwiftUI
 
 public struct HomeView: View {
-    @StateObject private var controller = GameStore()
+    @StateObject private var store = AppStore()
 
     public init() {}
 
     public var body: some View {
         ZStack {
-            switch controller.screen {
+            switch store.screen {
             case .home:
-                HomeScreen(controller: controller)
+                HomeScreen(store: store)
             case .lobby:
-                RoomLobbyView(controller: controller)
+                RoomLobbyView(store: store)
             case .characterCreation:
-                CharacterCreationView(controller: controller)
+                CharacterCreationView(store: store)
             case .generating:
-                GeneratingView(controller: controller)
+                GeneratingView(store: store)
             case .intro:
-                IntroView(controller: controller)
+                IntroView(store: store)
             case .playing:
-                GamePlayView(controller: controller)
+                GamePlayView(store: store)
             case .ended:
-                GamePlayView(controller: controller)
+                GamePlayView(store: store)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: controller.screen)
+        .animation(.easeInOut(duration: 0.3), value: store.screen)
     }
 }
 
 // MARK: - Home Screen
 
 struct HomeScreen: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
     @State private var showCreateSheet = false
     @State private var showJoinSheet = false
     @State private var joinCode = ""
@@ -53,11 +53,14 @@ struct HomeScreen: View {
                 .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.lg)
 
-                MDTextField(label: "あなたの名前", text: $controller.displayName, placeholder: "名前を入力")
+                MDTextField(label: "あなたの名前", text: Binding(
+                    get: { store.room.displayName },
+                    set: { store.room.displayName = $0 }
+                ), placeholder: "名前を入力")
                     .padding(.horizontal, Spacing.lg)
                     .padding(.top, Spacing.md)
 
-                if let error = controller.errorMessage {
+                if let error = store.errorMessage {
                     Text(error)
                         .font(.mdCaption)
                         .foregroundStyle(Color.mdError)
@@ -71,7 +74,7 @@ struct HomeScreen: View {
                         .foregroundStyle(Color.mdTextSecondary)
                     Spacer()
                     Button {
-                        Task { @MainActor in await controller.fetchRooms() }
+                        store.dispatch(.fetchRooms)
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .foregroundStyle(Color.mdTextMuted)
@@ -82,14 +85,14 @@ struct HomeScreen: View {
 
                 ScrollView {
                     LazyVStack(spacing: Spacing.xs) {
-                        if controller.availableRooms.isEmpty {
+                        if store.room.availableRooms.isEmpty {
                             Text("ルームがありません")
                                 .font(.mdBody)
                                 .foregroundStyle(Color.mdTextMuted)
                                 .padding(Spacing.xl)
                         }
 
-                        ForEach(controller.availableRooms) { room in
+                        ForEach(store.room.availableRooms) { room in
                             MDCard {
                                 HStack {
                                     VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -109,7 +112,7 @@ struct HomeScreen: View {
                                     }
                                     Spacer()
                                     MDButton("参加", style: .secondary) {
-                                        Task { @MainActor in await controller.joinRoom(roomCode: room.roomCode) }
+                                        store.dispatch(.joinRoom(code: room.roomCode, password: nil))
                                     }
                                 }
                             }
@@ -133,12 +136,12 @@ struct HomeScreen: View {
         .onTapGesture {
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
-        .task { await controller.fetchRooms() }
+        .task { store.dispatch(.fetchRooms) }
         .sheet(isPresented: $showCreateSheet) {
-            CreateRoomSheet(controller: controller, isPresented: $showCreateSheet)
+            CreateRoomSheet(store: store, isPresented: $showCreateSheet)
         }
         .sheet(isPresented: $showJoinSheet) {
-            JoinRoomSheet(controller: controller, isPresented: $showJoinSheet, joinCode: $joinCode, password: $password)
+            JoinRoomSheet(store: store, isPresented: $showJoinSheet, joinCode: $joinCode, password: $password)
         }
     }
 }
@@ -146,7 +149,7 @@ struct HomeScreen: View {
 // MARK: - Create Room Sheet
 
 struct CreateRoomSheet: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
     @Binding var isPresented: Bool
     @State private var usePassword = false
     @State private var password = ""
@@ -179,10 +182,10 @@ struct CreateRoomSheet: View {
 
                 Spacer()
 
-                MDButton("作成", isLoading: controller.isLoading) {
-                    Task { @MainActor in
-                        await controller.createRoom(password: usePassword ? password : nil)
-                        if controller.screen == .lobby { isPresented = false }
+                MDButton("作成", isLoading: store.isLoading) {
+                    store.dispatch(.createRoom(password: usePassword ? password : nil))
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if store.screen == .lobby { isPresented = false }
                     }
                 }
             }
@@ -194,7 +197,7 @@ struct CreateRoomSheet: View {
 // MARK: - Join Room Sheet
 
 struct JoinRoomSheet: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
     @Binding var isPresented: Bool
     @Binding var joinCode: String
     @Binding var password: String
@@ -219,10 +222,10 @@ struct JoinRoomSheet: View {
 
                 Spacer()
 
-                MDButton("参加する", isLoading: controller.isLoading) {
-                    Task { @MainActor in
-                        await controller.joinRoom(roomCode: joinCode, password: password.isEmpty ? nil : password)
-                        if controller.screen == .lobby { isPresented = false }
+                MDButton("参加する", isLoading: store.isLoading) {
+                    store.dispatch(.joinRoom(code: joinCode, password: password.isEmpty ? nil : password))
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if store.screen == .lobby { isPresented = false }
                     }
                 }
             }
@@ -234,7 +237,7 @@ struct JoinRoomSheet: View {
 // MARK: - Generating View
 
 struct GeneratingView: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
 
     var body: some View {
         ZStack {
@@ -245,11 +248,11 @@ struct GeneratingView: View {
                     .tint(Color.mdPrimary)
                     .scaleEffect(1.5)
 
-                Text(controller.progressMessage ?? "シナリオを生成中...")
+                Text(store.room.progressMessage ?? "シナリオを生成中...")
                     .font(.mdBody)
                     .foregroundStyle(Color.mdTextSecondary)
 
-                if let error = controller.errorMessage {
+                if let error = store.errorMessage {
                     Text(error)
                         .font(.mdCaption)
                         .foregroundStyle(Color.mdError)
@@ -257,7 +260,7 @@ struct GeneratingView: View {
             }
         }
         .task {
-            await controller.setupSpeech()
+            await store.setupSpeech()
         }
     }
 }

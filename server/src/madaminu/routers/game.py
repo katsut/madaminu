@@ -10,7 +10,10 @@ from sqlalchemy.orm import selectinload
 from madaminu.config import settings
 from madaminu.db import get_db
 from madaminu.models import Game, GameStatus, Player
+from madaminu.repositories import GameRepository
+from madaminu.schemas.game import build_game_state
 from madaminu.services.ai_player import fill_ai_players
+from madaminu.services.errors import InvalidTransition
 from madaminu.services.scenario_engine import generate_scenario
 
 logger = logging.getLogger(__name__)
@@ -20,11 +23,25 @@ router = APIRouter(prefix="/api/v1/rooms", tags=["game"])
 MAX_VALIDATION_RETRIES = 2
 LLM_COST_LIMIT_USD = 2.0
 
+VALID_TRANSITIONS = {
+    GameStatus.waiting: [GameStatus.generating],
+    GameStatus.generating: [GameStatus.playing, GameStatus.waiting],
+    GameStatus.playing: [GameStatus.voting, GameStatus.ended],
+    GameStatus.voting: [GameStatus.ended],
+    GameStatus.ended: [],
+}
+
 
 class StartGameResponse(BaseModel):
     status: str
     scenario_setting: dict | None = None
     total_cost_usd: float
+
+
+def validate_transition(current: GameStatus, target: GameStatus) -> None:
+    allowed = VALID_TRANSITIONS.get(current, [])
+    if target not in allowed:
+        raise InvalidTransition(f"Cannot transition from {current} to {target}")
 
 
 async def _generate_images_background(game_id: str, room_code: str, session_factory, ws_manager=None):
@@ -36,9 +53,7 @@ async def _generate_images_background(game_id: str, room_code: str, session_fact
 
     try:
         async with session_factory() as db:
-            result = await db.execute(
-                select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-            )
+            result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
             game = result.scalar_one_or_none()
             if game is None:
                 return
@@ -50,7 +65,9 @@ async def _generate_images_background(game_id: str, room_code: str, session_fact
             setting_desc = ""
             if game.scenario_skeleton:
                 setting = game.scenario_skeleton.get("setting", {})
-                setting_desc = setting.get("location", "") or setting.get("situation", "") or setting.get("description", "")
+                setting_desc = (
+                    setting.get("location", "") or setting.get("situation", "") or setting.get("description", "")
+                )
 
             if setting_desc:
                 tasks.append(("scene", None, generate_scene_image(client, setting_desc)))
@@ -58,16 +75,18 @@ async def _generate_images_background(game_id: str, room_code: str, session_fact
             # Character portraits
             for player in game.players:
                 if player.character_name:
-                    tasks.append((
-                        "portrait",
-                        player.id,
-                        generate_character_portrait(
-                            client,
-                            player.character_name,
-                            player.character_personality or "",
-                            player.character_background or "",
-                        ),
-                    ))
+                    tasks.append(
+                        (
+                            "portrait",
+                            player.id,
+                            generate_character_portrait(
+                                client,
+                                player.character_name,
+                                player.character_personality or "",
+                                player.character_background or "",
+                            ),
+                        )
+                    )
 
             # Execute all in parallel
             results = await asyncio.gather(
@@ -76,7 +95,7 @@ async def _generate_images_background(game_id: str, room_code: str, session_fact
             )
 
             # Save results
-            for (task_type, player_id, _), result_or_error in zip(tasks, results):
+            for (task_type, player_id, _), result_or_error in zip(tasks, results, strict=True):
                 if isinstance(result_or_error, Exception):
                     logger.exception("Image generation failed: %s %s", task_type, player_id or "scene")
                     continue
@@ -187,6 +206,7 @@ async def start_game(
             total_cost_usd=round(total_cost, 4),
         )
 
+    validate_transition(game.status, GameStatus.generating)
     game.status = GameStatus.generating
     await db.commit()
 
@@ -216,3 +236,21 @@ async def start_game(
         status=game.status,
         total_cost_usd=round(game.total_llm_cost_usd, 4),
     )
+
+
+@router.get("/{room_code}/state")
+async def get_game_state(
+    room_code: str,
+    x_session_token: str = Header(...),
+    db: AsyncSession = Depends(get_db),
+):
+    game_repo = GameRepository(db)
+    game = await game_repo.find_by_room_code(room_code)
+    if game is None:
+        raise HTTPException(status_code=404)
+
+    player = next((p for p in game.players if p.session_token == x_session_token), None)
+    if player is None:
+        raise HTTPException(status_code=403)
+
+    return await build_game_state(db, game, player.id)

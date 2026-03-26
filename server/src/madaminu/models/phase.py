@@ -29,5 +29,6 @@ class Phase(Base, UUIDPrimaryKeyMixin):
     investigation_locations: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     started_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
+    deadline_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
 
     game: Mapped[Game] = relationship("Game", back_populates="phases", foreign_keys=[game_id])

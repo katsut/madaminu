@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct TranscriptEditView: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
     @State private var editedTranscript = ""
     @Environment(\.dismiss) private var dismiss
 
@@ -29,8 +29,8 @@ struct TranscriptEditView: View {
                     }
 
                     MDButton("確定して送信") {
-                        controller.currentTranscript = editedTranscript
-                        controller.releaseSpeech()
+                        store.game.currentTranscript = editedTranscript
+                        store.dispatch(.releaseSpeech)
                         dismiss()
                     }
                 }
@@ -38,7 +38,7 @@ struct TranscriptEditView: View {
             .padding(Spacing.lg)
         }
         .onAppear {
-            editedTranscript = controller.currentTranscript
+            editedTranscript = store.game.currentTranscript
         }
     }
 }
