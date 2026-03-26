@@ -13,6 +13,12 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var currentTranscript = ""
     @Published var isConnected = false
 
+    // Preparation checklist
+    @Published var aiPlayersReady = false
+    @Published var scenarioReady = false
+    @Published var imagesReady = false
+    @Published var allReady = false
+
     func reset() {
         scenarioSetting = ScenarioSettingData()
         mySecretInfo = nil
@@ -24,5 +30,9 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         isSpeaking = false
         currentTranscript = ""
         isConnected = false
+        aiPlayersReady = false
+        scenarioReady = false
+        imagesReady = false
+        allReady = false
     }
 }

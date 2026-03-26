@@ -7,11 +7,19 @@ struct WSMessageAdapter {
         case "game.state":
             applyGameState(data, store: store)
         case "game.generating":
+            store.game.aiPlayersReady = true
             if store.screen != .generating { store.screen = .generating }
+        case "progress":
+            let step = data["step"] ?? ""
+            let status = data["status"] ?? ""
+            if step == "scenario" && status == "done" {
+                store.game.scenarioReady = true
+            } else if step == "images" && status == "done" {
+                store.game.imagesReady = true
+            }
         case "game.ready":
+            store.game.allReady = true
             store.screen = .intro
-        case "images.ready":
-            store.reconnectWebSocket()
         case "phase.started":
             applyPhaseStarted(data, store: store)
         case "phase.timer":
