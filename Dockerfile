@@ -13,4 +13,4 @@ ENV PORT=8000
 
 COPY server/scripts/ scripts/
 
-CMD uv run python scripts/reset_db.py; uv run alembic upgrade head; uv run uvicorn madaminu.main:app --host 0.0.0.0 --port $PORT
+CMD uv run alembic upgrade head; uv run uvicorn madaminu.main:app --host 0.0.0.0 --port $PORT
