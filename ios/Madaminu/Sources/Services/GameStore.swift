@@ -189,6 +189,14 @@ final class GameStore: ObservableObject, @unchecked Sendable {
             try await api.startGame(roomCode: roomCode, sessionToken: token)
             screen = .generating
             connectWebSocket()
+        } catch let apiError as APIError {
+            if case .requestFailed(let code, _) = apiError, code == 400 {
+                // Game already started — join in progress
+                screen = .generating
+                connectWebSocket()
+            } else {
+                errorMessage = "ゲーム開始に失敗しました"
+            }
         } catch {
             errorMessage = "ゲーム開始に失敗しました"
         }
