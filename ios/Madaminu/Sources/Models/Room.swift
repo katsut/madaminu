@@ -56,6 +56,19 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         self.isAI = isAI
         self.connectionStatus = connectionStatus
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        characterName = try container.decodeIfPresent(String.self, forKey: .characterName)
+        characterPersonality = try container.decodeIfPresent(String.self, forKey: .characterPersonality)
+        characterBackground = try container.decodeIfPresent(String.self, forKey: .characterBackground)
+        portraitUrl = try container.decodeIfPresent(String.self, forKey: .portraitUrl)
+        isHost = try container.decodeIfPresent(Bool.self, forKey: .isHost) ?? false
+        isAI = try container.decodeIfPresent(Bool.self, forKey: .isAI) ?? false
+        connectionStatus = try container.decodeIfPresent(String.self, forKey: .connectionStatus) ?? "offline"
+    }
 }
 
 struct CharacterResponse: Codable, Sendable {
