@@ -27,9 +27,7 @@ async def get_player_portrait(player_id: str, db: AsyncSession = Depends(get_db)
 
 @router.get("/game/{room_code}/scene")
 async def get_scene_image(room_code: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code)
-    )
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found") from None

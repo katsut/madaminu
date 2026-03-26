@@ -2,7 +2,7 @@ import DesignSystem
 import SwiftUI
 
 struct IntroView: View {
-    @ObservedObject var controller: GameStore
+    @ObservedObject var store: AppStore
     @State private var currentPage = 0
 
     private let pageCount = 3
@@ -68,7 +68,7 @@ struct IntroView: View {
                 .font(.mdLargeTitle)
                 .foregroundStyle(Color.mdPrimary)
 
-            if let urlString = controller.scenarioSetting.sceneImageUrl,
+            if let urlString = store.game.scenarioSetting.sceneImageUrl,
                let url = URL(string: APIClient.defaultBaseURL + urlString) {
                 AsyncImage(url: url) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
@@ -80,13 +80,13 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
             }
 
-            if let setting = controller.scenarioSetting.location {
+            if let setting = store.game.scenarioSetting.location {
                 Text("舞台: \(setting)")
                     .font(.mdTitle2)
                     .foregroundStyle(Color.mdTextPrimary)
             }
 
-            if let situation = controller.scenarioSetting.situation {
+            if let situation = store.game.scenarioSetting.situation {
                 MDCard {
                     Text(situation)
                         .font(.mdBody)
@@ -95,7 +95,7 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
             }
 
-            if let victim = controller.scenarioSetting.victimName {
+            if let victim = store.game.scenarioSetting.victimName {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.sm) {
                         Label("被害者", systemImage: "person.slash")
@@ -104,7 +104,7 @@ struct IntroView: View {
                         Text(victim)
                             .font(.mdTitle2)
                             .foregroundStyle(Color.mdTextPrimary)
-                        if let desc = controller.scenarioSetting.victimDescription {
+                        if let desc = store.game.scenarioSetting.victimDescription {
                             Text(desc)
                                 .font(.mdBody)
                                 .foregroundStyle(Color.mdTextSecondary)
@@ -127,7 +127,7 @@ struct IntroView: View {
 
             ScrollView(.vertical) {
                 VStack(spacing: Spacing.sm) {
-                    ForEach(controller.players) { player in
+                    ForEach(store.room.players) { player in
                         MDCard {
                             HStack(alignment: .top, spacing: Spacing.sm) {
                                 if let urlString = player.portraitUrl,
@@ -154,7 +154,7 @@ struct IntroView: View {
                                             .font(.mdTitle2)
                                             .foregroundStyle(Color.mdTextPrimary)
                                         Spacer()
-                                        if player.id == controller.playerId {
+                                        if player.id == store.room.playerId {
                                             Text("あなた")
                                                 .font(.mdCaption2)
                                                 .foregroundStyle(Color.mdPrimary)
@@ -206,7 +206,7 @@ struct IntroView: View {
                 .font(.mdTitle)
                 .foregroundStyle(Color.mdAccent)
 
-            if let role = controller.myRole {
+            if let role = store.game.myRole {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Label("役割", systemImage: "theatermask.and.paintbrush")
@@ -220,7 +220,7 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
             }
 
-            if let secret = controller.mySecretInfo {
+            if let secret = store.game.mySecretInfo {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Label("秘密情報", systemImage: "lock.fill")
@@ -234,7 +234,7 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
             }
 
-            if let objective = controller.myObjective {
+            if let objective = store.game.myObjective {
                 MDCard {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Label("あなたの目的", systemImage: "target")
@@ -251,7 +251,7 @@ struct IntroView: View {
             Spacer()
 
             MDButton("ゲームを始める") {
-                withAnimation { controller.dismissIntro() }
+                withAnimation { store.dispatch(.dismissIntro) }
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.md)
