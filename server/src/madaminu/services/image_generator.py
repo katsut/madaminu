@@ -13,9 +13,10 @@ async def generate_character_portrait(
     background: str,
 ) -> str:
     prompt = (
-        f"A stylized portrait of a character named {character_name} for a murder mystery game. "
-        f"Personality: {personality}. Background: {background}. "
-        "Dark, moody atmosphere with dramatic lighting. Semi-realistic illustration style."
+        "A stylized portrait of a single person for a murder mystery game. "
+        "Dark, moody atmosphere with dramatic lighting. Semi-realistic illustration style. "
+        "Show only the person's face and upper body. "
+        "Absolutely no text, no labels, no names, no words, no letters anywhere in the image."
     )
 
     response = await client.images.generate(
@@ -48,7 +49,8 @@ async def generate_scene_image(
 ) -> str:
     prompt = (
         f"A wide establishing shot of a murder mystery scene: {setting_description}. "
-        "Dark, atmospheric, cinematic composition. Detailed environment illustration."
+        "Dark, atmospheric, cinematic composition. Detailed environment illustration. "
+        "No text, no labels, no names, no words in the image. Scene only."
     )
 
     response = await client.images.generate(
@@ -74,15 +76,17 @@ async def generate_scene_image(
 
     return image_b64
 
+
 async def generate_victim_portrait(
     client: AsyncOpenAI,
     victim_name: str,
     victim_description: str,
 ) -> str:
     prompt = (
-        f"A portrait of a murder victim named {victim_name} for a mystery game. "
+        f"A portrait of a murder victim for a mystery game. "
         f"Description: {victim_description}. "
-        "Somber, memorial-style portrait. Semi-realistic illustration."
+        "Somber, memorial-style portrait. Semi-realistic illustration. "
+        "No text, no labels, no names, no words in the image. Portrait only."
     )
 
     response = await client.images.generate(
