@@ -356,6 +356,20 @@ async def get_debug_info(
     if player is None or not player.is_host:
         raise HTTPException(status_code=403, detail="Host only") from None
 
+    from madaminu.models import Evidence
+
+    evidence_result = await db.execute(
+        select(Evidence).where(Evidence.game_id == game.id).order_by(Evidence.revealed_at)
+    )
+    all_evidence = evidence_result.scalars().all()
+    evidence_by_player: dict[str, list[dict]] = {}
+    for ev in all_evidence:
+        evidence_by_player.setdefault(ev.player_id, []).append({
+            "title": ev.title,
+            "content": ev.content,
+            "source": ev.source,
+        })
+
     return {
         "players": [
             {
@@ -366,6 +380,7 @@ async def get_debug_info(
                 "secret_info": p.secret_info,
                 "objective": p.objective,
                 "is_ai": p.is_ai,
+                "evidences": evidence_by_player.get(p.id, []),
             }
             for p in game.players
         ],
