@@ -61,6 +61,8 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             if let locationId = game.selectedLocationId {
                 ws.send(type: "investigate.select", data: ["location_id": locationId, "feature": feature])
             }
+        case .sendRoomMessage(let text):
+            ws.send(type: "room_message.send", data: ["text": text])
         case .vote(let suspectId):
             ws.send(type: "vote.submit", data: ["suspect_player_id": suspectId])
         case .advancePhase:

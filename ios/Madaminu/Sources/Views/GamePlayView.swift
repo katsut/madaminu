@@ -501,9 +501,60 @@ struct InvestigationPhaseView: View {
                         .frame(maxWidth: .infinity)
                     }
                 }
+
+                RoomChatView(store: store)
             }
             .padding(Spacing.lg)
         }
+    }
+}
+
+struct RoomChatView: View {
+    @ObservedObject var store: AppStore
+    @State private var messageText = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .foregroundStyle(Color.mdInfo)
+                Text("同室のヒソヒソ話")
+                    .font(.mdHeadline)
+                    .foregroundStyle(Color.mdTextPrimary)
+            }
+
+            ForEach(store.game.roomMessages) { msg in
+                HStack(alignment: .top, spacing: Spacing.xs) {
+                    Text(msg.senderName)
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdPrimary)
+                        .frame(width: 60, alignment: .leading)
+                    Text(msg.text)
+                        .font(.mdBody)
+                        .foregroundStyle(Color.mdTextPrimary)
+                }
+            }
+
+            HStack(spacing: Spacing.xs) {
+                TextField("メッセージ...", text: $messageText)
+                    .font(.mdBody)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    guard !messageText.isEmpty else { return }
+                    store.dispatch(.sendRoomMessage(text: messageText))
+                    let myName = store.room.players.first(where: { $0.id == store.room.playerId })?.characterName ?? "自分"
+                    store.game.roomMessages.append(RoomMessage(senderId: store.room.playerId ?? "", senderName: myName, text: messageText))
+                    messageText = ""
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                        .foregroundStyle(Color.mdPrimary)
+                }
+            }
+        }
+        .padding(Spacing.md)
+        .background(Color.mdSurface)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
     }
 }
 
