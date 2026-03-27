@@ -915,9 +915,9 @@ struct PhaseTransitionOverlay: View {
                 .opacity(0.3)
             }
 
-            VStack(spacing: Spacing.lg) {
-                Text("PHASE \(phase.phaseOrder + 1) / \(phase.totalPhases)")
-                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+            VStack(spacing: Spacing.md) {
+                Text("ターン \(phase.turnNumber) / \(phase.totalTurns)")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color.mdTextMuted)
                     .tracking(4)
 
@@ -930,6 +930,25 @@ struct PhaseTransitionOverlay: View {
                     .foregroundStyle(Color.mdTextSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Spacing.xl)
+
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    ForEach(phaseGuide(phase.phaseType), id: \.self) { step in
+                        HStack(alignment: .top, spacing: Spacing.xs) {
+                            Text("•")
+                                .foregroundStyle(Color.mdPrimary)
+                            Text(step)
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextSecondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, Spacing.xl)
+                .padding(.top, Spacing.sm)
+
+                Text(formatDuration(phase.durationSec))
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.mdTextMuted)
+                    .padding(.top, Spacing.xs)
             }
         }
     }
@@ -952,6 +971,42 @@ struct PhaseTransitionOverlay: View {
         case "voting": "犯人だと思う人物に投票してください"
         default: ""
         }
+    }
+
+    private func phaseGuide(_ type: String) -> [String] {
+        switch type {
+        case "planning":
+            return [
+                "マップを見て調べたい場所を1つ選ぶ",
+                "発言ボタンで他のプレイヤーと相談できる",
+                "制限時間後、選んだ場所で調査が始まる",
+            ]
+        case "investigation":
+            return [
+                "場所にあるものから1つ選んで調べる",
+                "手がかりが見つかると手帳に記録される",
+                "同じ場所の人とだけヒソヒソ話ができる",
+            ]
+        case "discussion":
+            return [
+                "発言ボタンを押して推理や情報を共有する",
+                "手帳で集めた証拠を確認できる",
+                "誰が怪しいか話し合おう",
+            ]
+        case "voting":
+            return [
+                "犯人だと思う人物を1人選ぶ",
+                "全員の投票が揃うと結果発表",
+            ]
+        default:
+            return []
+        }
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let min = seconds / 60
+        let sec = seconds % 60
+        return sec > 0 ? "制限時間 \(min)分\(sec)秒" : "制限時間 \(min)分"
     }
 }
 
