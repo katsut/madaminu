@@ -11,6 +11,7 @@ final class RoomStore: ObservableObject, @unchecked Sendable {
     @Published var hasCreatedCharacter = false
     @Published var availableRooms: [RoomListItem] = []
     @Published var myRooms: [MyRoomItem] = []
+    @Published var turnCount: Int = 3
     @Published var progressMessage: String?
 
     var playerId: String?
@@ -27,6 +28,7 @@ final class RoomStore: ObservableObject, @unchecked Sendable {
         hasCreatedCharacter = false
         playerId = nil
         sessionToken = nil
+        turnCount = 3
         progressMessage = nil
     }
 }

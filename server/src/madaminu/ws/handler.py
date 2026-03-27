@@ -120,6 +120,8 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 await _handle_investigate(db, room_code, player_id, data, websocket)
             elif msg_type == "investigate.select":
                 _handle_investigate_select(room_code, player_id, data, websocket)
+            elif msg_type == "room_message.send":
+                await _handle_room_message(db, room_code, player_id, data, websocket)
             elif msg_type == "vote.submit":
                 await _handle_vote(db, room_code, player_id, data, websocket)
     except WebSocketDisconnect:
@@ -214,9 +216,11 @@ def _handle_investigate_select(room_code: str, player_id: str, data: dict, webso
     pm = _get_phase_manager(websocket)
     if pm is None:
         return
-    location_id = data.get("data", {}).get("location_id", "")
-    pm.set_investigation_selection(room_code, player_id, location_id if location_id else None)
-    logger.info("Player %s selected investigation location: %s", player_id, location_id or "(none)")
+    payload = data.get("data", {})
+    location_id = payload.get("location_id", "")
+    feature = payload.get("feature")
+    pm.set_investigation_selection(room_code, player_id, location_id if location_id else None, feature)
+    logger.info("Player %s selected: location=%s feature=%s", player_id, location_id or "(none)", feature or "(none)")
 
 
 async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
@@ -253,6 +257,50 @@ async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, 
             data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
         ),
     )
+
+
+async def _handle_room_message(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    from madaminu.ws.messages import RoomMessageData
+
+    pm = _get_phase_manager(websocket)
+    if pm is None:
+        return
+
+    text = data.get("data", {}).get("text", "").strip()
+    if not text:
+        return
+
+    selections = pm.get_investigation_selections(room_code)
+    sender_selection = selections.get(player_id, {})
+    sender_location = sender_selection.get("location_id")
+    if not sender_location:
+        return
+
+    result = await db.execute(
+        select(Player).where(Player.id == player_id)
+    )
+    sender = result.scalar_one_or_none()
+    if sender is None:
+        return
+
+    sender_name = sender.character_name or sender.display_name
+
+    for other_id, other_sel in selections.items():
+        if other_id == player_id:
+            continue
+        if other_sel.get("location_id") == sender_location:
+            await manager.send_to_player(
+                room_code,
+                other_id,
+                WSMessage(
+                    type="room_message.received",
+                    data=RoomMessageData(
+                        sender_id=player_id,
+                        sender_name=sender_name,
+                        text=text,
+                    ).model_dump(),
+                ),
+            )
 
 
 async def _handle_vote(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):

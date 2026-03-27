@@ -24,14 +24,14 @@ class PhaseManager:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self._session_factory = session_factory
         self._timers: dict[str, asyncio.Task] = {}
-        self._investigation_selections: dict[str, dict[str, str | None]] = {}  # room_code -> {player_id: location_id}
+        self._investigation_selections: dict[str, dict[str, dict]] = {}  # room_code -> {player_id: {location_id, feature}}
 
-    def set_investigation_selection(self, room_code: str, player_id: str, location_id: str | None):
+    def set_investigation_selection(self, room_code: str, player_id: str, location_id: str | None, feature: str | None = None):
         if room_code not in self._investigation_selections:
             self._investigation_selections[room_code] = {}
-        self._investigation_selections[room_code][player_id] = location_id
+        self._investigation_selections[room_code][player_id] = {"location_id": location_id, "feature": feature}
 
-    def get_investigation_selections(self, room_code: str) -> dict[str, str | None]:
+    def get_investigation_selections(self, room_code: str) -> dict[str, dict]:
         return dict(self._investigation_selections.get(room_code, {}))
 
     def clear_investigation_selections(self, room_code: str):
@@ -190,27 +190,34 @@ class PhaseManager:
         if not selections:
             return
 
-        for player_id, location_id in selections.items():
+        for player_id, selection in selections.items():
+            location_id = selection.get("location_id")
+            feature = selection.get("feature")
             if not location_id:
                 continue
             try:
                 async with self._session_factory() as db:
-                    evidence, usage = await investigate_location(db, game_id, player_id, location_id)
+                    evidence, usage = await investigate_location(db, game_id, player_id, location_id, feature)
                     if evidence:
                         await manager.send_to_player(
                             room_code,
                             player_id,
                             WSMessage(
                                 type="investigate.result",
-                                data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
+                                data={
+                                    "title": evidence.title,
+                                    "content": evidence.content,
+                                    "location_id": location_id,
+                                    "hint": "",
+                                },
                             ),
                         )
-                        logger.info("Investigation result sent to %s for %s", player_id, location_id)
+                        logger.info("Investigation result sent to %s for %s/%s", player_id, location_id, feature)
             except Exception:
                 logger.exception("Investigation failed for player %s location %s", player_id, location_id)
 
     async def _schedule_ai_speeches(self, game_id: str, room_code: str, phase: Phase):
-        if phase.phase_type not in (PhaseType.discussion, PhaseType.investigation):
+        if phase.phase_type != PhaseType.discussion:
             return
 
         try:
@@ -276,6 +283,7 @@ class PhaseManager:
     async def _broadcast_phase_started(self, room_code: str, phase: Phase, total_phases: int | None = None):
         from madaminu.ws.handler import manager
 
+        total_turns = 3
         if total_phases is None:
             async with self._session_factory() as db:
                 from sqlalchemy import func
@@ -284,6 +292,14 @@ class PhaseManager:
                     select(func.count()).select_from(Phase).where(Phase.game_id == phase.game_id)
                 )
                 total_phases = count_result.scalar_one()
+
+                game_result = await db.execute(select(Game).where(Game.id == phase.game_id))
+                game = game_result.scalar_one()
+                total_turns = game.turn_count or 3
+        else:
+            total_turns = max(1, (total_phases - 1) // 3)
+
+        turn_number = phase.phase_order // 3 + 1
 
         await manager.broadcast(
             room_code,
@@ -295,6 +311,8 @@ class PhaseManager:
                     phase_order=phase.phase_order,
                     total_phases=total_phases,
                     duration_sec=phase.duration_sec,
+                    turn_number=turn_number,
+                    total_turns=total_turns,
                     investigation_locations=phase.investigation_locations,
                 ).model_dump(),
             ),
