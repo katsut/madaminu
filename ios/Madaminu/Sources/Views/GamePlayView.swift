@@ -291,13 +291,14 @@ struct SpeechButton: View {
 struct InvestigationPhaseView: View {
     @ObservedObject var store: AppStore
     @State private var showMap = false
+    @State private var selectedLocationId: String?
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
                     title: "調査フェーズ",
-                    message: "気になる場所を調べて手がかりを集めましょう。1フェーズにつき最大3回まで調査できます。発言ボタンで他のプレイヤーと情報を共有することもできます。"
+                    message: "調査したい場所を1つ選んでください。制限時間になると自動的に調査が実行されます。発言ボタンで他のプレイヤーと相談もできます。"
                 )
 
                 if let speaker = store.game.currentSpeakerId {
@@ -315,33 +316,47 @@ struct InvestigationPhaseView: View {
                 }
 
                 if let locations = store.game.currentPhase?.investigationLocations {
-                    Text("調査可能な場所")
+                    Text("調査先を選択")
                         .font(.mdHeadline)
                         .foregroundStyle(Color.mdTextSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     ForEach(locations) { location in
-                        MDCard {
-                            HStack {
-                                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                    Text(location.name)
-                                        .font(.mdHeadline)
-                                        .foregroundStyle(Color.mdTextPrimary)
-                                    Text(location.description)
-                                        .font(.mdCaption)
-                                        .foregroundStyle(Color.mdTextSecondary)
-                                    if let features = location.features, !features.isEmpty {
-                                        Text(features.joined(separator: "・"))
-                                            .font(.mdCaption)
-                                            .foregroundStyle(Color.mdTextMuted)
-                                    }
+                        let isSelected = selectedLocationId == location.id
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                if isSelected {
+                                    selectedLocationId = nil
+                                    store.dispatch(.selectInvestigation(locationId: nil))
+                                } else {
+                                    selectedLocationId = location.id
+                                    store.dispatch(.selectInvestigation(locationId: location.id))
                                 }
-                                Spacer()
-                                MDButton("調べる", style: .secondary) {
-                                    store.dispatch(.investigate(locationId: location.id))
+                            }
+                        } label: {
+                            MDCard {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                        Text(location.name)
+                                            .font(.mdHeadline)
+                                            .foregroundStyle(Color.mdTextPrimary)
+                                        Text(location.description)
+                                            .font(.mdCaption)
+                                            .foregroundStyle(Color.mdTextSecondary)
+                                        if let features = location.features, !features.isEmpty {
+                                            Text(features.joined(separator: "・"))
+                                                .font(.mdCaption)
+                                                .foregroundStyle(Color.mdTextMuted)
+                                        }
+                                    }
+                                    Spacer()
+                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(isSelected ? Color.mdSuccess : Color.mdTextMuted)
                                 }
                             }
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }

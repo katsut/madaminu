@@ -11,6 +11,7 @@ enum AppAction {
     case requestSpeech
     case releaseSpeech
     case investigate(locationId: String)
+    case selectInvestigation(locationId: String?)
     case vote(suspectId: String)
     case advancePhase
     case extendPhase

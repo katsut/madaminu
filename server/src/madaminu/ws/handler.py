@@ -118,6 +118,8 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 await _handle_speech_release(room_code, player_id, data, websocket)
             elif msg_type == "investigate":
                 await _handle_investigate(db, room_code, player_id, data, websocket)
+            elif msg_type == "investigate.select":
+                _handle_investigate_select(room_code, player_id, data, websocket)
             elif msg_type == "vote.submit":
                 await _handle_vote(db, room_code, player_id, data, websocket)
     except WebSocketDisconnect:
@@ -138,6 +140,10 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 data=PlayerDisconnectedData(player_id=player_id, display_name=display_name).model_dump(),
             ),
         )
+
+
+def _get_phase_manager(websocket: WebSocket):
+    return getattr(websocket.app.state, "phase_manager", None)
 
 
 def _get_speech_manager(websocket: WebSocket):
@@ -202,6 +208,15 @@ async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str,
         await pm.advance_phase(game.id, room_code)
     elif msg_type == "phase.extend":
         await pm.extend_phase(game.id, room_code)
+
+
+def _handle_investigate_select(room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    pm = _get_phase_manager(websocket)
+    if pm is None:
+        return
+    location_id = data.get("data", {}).get("location_id", "")
+    pm.set_investigation_selection(room_code, player_id, location_id if location_id else None)
+    logger.info("Player %s selected investigation location: %s", player_id, location_id or "(none)")
 
 
 async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
