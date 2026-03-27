@@ -20,9 +20,9 @@ class EvidenceSource(enum.StrEnum):
 class Evidence(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "evidences"
 
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), nullable=False, index=True)
-    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False, index=True)
-    phase_id: Mapped[str] = mapped_column(ForeignKey("phases.id"), nullable=False)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False, index=True)
+    phase_id: Mapped[str] = mapped_column(ForeignKey("phases.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[EvidenceSource] = mapped_column(Enum(EvidenceSource), nullable=False)

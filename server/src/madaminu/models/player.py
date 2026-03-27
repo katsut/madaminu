@@ -29,7 +29,7 @@ class ConnectionStatus(enum.StrEnum):
 class Player(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "players"
 
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), nullable=False, index=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True)
     device_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     session_token: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(50), nullable=False)

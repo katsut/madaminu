@@ -22,7 +22,7 @@ class PhaseType(enum.StrEnum):
 class Phase(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "phases"
 
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), nullable=False, index=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True)
     phase_type: Mapped[PhaseType] = mapped_column(Enum(PhaseType), nullable=False)
     phase_order: Mapped[int] = mapped_column(Integer, nullable=False)
     duration_sec: Mapped[int] = mapped_column(Integer, nullable=False)
