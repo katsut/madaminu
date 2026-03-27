@@ -44,12 +44,12 @@ struct HomeScreen: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Title logo (text baked into image)
+                // Title logo with text overlay
                 if let logoImage = UIImage(named: "logo", in: .module, compatibleWith: nil) {
                     Image(uiImage: logoImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(height: 180)
+                        .frame(height: 200)
                         .clipped()
                         .overlay(
                             LinearGradient(
@@ -57,6 +57,20 @@ struct HomeScreen: View {
                                 startPoint: .center,
                                 endPoint: .bottom
                             )
+                        )
+                        .overlay(
+                            VStack(spacing: 4) {
+                                Text("まだみぬ")
+                                    .font(.system(size: 36, weight: .black))
+                                    .foregroundStyle(Color(red: 0.95, green: 0.85, blue: 0.5))
+                                    .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 2)
+                                    .shadow(color: .black, radius: 8, x: 0, y: 0)
+                                Text("AI マーダーミステリー")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.8, green: 0.75, blue: 0.6))
+                                    .shadow(color: .black.opacity(0.8), radius: 3, x: 0, y: 1)
+                            }
+                            .padding(.top, 20)
                         )
                 }
 
@@ -348,6 +362,20 @@ struct GeneratingView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
 
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    Text("もうすぐストーリーが始まります")
+                        .font(.mdHeadline)
+                        .foregroundStyle(Color.mdTextPrimary)
+
+                    guideStep(1, "物語の設定と自分のプロフィール・目的を読む")
+                    guideStep(2, "他のプレイヤーのプロフィールを確認する")
+                    guideStep(3, "手帳に配られた証拠・アリバイを確認する")
+                    guideStep(4, "調査計画で最初に調べる場所をみんなで決める")
+                }
+                .padding(Spacing.lg)
+                .background(Color.mdSurface)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+
                 if let error = store.errorMessage {
                     Text(error)
                         .font(.mdCaption)
@@ -373,6 +401,18 @@ struct GeneratingView: View {
             Text(label)
                 .font(.mdBody)
                 .foregroundStyle(done ? Color.mdTextPrimary : Color.mdTextSecondary)
+        }
+    }
+
+    private func guideStep(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: Spacing.sm) {
+            Text("\(number).")
+                .font(.mdHeadline)
+                .foregroundStyle(Color.mdPrimary)
+                .frame(width: 20)
+            Text(text)
+                .font(.mdCaption)
+                .foregroundStyle(Color.mdTextSecondary)
         }
     }
 }
