@@ -168,54 +168,28 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
             if backbone:
                 branches.setdefault(backbone[-1], []).append(rid)
 
-        # Decide above/below placement per room to avoid overlaps
-        # room_side: rid -> "above" or "below"
-        room_side: dict[str, str] = {}
-        prev_above_wide = False
+        # Calculate room placement: above and below backbone, stacked
+        room_placement: dict[str, dict] = {}  # rid -> {"side": "above"|"below", "stack_index": int}
+        max_above_stacks = 0
+        max_below_stacks = 0
         for pid in backbone:
             rooms = branches.get(pid, [])
+            above_idx = 0
+            below_idx = 0
             for j, rid in enumerate(rooms):
-                rw, _ = _node_size(node_map[rid])
-                is_wide = rw > CELL
-                if j == 0:
-                    if prev_above_wide and is_wide:
-                        room_side[rid] = "below"
-                    else:
-                        room_side[rid] = "above"
+                if j % 2 == 0:
+                    room_placement[rid] = {"side": "above", "stack": above_idx}
+                    above_idx += 1
                 else:
-                    room_side[rid] = "below" if room_side.get(rooms[0]) == "above" else "above"
-            # Track if this passage has a wide room above for next iteration
-            first_room = rooms[0] if rooms else None
-            if first_room:
-                rw, _ = _node_size(node_map[first_room])
-                prev_above_wide = room_side.get(first_room) == "above" and rw > CELL
-            else:
-                prev_above_wide = False
+                    room_placement[rid] = {"side": "below", "stack": below_idx}
+                    below_idx += 1
+            max_above_stacks = max(max_above_stacks, above_idx)
+            max_below_stacks = max(max_below_stacks, below_idx)
 
-        # Calculate dimensions
         n_backbone = len(backbone)
-        has_above = False
-        has_below = False
-        max_room_h_above = CELL
-        max_room_h_below = CELL
-        for pid in backbone:
-            for rid in branches.get(pid, []):
-                _, rh = _node_size(node_map[rid])
-                if room_side.get(rid) == "above":
-                    has_above = True
-                    max_room_h_above = max(max_room_h_above, rh)
-                else:
-                    has_below = True
-                    max_room_h_below = max(max_room_h_below, rh)
-        if not has_above and not has_below:
-            for pid in backbone:
-                if branches.get(pid):
-                    has_above = True
-                    break
-
         content_w = n_backbone * (PASSAGE_W + PASSAGE_GAP) - PASSAGE_GAP
-        above_h = (max_room_h_above + BRANCH_GAP) if has_above else 0
-        below_h = (max_room_h_below + BRANCH_GAP) if has_below else 0
+        above_h = max_above_stacks * (CELL + BRANCH_GAP) if max_above_stacks else 0
+        below_h = max_below_stacks * (CELL + BRANCH_GAP) if max_below_stacks else 0
         content_h = above_h + PASSAGE_H + below_h
 
         block_w = content_w + AREA_PAD * 2
@@ -225,7 +199,7 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
 
         area_blocks.append({
             "area": area, "backbone": backbone, "branches": branches,
-            "node_map": node_map, "edges": edges, "room_side": room_side,
+            "node_map": node_map, "edges": edges, "room_placement": room_placement,
             "w": block_w, "h": block_h,
             "content_w": content_w,
             "above_h": above_h, "below_h": below_h,
@@ -252,8 +226,8 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
                 "is_backbone": True,
             }
 
-        # Position room branches using room_side
-        rs = block["room_side"]
+        # Position room branches using room_placement
+        rp = block["room_placement"]
         for pid in block["backbone"]:
             rooms = block["branches"].get(pid, [])
             pp = node_positions[pid]
@@ -261,10 +235,12 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
                 node = block["node_map"][rid]
                 rw, rh = _node_size(node)
                 rx = pp["cx"] - rw // 2
-                if rs.get(rid, "above") == "above":
-                    ry = oy + above_h - rh - BRANCH_GAP
+                placement = rp.get(rid, {"side": "above", "stack": 0})
+                stack = placement["stack"]
+                if placement["side"] == "above":
+                    ry = oy + above_h - (stack + 1) * (CELL + BRANCH_GAP)
                 else:
-                    ry = oy + above_h + PASSAGE_H + BRANCH_GAP
+                    ry = oy + above_h + PASSAGE_H + BRANCH_GAP + stack * (CELL + BRANCH_GAP)
                 node_positions[rid] = {
                     "x": rx, "y": ry, "w": rw, "h": rh,
                     "cx": rx + rw // 2, "cy": ry + rh // 2,
