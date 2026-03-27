@@ -91,11 +91,13 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
     connections = map_data.get("connections", [])
 
     # Build node lookup
+    _type_map = {"corridor": "passage"}
     all_nodes: dict[str, dict] = {}
     for area in areas:
         for node in area.get("nodes", []):
             if "type" not in node:
-                node["type"] = node.get("room_type", "room")
+                raw_type = node.get("room_type", "room")
+                node["type"] = _type_map.get(raw_type, raw_type)
             all_nodes[node["id"]] = node
 
     # Layout each area

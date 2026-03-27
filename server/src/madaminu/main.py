@@ -15,6 +15,7 @@ from madaminu.db.database import async_session, engine
 from madaminu.models import Base, Game, GameStatus
 from madaminu.events import EventBus, ImagesReady, ScenarioReady
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 from madaminu.routers.characters import router as characters_router
 from madaminu.routers.game import router as game_router
@@ -27,13 +28,12 @@ from madaminu.ws.handler import handle_websocket
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not settings.testing:
-        # Alembic handles migrations on startup via Dockerfile CMD
+    app.state.phase_manager = PhaseManager(async_session)
+    app.state.speech_manager = SpeechManager(async_session)
 
+    if not settings.testing:
         event_bus = EventBus()
         app.state.event_bus = event_bus
-        app.state.phase_manager = PhaseManager(async_session)
-        app.state.speech_manager = SpeechManager(async_session)
 
         event_bus.on(ScenarioReady, lambda e: None)
         event_bus.on(ImagesReady, lambda e: None)

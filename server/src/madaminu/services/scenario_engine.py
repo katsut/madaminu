@@ -36,6 +36,7 @@ ROLE_MAP = {
 async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[LLMUsage]]:
     usages: list[LLMUsage] = []
 
+    db.expire_all()
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
     game = result.scalar_one()
 
@@ -64,10 +65,13 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     usages.append(usage)
 
     logger.info("LLM response length: %d chars", len(raw_response))
+    logger.info("LLM response (first 500): %s", raw_response[:500])
+    logger.info("LLM response (last 500): %s", raw_response[-500:])
     if not raw_response.strip():
         raise ValueError("LLM returned empty response")
 
     scenario = _parse_scenario_json(raw_response)
+    logger.info("Scenario keys: %s", list(scenario.keys()))
 
     game.scenario_skeleton = {
         "setting": scenario["setting"],

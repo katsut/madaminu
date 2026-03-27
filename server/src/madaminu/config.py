@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     debug: bool = False
     testing: bool = False
 
-    model_config = {"env_prefix": "MADAMINU_"}
+    model_config = {"env_prefix": "MADAMINU_", "env_file": ".env"}
 
     @property
     def async_database_url(self) -> str:

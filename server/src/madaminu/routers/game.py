@@ -272,15 +272,34 @@ async def start_game(
             characters_ready += len(ai_added)
         if characters_ready < 4:
             raise HTTPException(status_code=400, detail=f"Need at least 4 characters, got {characters_ready}") from None
+        await db.commit()
 
     if settings.testing:
+        from madaminu.schemas.game import build_game_state
+        from madaminu.ws.handler import manager as ws_manager
+        from madaminu.ws.messages import WSMessage
+
+        await ws_manager.broadcast(room_code, WSMessage(type="game.generating", data={"room_code": room_code}))
+
+        await db.commit()
         scenario, gen_usages = await generate_scenario(db, game.id)
         total_cost = sum(u.estimated_cost_usd for u in gen_usages)
         logger.info("Scenario generated, cost: $%.4f", total_cost)
 
+        await ws_manager.broadcast(room_code, WSMessage(type="progress", data={"step": "scenario", "status": "done"}))
+
         pm = getattr(request.app.state, "phase_manager", None)
         if pm:
             await pm.start_first_phase(game.id, room_code)
+
+        await db.refresh(game, ["players"])
+        for player in game.players:
+            state = await build_game_state(db, game, player.id)
+            await ws_manager.send_to_player(room_code, player.id, WSMessage(type="game.state", data=state))
+
+        await ws_manager.broadcast(room_code, WSMessage(type="progress", data={"step": "scene_image", "status": "done"}))
+        await ws_manager.broadcast(room_code, WSMessage(type="progress", data={"step": "portraits", "status": "done"}))
+        await ws_manager.broadcast(room_code, WSMessage(type="game.ready", data={"room_code": room_code}))
 
         return StartGameResponse(
             status=game.status,
