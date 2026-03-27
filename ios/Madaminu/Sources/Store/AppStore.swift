@@ -233,6 +233,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         do {
             room.availableRooms = try await api.listRooms()
         } catch {
+            print("[AppStore] fetchRooms error: \(error)")
             room.availableRooms = []
         }
     }
@@ -266,6 +267,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
 
             if let me = room.players.first(where: { $0.id == room.playerId }) {
                 room.hasCreatedCharacter = me.characterName != nil
+                room.isHost = me.isHost
             }
         } catch {
             errorMessage = "ルーム情報の取得に失敗しました"
