@@ -135,13 +135,38 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
         if not backbone:
             backbone = [n["id"] for n in nodes]
 
-        # Find which rooms branch from which passage node
+        # Find which rooms branch from which backbone node
+        backbone_set = set(backbone)
         branches: dict[str, list[str]] = {pid: [] for pid in backbone}
+        assigned = set(backbone)
         for rid in room_ids:
             for nb in adj.get(rid, []):
-                if nb in passage_ids:
+                if nb in backbone_set:
                     branches.setdefault(nb, []).append(rid)
+                    assigned.add(rid)
                     break
+
+        # Assign unassigned rooms to their nearest backbone neighbor (BFS)
+        for rid in room_ids - assigned:
+            visited = {rid}
+            queue = list(adj.get(rid, []))
+            found = False
+            while queue and not found:
+                nid = queue.pop(0)
+                if nid in visited:
+                    continue
+                visited.add(nid)
+                if nid in backbone_set:
+                    branches.setdefault(nid, []).append(rid)
+                    assigned.add(rid)
+                    found = True
+                else:
+                    queue.extend(adj.get(nid, []))
+
+        # If still unassigned (disconnected), add to last backbone node
+        for rid in room_ids - assigned:
+            if backbone:
+                branches.setdefault(backbone[-1], []).append(rid)
 
         # Decide above/below placement per room to avoid overlaps
         # room_side: rid -> "above" or "below"
