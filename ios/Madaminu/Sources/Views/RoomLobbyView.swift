@@ -98,11 +98,16 @@ struct RoomLobbyView: View {
                         }
 
                         if store.room.isHost {
-                            MDButton("ゲーム開始", isLoading: store.isLoading) {
+                            MDButton("ゲーム開始", style: allReady ? .primary : .ghost, isLoading: store.isLoading) {
                                 store.dispatch(.startGame)
                             }
                             .disabled(!allReady)
                         }
+                    }
+
+                    if !allReady && store.room.isHost && store.room.hasCreatedCharacter {
+                        Text("全員が準備完了するとゲームを開始できます")
+                            .font(.mdCaption).foregroundStyle(Color.mdTextMuted)
                     }
 
                     let need = max(0, 4 - store.room.players.filter { $0.characterName != nil }.count)
