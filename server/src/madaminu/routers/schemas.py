@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class CreateRoomRequest(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=50)
     password: str | None = None
+    turn_count: int = Field(default=3, ge=2, le=5)
 
 
 class CreateRoomResponse(BaseModel):
@@ -60,6 +61,7 @@ class RoomInfoResponse(BaseModel):
     players: list[PlayerInfo]
     host_player_id: str | None
     has_password: bool = False
+    turn_count: int = 3
 
 
 class RoomListItem(BaseModel):

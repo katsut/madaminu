@@ -37,7 +37,7 @@ async def list_rooms_endpoint(db: AsyncSession = Depends(get_db)):
 @router.post("", response_model=CreateRoomResponse)
 async def create_room_endpoint(req: CreateRoomRequest, db: AsyncSession = Depends(get_db), x_device_id: str | None = Header(None)):
     try:
-        game, player = await create_room(db, req.display_name, req.password, device_id=x_device_id)
+        game, player = await create_room(db, req.display_name, req.password, device_id=x_device_id, turn_count=req.turn_count)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e)) from None
     return CreateRoomResponse(
@@ -70,6 +70,7 @@ async def get_room_endpoint(room_code: str, db: AsyncSession = Depends(get_db)):
         status=game.status,
         host_player_id=game.host_player_id,
         has_password=game.password is not None,
+        turn_count=game.turn_count,
         players=[
             PlayerInfo(
                 id=p.id,
