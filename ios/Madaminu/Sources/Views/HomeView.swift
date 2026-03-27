@@ -44,35 +44,20 @@ struct HomeScreen: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Title with logo
-                ZStack {
-                    if let logoImage = UIImage(named: "logo", in: .module, compatibleWith: nil) {
-                        Image(uiImage: logoImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 160)
-                            .clipped()
-                            .overlay(
-                                LinearGradient(
-                                    colors: [Color.mdBackground.opacity(0), Color.mdBackground],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
+                // Title logo (text baked into image)
+                if let logoImage = UIImage(named: "logo", in: .module, compatibleWith: nil) {
+                    Image(uiImage: logoImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 180)
+                        .clipped()
+                        .overlay(
+                            LinearGradient(
+                                colors: [Color.clear, Color.mdBackground],
+                                startPoint: .center,
+                                endPoint: .bottom
                             )
-                    } else {
-                        Color.mdBackgroundSecondary
-                            .frame(height: 120)
-                    }
-
-                    VStack(spacing: Spacing.xxs) {
-                        Text("マダ見ヌ")
-                            .font(.system(size: 36, weight: .black))
-                            .foregroundStyle(Color.mdPrimary)
-                        Text("AI マーダーミステリー")
-                            .font(.mdCaption)
-                            .foregroundStyle(Color.mdTextMuted)
-                    }
-                    .padding(.top, Spacing.xl)
+                        )
                 }
 
                 MDTextField(label: "あなたの名前", text: Binding(
