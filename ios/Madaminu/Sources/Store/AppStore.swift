@@ -269,6 +269,13 @@ final class AppStore: ObservableObject, @unchecked Sendable {
                 room.hasCreatedCharacter = me.characterName != nil
                 room.isHost = me.isHost
             }
+
+            if info.status == "generating" || info.status == "playing" || info.status == "voting" {
+                if screen == .lobby {
+                    screen = .generating
+                    connectWebSocket()
+                }
+            }
         } catch {
             errorMessage = "ルーム情報の取得に失敗しました"
         }
