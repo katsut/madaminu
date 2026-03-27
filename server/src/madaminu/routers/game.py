@@ -259,7 +259,7 @@ async def start_game(
     if player is None or not player.is_host:
         raise HTTPException(status_code=403, detail="Only the host can start the game") from None
 
-    not_ready = [p for p in game.players if not p.is_ready and not p.is_ai]
+    not_ready = [p for p in game.players if p.character_name and not p.is_ready and not p.is_ai]
     if not_ready:
         names = ", ".join(p.display_name for p in not_ready)
         raise HTTPException(status_code=400, detail=f"Not all players are ready: {names}") from None

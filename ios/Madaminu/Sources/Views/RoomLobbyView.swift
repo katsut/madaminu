@@ -5,16 +5,20 @@ struct RoomLobbyView: View {
     @ObservedObject var store: AppStore
     @State private var copied = false
 
-    private var readyCount: Int {
-        store.room.players.filter(\.isReady).count
+    private var playersWithCharacter: [PlayerInfo] {
+        store.room.players.filter { $0.characterName != nil }
     }
 
-    private var totalCount: Int {
-        store.room.players.count
+    private var readyCount: Int {
+        playersWithCharacter.filter(\.isReady).count
+    }
+
+    private var totalWithCharacter: Int {
+        playersWithCharacter.count
     }
 
     private var allReady: Bool {
-        totalCount > 0 && readyCount == totalCount
+        totalWithCharacter > 0 && readyCount == totalWithCharacter
     }
 
     var body: some View {
@@ -49,7 +53,7 @@ struct RoomLobbyView: View {
                         }
                     }
 
-                    Text(copied ? "コピーしました" : "\(readyCount)/\(totalCount) 人が準備完了")
+                    Text(copied ? "コピーしました" : "\(readyCount)/\(totalWithCharacter) 人が準備完了")
                         .font(.mdCaption).foregroundStyle(copied ? Color.mdSuccess : Color.mdTextMuted)
                 }
 
