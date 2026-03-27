@@ -4,6 +4,7 @@ import SwiftUI
 struct NotebookView: View {
     @ObservedObject var store: AppStore
     @Binding var isPresented: Bool
+    @State private var selectedPlayer: PlayerInfo?
 
     var body: some View {
         ZStack {
@@ -15,11 +16,15 @@ struct NotebookView: View {
                     header
                     characterSection
                     objectiveSection
+                    playersSection
                     evidenceSection
                     notesSection
                 }
                 .padding(Spacing.lg)
             }
+        }
+        .sheet(item: $selectedPlayer) { player in
+            PlayerDetailSheet(player: player, isMe: player.id == store.room.playerId)
         }
     }
 
@@ -126,6 +131,63 @@ struct NotebookView: View {
             }
         }
         .animation(.easeInOut, value: store.notebook.evidences.count)
+    }
+
+    private var playersSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Label("登場人物", systemImage: "person.3.fill")
+                .font(.mdHeadline)
+                .foregroundStyle(Color.mdTextSecondary)
+
+            ForEach(store.room.players) { player in
+                Button { selectedPlayer = player } label: {
+                    MDCard {
+                        HStack(spacing: Spacing.sm) {
+                            if let urlString = player.portraitUrl,
+                               let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Image(systemName: "person.fill")
+                                        .foregroundStyle(Color.mdTextMuted)
+                                        .frame(width: 40, height: 40)
+                                        .background(Color.mdSurface)
+                                }
+                                .frame(width: 40, height: 40)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                HStack(spacing: Spacing.xs) {
+                                    Text(player.characterName ?? player.displayName)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    if player.id == store.room.playerId {
+                                        Text("自分")
+                                            .font(.mdCaption2)
+                                            .foregroundStyle(Color.mdPrimary)
+                                            .padding(.horizontal, Spacing.xs)
+                                            .padding(.vertical, 1)
+                                            .background(Color.mdPrimary.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                    }
+                                }
+                                if let occupation = player.characterOccupation, !occupation.isEmpty {
+                                    Text(occupation)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextMuted)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextMuted)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private var notesSection: some View {
