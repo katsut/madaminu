@@ -5,6 +5,18 @@ struct RoomLobbyView: View {
     @ObservedObject var store: AppStore
     @State private var copied = false
 
+    private var readyCount: Int {
+        store.room.players.filter(\.isReady).count
+    }
+
+    private var totalCount: Int {
+        store.room.players.count
+    }
+
+    private var allReady: Bool {
+        totalCount > 0 && readyCount == totalCount
+    }
+
     var body: some View {
         ZStack {
             Color.mdBackground.ignoresSafeArea()
@@ -37,7 +49,7 @@ struct RoomLobbyView: View {
                         }
                     }
 
-                    Text(copied ? "コピーしました" : "\(store.room.players.count)人が参加中")
+                    Text(copied ? "コピーしました" : "\(readyCount)/\(totalCount) 人が準備完了")
                         .font(.mdCaption).foregroundStyle(copied ? Color.mdSuccess : Color.mdTextMuted)
                 }
 
@@ -58,8 +70,14 @@ struct RoomLobbyView: View {
                                         .background(Color.mdPrimary.opacity(0.15))
                                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                                 }
-                                Image(systemName: player.characterName != nil ? "checkmark.circle.fill" : "circle.dashed")
-                                    .foregroundStyle(player.characterName != nil ? Color.mdSuccess : Color.mdTextMuted)
+                                if player.isAI {
+                                    Text("AI").font(.mdCaption2).foregroundStyle(Color.mdInfo)
+                                        .padding(.horizontal, Spacing.xs).padding(.vertical, Spacing.xxs)
+                                        .background(Color.mdInfo.opacity(0.15))
+                                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                }
+                                Image(systemName: player.isReady ? "checkmark.circle.fill" : "circle.dashed")
+                                    .foregroundStyle(player.isReady ? Color.mdSuccess : Color.mdTextMuted)
                             }
                         }
                     }
@@ -69,16 +87,24 @@ struct RoomLobbyView: View {
 
                 if !store.room.hasCreatedCharacter {
                     MDButton("キャラクターを作成") { store.dispatch(.showCharacterCreation) }
-                } else if store.room.isHost {
-                    MDButton("ゲーム開始", isLoading: store.isLoading) {
-                        store.dispatch(.startGame)
+                } else {
+                    HStack(spacing: Spacing.sm) {
+                        MDButton(meIsReady ? "準備取消" : "準備完了", style: meIsReady ? .secondary : .primary) {
+                            store.dispatch(.toggleReady)
+                        }
+
+                        if store.room.isHost {
+                            MDButton("ゲーム開始", isLoading: store.isLoading) {
+                                store.dispatch(.startGame)
+                            }
+                            .disabled(!allReady)
+                        }
                     }
+
                     let need = max(0, 4 - store.room.players.filter { $0.characterName != nil }.count)
                     if need > 0 {
                         Text("AIプレイヤーが\(need)人補充されます").font(.mdCaption).foregroundStyle(Color.mdPrimary)
                     }
-                } else {
-                    Text("ホストがゲームを開始するのを待っています...").font(.mdCaption).foregroundStyle(Color.mdTextMuted)
                 }
 
                 if let error = store.errorMessage {
@@ -93,5 +119,9 @@ struct RoomLobbyView: View {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
+    }
+
+    private var meIsReady: Bool {
+        store.room.players.first(where: { $0.id == store.room.playerId })?.isReady ?? false
     }
 }
