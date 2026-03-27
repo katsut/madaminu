@@ -4,6 +4,7 @@ struct PhaseInfo: Codable, Sendable {
     let phaseId: String
     let phaseType: String
     let phaseOrder: Int
+    let totalPhases: Int
     let durationSec: Int
     let remainingSec: Int
     let investigationLocations: [InvestigationLocation]?
@@ -12,6 +13,7 @@ struct PhaseInfo: Codable, Sendable {
         case phaseId = "phase_id"
         case phaseType = "phase_type"
         case phaseOrder = "phase_order"
+        case totalPhases = "total_phases"
         case durationSec = "duration_sec"
         case remainingSec = "remaining_sec"
         case investigationLocations = "investigation_locations"
