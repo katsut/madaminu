@@ -14,5 +14,8 @@ enum AppAction {
     case advancePhase
     case extendPhase
     case fetchRooms
+    case fetchMyRooms
+    case deleteRoom(roomCode: String)
+    case rejoinRoom(sessionToken: String, playerId: String, roomCode: String)
     case refreshRoom
 }

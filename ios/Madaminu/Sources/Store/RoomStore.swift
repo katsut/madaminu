@@ -10,6 +10,7 @@ final class RoomStore: ObservableObject, @unchecked Sendable {
     @Published var isHost = false
     @Published var hasCreatedCharacter = false
     @Published var availableRooms: [RoomListItem] = []
+    @Published var myRooms: [MyRoomItem] = []
     @Published var progressMessage: String?
 
     var playerId: String?
