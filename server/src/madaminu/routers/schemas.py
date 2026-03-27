@@ -27,6 +27,7 @@ class PlayerInfo(BaseModel):
     display_name: str
     character_name: str | None = None
     is_host: bool
+    is_ready: bool = False
     connection_status: str
 
 

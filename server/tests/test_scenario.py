@@ -97,6 +97,9 @@ async def test_start_game_endpoint(client, test_session):
             headers={"x-session-token": token},
         )
 
+    for token in tokens:
+        await client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": token})
+
     mock_generate = AsyncMock(return_value=(json.dumps(MOCK_SCENARIO, ensure_ascii=False), MOCK_USAGE))
 
     with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
@@ -123,10 +126,22 @@ async def test_start_game_not_host(client, test_session):
     assert resp.status_code == 403
 
 
+async def test_start_game_not_ready(client, test_session):
+    room_resp = await client.post("/api/v1/rooms", json={"display_name": "Alice"})
+    room_code = room_resp.json()["room_code"]
+    host_token = room_resp.json()["session_token"]
+
+    resp = await client.post(f"/api/v1/rooms/{room_code}/start", headers={"x-session-token": host_token})
+    assert resp.status_code == 400
+    assert "ready" in resp.json()["detail"].lower()
+
+
 async def test_start_game_not_enough_characters(client, test_session):
     room_resp = await client.post("/api/v1/rooms", json={"display_name": "Alice"})
     room_code = room_resp.json()["room_code"]
     host_token = room_resp.json()["session_token"]
+
+    await client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": host_token})
 
     resp = await client.post(f"/api/v1/rooms/{room_code}/start", headers={"x-session-token": host_token})
     assert resp.status_code == 400

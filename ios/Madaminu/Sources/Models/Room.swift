@@ -35,6 +35,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
     let portraitUrl: String?
     let isHost: Bool
     let isAI: Bool
+    let isReady: Bool
     let connectionStatus: String
 
     enum CodingKeys: String, CodingKey {
@@ -50,10 +51,11 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         case portraitUrl = "portrait_url"
         case isHost = "is_host"
         case isAI = "is_ai"
+        case isReady = "is_ready"
         case connectionStatus = "connection_status"
     }
 
-    init(id: String, displayName: String, characterName: String? = nil, characterGender: String? = nil, characterAge: String? = nil, characterOccupation: String? = nil, characterAppearance: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, connectionStatus: String = "offline") {
+    init(id: String, displayName: String, characterName: String? = nil, characterGender: String? = nil, characterAge: String? = nil, characterOccupation: String? = nil, characterAppearance: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, isReady: Bool = false, connectionStatus: String = "offline") {
         self.id = id
         self.displayName = displayName
         self.characterName = characterName
@@ -66,6 +68,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         self.portraitUrl = portraitUrl
         self.isHost = isHost
         self.isAI = isAI
+        self.isReady = isReady
         self.connectionStatus = connectionStatus
     }
 
@@ -83,6 +86,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         portraitUrl = try container.decodeIfPresent(String.self, forKey: .portraitUrl)
         isHost = try container.decodeIfPresent(Bool.self, forKey: .isHost) ?? false
         isAI = try container.decodeIfPresent(Bool.self, forKey: .isAI) ?? false
+        isReady = try container.decodeIfPresent(Bool.self, forKey: .isReady) ?? false
         connectionStatus = try container.decodeIfPresent(String.self, forKey: .connectionStatus) ?? "offline"
     }
 }
