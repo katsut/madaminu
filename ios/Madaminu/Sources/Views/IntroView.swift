@@ -180,32 +180,19 @@ struct IntroView: View {
                         .font(.mdTitle)
                         .foregroundStyle(Color.mdTextPrimary)
 
-                    if let personality = me.characterPersonality {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.xs) {
-                                Label("性格", systemImage: "brain.head.profile")
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdPrimary)
-                                Text(personality)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                            }
-                        }
+                    profileBasicInfo(me)
                         .padding(.horizontal, Spacing.lg)
+
+                    if let appearance = me.characterAppearance, !appearance.isEmpty {
+                        profileCard("外見の特徴", icon: "eye", text: appearance)
+                    }
+
+                    if let personality = me.characterPersonality {
+                        profileCard("性格", icon: "brain.head.profile", text: personality)
                     }
 
                     if let background = me.characterBackground {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.xs) {
-                                Label("経歴", systemImage: "book")
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdPrimary)
-                                Text(background)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                            }
-                        }
-                        .padding(.horizontal, Spacing.lg)
+                        profileCard("経歴", icon: "book", text: background)
                     }
                 }
             }
@@ -234,6 +221,19 @@ struct IntroView: View {
                         Text(me.characterName ?? me.displayName)
                             .font(.mdTitle2)
                             .foregroundStyle(Color.mdTextPrimary)
+
+                        HStack(spacing: Spacing.sm) {
+                            if let gender = me.characterGender, !gender.isEmpty {
+                                profileBadge(gender)
+                            }
+                            if let age = me.characterAge, !age.isEmpty, age != "不明" {
+                                profileBadge("\(age)歳")
+                            }
+                            if let occupation = me.characterOccupation, !occupation.isEmpty {
+                                profileBadge(occupation)
+                            }
+                        }
+
                         if let personality = me.characterPersonality {
                             Text(personality)
                                 .font(.mdBody)
@@ -460,6 +460,44 @@ struct IntroView: View {
         default: role
         }
     }
+
+    private func profileBasicInfo(_ player: PlayerInfo) -> some View {
+        HStack(spacing: Spacing.sm) {
+            if let gender = player.characterGender, !gender.isEmpty {
+                profileBadge(gender)
+            }
+            if let age = player.characterAge, !age.isEmpty, age != "不明" {
+                profileBadge("\(age)歳")
+            }
+            if let occupation = player.characterOccupation, !occupation.isEmpty {
+                profileBadge(occupation)
+            }
+        }
+    }
+
+    private func profileBadge(_ text: String) -> some View {
+        Text(text)
+            .font(.mdCaption)
+            .foregroundStyle(Color.mdTextSecondary)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.xxs)
+            .background(Color.mdSurface)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+    }
+
+    private func profileCard(_ label: String, icon: String, text: String) -> some View {
+        MDCard {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Label(label, systemImage: icon)
+                    .font(.mdHeadline)
+                    .foregroundStyle(Color.mdPrimary)
+                Text(text)
+                    .font(.mdBody)
+                    .foregroundStyle(Color.mdTextPrimary)
+            }
+        }
+        .padding(.horizontal, Spacing.lg)
+    }
 }
 
 // MARK: - Player Detail Sheet
@@ -515,33 +553,54 @@ struct PlayerDetailSheet: View {
                         }
                     }
 
-                    if let personality = player.characterPersonality {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.xs) {
-                                Label("性格", systemImage: "brain.head.profile")
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdPrimary)
-                                Text(personality)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                            }
+                    HStack(spacing: Spacing.sm) {
+                        if let gender = player.characterGender, !gender.isEmpty {
+                            detailBadge(gender)
+                        }
+                        if let age = player.characterAge, !age.isEmpty, age != "不明" {
+                            detailBadge("\(age)歳")
+                        }
+                        if let occupation = player.characterOccupation, !occupation.isEmpty {
+                            detailBadge(occupation)
                         }
                     }
 
+                    if let appearance = player.characterAppearance, !appearance.isEmpty {
+                        detailCard("外見の特徴", icon: "eye", text: appearance)
+                    }
+
+                    if let personality = player.characterPersonality {
+                        detailCard("性格", icon: "brain.head.profile", text: personality)
+                    }
+
                     if let background = player.characterBackground {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.xs) {
-                                Label("経歴", systemImage: "book")
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdPrimary)
-                                Text(background)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                            }
-                        }
+                        detailCard("経歴", icon: "book", text: background)
                     }
                 }
                 .padding(Spacing.lg)
+            }
+        }
+    }
+
+    private func detailBadge(_ text: String) -> some View {
+        Text(text)
+            .font(.mdCaption)
+            .foregroundStyle(Color.mdTextSecondary)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.xxs)
+            .background(Color.mdSurface)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+    }
+
+    private func detailCard(_ label: String, icon: String, text: String) -> some View {
+        MDCard {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Label(label, systemImage: icon)
+                    .font(.mdHeadline)
+                    .foregroundStyle(Color.mdPrimary)
+                Text(text)
+                    .font(.mdBody)
+                    .foregroundStyle(Color.mdTextPrimary)
             }
         }
     }
