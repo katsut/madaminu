@@ -165,7 +165,7 @@ struct GamePlayView: View {
                 showNotebook = true
             }
 
-            if ["planning", "discussion", "investigation"].contains(store.game.currentPhase?.phaseType) {
+            if ["planning", "discussion"].contains(store.game.currentPhase?.phaseType) {
                 SpeechButton(store: store)
             }
         }
@@ -434,75 +434,23 @@ struct InvestigationPhaseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                GMGuideCard(
-                    title: "調査フェーズ",
-                    message: "調べたいものを選んでください。制限時間になると自動的に調査が実行されます。"
-                )
-
                 if let location = selectedLocation {
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            HStack {
-                                Image(systemName: "mappin.circle.fill")
-                                    .foregroundStyle(Color.mdInfo)
-                                Text(location.name)
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                            }
-                            Text(location.description)
-                                .font(.mdCaption)
-                                .foregroundStyle(Color.mdTextSecondary)
-                        }
-                    }
-
-                    if let features = location.features, !features.isEmpty {
-                        Text("何を調べますか？")
-                            .font(.mdHeadline)
-                            .foregroundStyle(Color.mdTextSecondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        ForEach(features, id: \.self) { feature in
-                            let isSelected = store.game.selectedFeature == feature
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    store.dispatch(.selectFeature(feature: feature))
-                                }
-                            } label: {
-                                HStack {
-                                    Text(feature)
-                                        .font(.mdHeadline)
-                                        .foregroundStyle(Color.mdTextPrimary)
-                                    Spacer()
-                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                        .font(.mdTitle2)
-                                        .foregroundStyle(isSelected ? Color.mdSuccess : Color.mdTextMuted)
-                                }
-                                .padding(Spacing.md)
-                                .background(isSelected ? Color.mdInfo.opacity(0.15) : Color.mdSurface)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: CornerRadius.md)
-                                        .stroke(isSelected ? Color.mdInfo : Color.mdSurface, lineWidth: isSelected ? 2 : 0)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    GMGuideCard(
+                        title: location.name,
+                        message: "部屋の中を調べています。発見物から1つだけ持ち帰れます。\(store.game.discoveries.first?.canTamper == true ? "誰もいないので、1つすり替えることもできます。" : "")"
+                    )
                 } else {
-                    MDCard {
-                        VStack(spacing: Spacing.sm) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.mdLargeTitle)
-                                .foregroundStyle(Color.mdTextMuted)
-                            Text("調査計画で場所が選ばれていません")
-                                .font(.mdBody)
-                                .foregroundStyle(Color.mdTextSecondary)
-                            Text("制限時間後、ランダムな場所で調査が行われます")
-                                .font(.mdCaption)
-                                .foregroundStyle(Color.mdTextMuted)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
+                    GMGuideCard(
+                        title: "調査フェーズ",
+                        message: "調査結果を待っています..."
+                    )
+                }
+
+                if store.game.discoveries.isEmpty {
+                    ProgressView()
+                        .tint(Color.mdPrimary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(Spacing.xl)
                 }
 
                 if !store.game.discoveries.isEmpty {
