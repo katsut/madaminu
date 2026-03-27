@@ -8,12 +8,19 @@ logger = logging.getLogger(__name__)
 
 async def generate_character_portrait(
     client: AsyncOpenAI,
-    character_name: str,
-    personality: str,
-    background: str,
+    gender: str,
+    age: str,
+    appearance: str,
 ) -> str:
+    gender_desc = {"男": "male", "女": "female"}.get(gender, "person")
+    age_desc = f"{age} years old" if age and age != "不明" else ""
+    appearance_desc = appearance if appearance else ""
+
+    subject = " ".join(filter(None, [age_desc, gender_desc]))
+
     prompt = (
-        "A stylized portrait of a single person for a murder mystery game. "
+        f"A stylized portrait of a {subject} for a murder mystery game. "
+        f"{appearance_desc} "
         "Dark, moody atmosphere with dramatic lighting. Semi-realistic illustration style. "
         "Show only the person's face and upper body. "
         "Absolutely no text, no labels, no names, no words, no letters anywhere in the image."

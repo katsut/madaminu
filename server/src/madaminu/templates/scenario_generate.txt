@@ -112,6 +112,18 @@ Connection side indicates where the passage is on the "from" room:
 - Consider sight lines and sound: adjacent rooms can hear loud noises
 - investigation_locations in phases reference location IDs from the map
 
+## Character Profile Enhancement
+
+Before generating the scenario, review each player's profile. If any field is too short, vague, or implausible for a murder mystery setting, enhance it:
+
+- If a character is a non-human (animal, robot, etc.), add a plausible reason they can communicate (e.g., "人語を解する猫", "高度なAI搭載のロボット")
+- If personality is only a few words, expand it to 2-3 sentences
+- If background is too brief, add context that ties into the mystery setting
+- If appearance is empty, generate an appropriate appearance based on gender, age, and occupation
+- If occupation is empty, infer one from the background
+
+Include these enhanced profiles in the player data output (as part of gm_notes).
+
 ## Constraints
 
 - Exactly one player must be the criminal
