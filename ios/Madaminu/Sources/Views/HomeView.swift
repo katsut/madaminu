@@ -107,12 +107,13 @@ struct HomeScreen: View {
                                                 .foregroundStyle(Color.mdTextSecondary)
                                         }
                                         Spacer()
-                                        if myRoom.status == "waiting" {
-                                            MDButton("再接続", style: .secondary) {
+                                        if myRoom.status != "ended" {
+                                            MDButton(myRoom.status == "waiting" ? "再接続" : "復帰", style: .secondary) {
                                                 store.dispatch(.rejoinRoom(
                                                     sessionToken: myRoom.sessionToken,
                                                     playerId: myRoom.playerId,
-                                                    roomCode: myRoom.roomCode
+                                                    roomCode: myRoom.roomCode,
+                                                    status: myRoom.status
                                                 ))
                                             }
                                         }

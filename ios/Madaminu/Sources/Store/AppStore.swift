@@ -64,12 +64,17 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             Task { @MainActor in await performFetchMyRooms() }
         case .deleteRoom(let roomCode):
             Task { @MainActor in await performDeleteRoom(roomCode: roomCode) }
-        case .rejoinRoom(let sessionToken, let playerId, let roomCode):
+        case .rejoinRoom(let sessionToken, let playerId, let roomCode, let status):
             room.sessionToken = sessionToken
             room.playerId = playerId
             room.roomCode = roomCode
-            screen = .lobby
-            Task { @MainActor in await performRefreshRoom() }
+            if status == "waiting" {
+                screen = .lobby
+                Task { @MainActor in await performRefreshRoom() }
+            } else {
+                // playing, generating, voting — connect WS, game.state will set screen
+                connectWebSocket()
+            }
         case .refreshRoom:
             Task { @MainActor in await performRefreshRoom() }
         }

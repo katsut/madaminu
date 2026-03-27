@@ -17,6 +17,6 @@ enum AppAction {
     case fetchRooms
     case fetchMyRooms
     case deleteRoom(roomCode: String)
-    case rejoinRoom(sessionToken: String, playerId: String, roomCode: String)
+    case rejoinRoom(sessionToken: String, playerId: String, roomCode: String, status: String)
     case refreshRoom
 }
