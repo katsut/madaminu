@@ -71,11 +71,21 @@ async def join_room(
     if game is None:
         raise ValueError("Room not found")
 
-    if game.status != GameStatus.waiting:
-        raise ValueError("Game already started")
-
     if game.password and game.password != password:
         raise ValueError("Invalid password")
+
+    # Check if this device already has a player in this room (rejoin)
+    if device_id:
+        existing = next((p for p in game.players if p.device_id == device_id), None)
+        if existing:
+            existing.display_name = display_name
+            existing.session_token = str(uuid.uuid4())
+            await db.commit()
+            await db.refresh(existing)
+            return game, existing
+
+    if game.status != GameStatus.waiting:
+        raise ValueError("Game already started")
 
     if len(game.players) >= MAX_PLAYERS:
         raise ValueError(f"Room is full (max {MAX_PLAYERS} players)")
