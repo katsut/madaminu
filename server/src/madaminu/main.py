@@ -71,9 +71,12 @@ async def _cleanup_old_rooms():
         logger.exception("Room cleanup failed")
 
 
+DEPLOY_VERSION = "2026-03-27T03"
+
+
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "version": DEPLOY_VERSION}
 
 
 @app.websocket("/ws/{room_code}")
