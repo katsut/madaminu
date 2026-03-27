@@ -26,6 +26,8 @@ struct GamePlayView: View {
                         Group {
                             if let phase = store.game.currentPhase {
                                 switch phase.phaseType {
+                                case "planning":
+                                    PlanningPhaseView(store: store)
                                 case "investigation":
                                     InvestigationPhaseView(store: store)
                                 case "discussion":
@@ -113,9 +115,14 @@ struct GamePlayView: View {
                         .fill(phaseColor(phase.phaseType))
                         .frame(width: 10, height: 10)
 
-                    Text("\(phaseDisplayName(phase.phaseType)) \(phase.phaseOrder + 1)/\(phase.totalPhases)")
-                        .font(.mdHeadline)
-                        .foregroundStyle(Color.mdTextPrimary)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("ターン \(phase.turnNumber)/\(phase.totalTurns)")
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdTextMuted)
+                        Text(phaseDisplayName(phase.phaseType))
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdTextPrimary)
+                    }
                 }
 
                 Spacer()
@@ -157,7 +164,7 @@ struct GamePlayView: View {
                 showNotebook = true
             }
 
-            if store.game.currentPhase?.phaseType == "discussion" || store.game.currentPhase?.phaseType == "investigation" {
+            if ["planning", "discussion", "investigation"].contains(store.game.currentPhase?.phaseType) {
                 SpeechButton(store: store)
             }
         }
@@ -242,6 +249,7 @@ struct GamePlayView: View {
 
     private func phaseColor(_ type: String) -> Color {
         switch type {
+        case "planning": .mdWarning
         case "investigation": .mdInfo
         case "discussion": .mdPrimary
         case "voting": .mdAccent
@@ -251,6 +259,7 @@ struct GamePlayView: View {
 
     private func phaseDisplayName(_ type: String) -> String {
         switch type {
+        case "planning": "調査計画"
         case "investigation": "調査フェーズ"
         case "discussion": "議論フェーズ"
         case "voting": "投票フェーズ"
@@ -288,7 +297,7 @@ struct SpeechButton: View {
     }
 }
 
-struct InvestigationPhaseView: View {
+struct PlanningPhaseView: View {
     @ObservedObject var store: AppStore
     @State private var selectedLocationId: String?
     @State private var mapSvg: String?
@@ -297,8 +306,8 @@ struct InvestigationPhaseView: View {
         ScrollView {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
-                    title: "調査フェーズ",
-                    message: "調査したい場所を1つ選んでください。制限時間になると自動的に調査が実行されます。発言ボタンで他のプレイヤーと相談もできます。"
+                    title: "調査計画",
+                    message: "みんなで相談して、次に調べる場所を決めましょう。発言ボタンで話し合えます。制限時間になると、選んだ場所で調査が始まります。"
                 )
 
                 if let speaker = store.game.currentSpeakerId {
@@ -309,7 +318,6 @@ struct InvestigationPhaseView: View {
                     TranscriptView(store: store)
                 }
 
-                // Embedded map
                 if let svg = mapSvg {
                     ScrollView(.horizontal, showsIndicators: false) {
                         SVGWebView(svgContent: svg)
@@ -408,6 +416,145 @@ struct InvestigationPhaseView: View {
                 Spacer()
             }
         }
+    }
+}
+
+struct InvestigationPhaseView: View {
+    @ObservedObject var store: AppStore
+
+    private var selectedLocation: InvestigationLocation? {
+        guard let locationId = store.game.selectedLocationId,
+              let locations = store.game.currentPhase?.investigationLocations else { return nil }
+        return locations.first(where: { $0.id == locationId })
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                GMGuideCard(
+                    title: "調査フェーズ",
+                    message: "調べたいものを選んでください。制限時間になると自動的に調査が実行されます。"
+                )
+
+                if let location = selectedLocation {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            HStack {
+                                Image(systemName: "mappin.circle.fill")
+                                    .foregroundStyle(Color.mdInfo)
+                                Text(location.name)
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                            Text(location.description)
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextSecondary)
+                        }
+                    }
+
+                    if let features = location.features, !features.isEmpty {
+                        Text("何を調べますか？")
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdTextSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        ForEach(features, id: \.self) { feature in
+                            let isSelected = store.game.selectedFeature == feature
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    store.dispatch(.selectFeature(feature: feature))
+                                }
+                            } label: {
+                                HStack {
+                                    Text(feature)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    Spacer()
+                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(isSelected ? Color.mdSuccess : Color.mdTextMuted)
+                                }
+                                .padding(Spacing.md)
+                                .background(isSelected ? Color.mdInfo.opacity(0.15) : Color.mdSurface)
+                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: CornerRadius.md)
+                                        .stroke(isSelected ? Color.mdInfo : Color.mdSurface, lineWidth: isSelected ? 2 : 0)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } else {
+                    MDCard {
+                        VStack(spacing: Spacing.sm) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.mdLargeTitle)
+                                .foregroundStyle(Color.mdTextMuted)
+                            Text("調査計画で場所が選ばれていません")
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextSecondary)
+                            Text("制限時間後、ランダムな場所で調査が行われます")
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextMuted)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+
+                RoomChatView(store: store)
+            }
+            .padding(Spacing.lg)
+        }
+    }
+}
+
+struct RoomChatView: View {
+    @ObservedObject var store: AppStore
+    @State private var messageText = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .foregroundStyle(Color.mdInfo)
+                Text("同室のヒソヒソ話")
+                    .font(.mdHeadline)
+                    .foregroundStyle(Color.mdTextPrimary)
+            }
+
+            ForEach(store.game.roomMessages) { msg in
+                HStack(alignment: .top, spacing: Spacing.xs) {
+                    Text(msg.senderName)
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdPrimary)
+                        .frame(width: 60, alignment: .leading)
+                    Text(msg.text)
+                        .font(.mdBody)
+                        .foregroundStyle(Color.mdTextPrimary)
+                }
+            }
+
+            HStack(spacing: Spacing.xs) {
+                TextField("メッセージ...", text: $messageText)
+                    .font(.mdBody)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    guard !messageText.isEmpty else { return }
+                    store.dispatch(.sendRoomMessage(text: messageText))
+                    let myName = store.room.players.first(where: { $0.id == store.room.playerId })?.characterName ?? "自分"
+                    store.game.roomMessages.append(RoomMessage(senderId: store.room.playerId ?? "", senderName: myName, text: messageText))
+                    messageText = ""
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                        .foregroundStyle(Color.mdPrimary)
+                }
+            }
+        }
+        .padding(Spacing.md)
+        .background(Color.mdSurface)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
     }
 }
 
@@ -746,6 +893,7 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseTitle(_ type: String) -> String {
         switch type {
+        case "planning": "調査計画"
         case "investigation": "調査フェーズ"
         case "discussion": "議論フェーズ"
         case "voting": "投票フェーズ"
@@ -755,7 +903,8 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseSubtitle(_ type: String) -> String {
         switch type {
-        case "investigation": "現場を調べて手がかりを集めましょう"
+        case "planning": "みんなで相談して、次に調べる場所を決めましょう"
+        case "investigation": "選んだ場所で手がかりを探しましょう"
         case "discussion": "集めた情報をもとに推理を話し合いましょう"
         case "voting": "犯人だと思う人物に投票してください"
         default: ""

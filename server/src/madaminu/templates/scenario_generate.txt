@@ -45,14 +45,6 @@ Create a complete scenario with the following structure (respond in JSON):
       "gm_notes": "GMがこの秘密を使ってシナリオを展開するためのメモ"
     }
   ],
-  "phases": [
-    {
-      "phase_type": "investigation",
-      "duration_sec": 300,
-      "description": "このフェーズの説明",
-      "investigation_locations": ["living_room", "kitchen", "study"]
-    }
-  ],
   "gm_strategy": "GMがゲーム全体をどう展開させるかの戦略メモ"
 }
 
@@ -105,7 +97,7 @@ The map is a hierarchical graph: **areas** contain **rooms**, and **connections*
 - The crime scene should have at least 2 connections
 - Consider sound: rooms connected by "door" or "corridor" can hear each other
 - Rooms connected by "window" have line of sight but limited sound
-- investigation_locations in phases reference room IDs from the map
+- Room IDs from the map are used for investigation locations during gameplay
 
 ## Character Profile Enhancement
 
@@ -145,7 +137,6 @@ Include these enhanced profiles in the player data output (as part of gm_notes).
 - The criminal must be one of the player characters
 - Each player must have a unique secret and objective
 - The mystery must be solvable through the clues provided
-- Include 3 phases: investigation, discussion, voting
-- Investigation phase should reference 4-6 locations from the map
+- Do NOT include a "phases" field — phases are managed by the server
 - All text content must be in Japanese
 - The map layout must support the crime's logic (alibis, escape routes, evidence placement)

@@ -31,6 +31,20 @@ _ws_skip = pytest.mark.skipif(
 MOCK_SCENARIO = {
     "setting": {"location": "洋館", "era": "現代", "situation": "パーティー中に殺人事件が発生"},
     "victim": {"name": "山田太郎", "description": "洋館の主人"},
+    "map": {
+        "areas": [
+            {
+                "id": "first_floor",
+                "name": "1階",
+                "area_type": "indoor",
+                "rooms": [
+                    {"id": "study", "name": "書斎", "features": ["本棚", "机"]},
+                    {"id": "garden", "name": "庭園", "features": ["噴水", "花壇"]},
+                ],
+            },
+        ],
+        "connections": [{"from": "study", "to": "garden", "type": "door"}],
+    },
     "relationships": [
         {"player1": "探偵", "player2": "医者", "relationship": "旧友"},
     ],
@@ -63,19 +77,6 @@ MOCK_SCENARIO = {
             "objective": "自分の出生の秘密を守る",
             "gm_notes": "出生証明書を調査可能",
         },
-    ],
-    "phases": [
-        {
-            "phase_type": "investigation",
-            "duration_sec": 300,
-            "description": "調査フェーズ",
-            "investigation_locations": [
-                {"id": "study", "name": "書斎", "description": "被害者の書斎"},
-                {"id": "garden", "name": "庭園", "description": "洋館の庭"},
-            ],
-        },
-        {"phase_type": "discussion", "duration_sec": 300, "description": "議論フェーズ"},
-        {"phase_type": "voting", "duration_sec": 120, "description": "投票フェーズ"},
     ],
     "gm_strategy": "序盤は関係性の手がかり、中盤で動機、終盤で決定的証拠を出す",
 }
@@ -119,6 +120,29 @@ async def _activate_first_phase(session_factory):
             if first_phase:
                 first_phase.started_at = datetime.now(UTC)
                 game.current_phase_id = first_phase.id
+        await db.commit()
+
+
+async def _activate_phase_by_type(session_factory, phase_type: PhaseType):
+    """Set current_phase_id to the first phase of the given type."""
+    from datetime import UTC, datetime
+
+    async with session_factory() as db:
+        result = await db.execute(
+            select(Game).where(Game.status == GameStatus.playing)
+        )
+        games = result.scalars().all()
+        for game in games:
+            phase_result = await db.execute(
+                select(Phase)
+                .where(Phase.game_id == game.id, Phase.phase_type == phase_type)
+                .order_by(Phase.phase_order)
+                .limit(1)
+            )
+            phase = phase_result.scalar_one_or_none()
+            if phase:
+                phase.started_at = datetime.now(UTC)
+                game.current_phase_id = phase.id
         await db.commit()
 
 
@@ -350,7 +374,7 @@ async def test_full_game_flow_with_websocket(e2e_client, e2e_session_factory):
         assert state["data"]["my_secret_info"] is not None
         assert state["data"]["my_role"] is not None
         assert "current_phase" in state["data"]
-        assert state["data"]["current_phase"]["phase_type"] == "investigation"
+        assert state["data"]["current_phase"]["phase_type"] == "planning"
 
         # Verify secret isolation
         for p in state["data"]["players"]:
@@ -386,7 +410,7 @@ async def test_websocket_investigation_flow(e2e_client, e2e_session_factory):
     with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
         e2e_client.post(f"/api/v1/rooms/{room_code}/start", headers={"x-session-token": host_token})
 
-    await _activate_first_phase(e2e_session_factory)
+    await _activate_phase_by_type(e2e_session_factory, PhaseType.investigation)
 
     with e2e_client.websocket_connect(f"/ws/{room_code}?token={host_token}") as ws:
         state = ws.receive_json()
@@ -733,10 +757,11 @@ async def test_room_state_after_game_start(async_client, e2e_session_factory):
 
         phases_result = await db.execute(select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order))
         phases = phases_result.scalars().all()
-        assert len(phases) == 3
-        assert phases[0].phase_type == PhaseType.investigation
-        assert phases[1].phase_type == PhaseType.discussion
-        assert phases[2].phase_type == PhaseType.voting
+        assert len(phases) == 10  # 3 turns × 3 phases + voting
+        assert phases[0].phase_type == PhaseType.planning
+        assert phases[1].phase_type == PhaseType.investigation
+        assert phases[2].phase_type == PhaseType.discussion
+        assert phases[9].phase_type == PhaseType.voting
 
         players_result = await db.execute(select(Player).where(Player.game_id == game.id))
         players = players_result.scalars().all()

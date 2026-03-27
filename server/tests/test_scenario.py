@@ -7,6 +7,20 @@ from madaminu.services.scenario_engine import _parse_scenario_json
 MOCK_SCENARIO = {
     "setting": {"location": "洋館", "era": "現代", "situation": "パーティー中に殺人事件が発生"},
     "victim": {"name": "山田太郎", "description": "洋館の主人"},
+    "map": {
+        "areas": [
+            {
+                "id": "first_floor",
+                "name": "1階",
+                "area_type": "indoor",
+                "rooms": [
+                    {"id": "study", "name": "書斎", "features": ["本棚", "机"]},
+                    {"id": "garden", "name": "庭園", "features": ["噴水", "花壇"]},
+                ],
+            },
+        ],
+        "connections": [{"from": "study", "to": "garden", "type": "door"}],
+    },
     "relationships": [
         {"player1": "探偵", "player2": "医者", "relationship": "旧友"},
     ],
@@ -39,19 +53,6 @@ MOCK_SCENARIO = {
             "objective": "自分の出生の秘密を守る",
             "gm_notes": "出生証明書を調査可能な場所に配置",
         },
-    ],
-    "phases": [
-        {
-            "phase_type": "investigation",
-            "duration_sec": 300,
-            "description": "調査フェーズ",
-            "investigation_locations": [
-                {"id": "study", "name": "書斎", "description": "被害者の書斎"},
-                {"id": "garden", "name": "庭園", "description": "洋館の庭"},
-            ],
-        },
-        {"phase_type": "discussion", "duration_sec": 300, "description": "議論フェーズ"},
-        {"phase_type": "voting", "duration_sec": 120, "description": "投票フェーズ"},
     ],
     "gm_strategy": "序盤は関係性の手がかり、中盤で動機、終盤で決定的証拠を出す",
 }

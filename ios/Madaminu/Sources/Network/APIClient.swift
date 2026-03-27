@@ -20,12 +20,12 @@ actor APIClient {
         return try await get("/api/v1/rooms")
     }
 
-    func createRoom(displayName: String, password: String? = nil) async throws -> CreateRoomResponse {
-        var body = ["display_name": displayName]
+    func createRoom(displayName: String, password: String? = nil, turnCount: Int = 3) async throws -> CreateRoomResponse {
+        var body: [String: Any] = ["display_name": displayName, "turn_count": turnCount]
         if let password, !password.isEmpty {
             body["password"] = password
         }
-        return try await post("/api/v1/rooms", body: body)
+        return try await postAny("/api/v1/rooms", body: body)
     }
 
     func joinRoom(roomCode: String, displayName: String, password: String? = nil) async throws -> JoinRoomResponse {
@@ -146,6 +146,29 @@ actor APIClient {
             request.setValue(value, forHTTPHeaderField: key)
         }
         request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response, data: data)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func postAny<T: Decodable>(
+        _ path: String,
+        body: [String: Any],
+        headers: [String: String] = [:]
+    ) async throws -> T {
+        guard let url = URL(string: baseURL + path) else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(DeviceIdentifier.deviceId, forHTTPHeaderField: "X-Device-Id")
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         try validateResponse(response, data: data)

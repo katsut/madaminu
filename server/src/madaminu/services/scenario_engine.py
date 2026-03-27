@@ -94,7 +94,6 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
 
     map_data = scenario.get("map", {})
     map_locations = {}
-    # Support both old flat structure and new hierarchical structure
     if "areas" in map_data:
         for area in map_data["areas"]:
             for room in area.get("rooms", []):
@@ -103,21 +102,8 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         for loc in map_data["locations"]:
             map_locations[loc["id"]] = loc
 
-    for i, phase_data in enumerate(scenario.get("phases", [])):
-        phase_type_str = phase_data.get("phase_type", "investigation")
-        phase_type = PhaseType(phase_type_str) if phase_type_str in PhaseType.__members__ else PhaseType.investigation
-
-        raw_locations = phase_data.get("investigation_locations", [])
-        resolved_locations = _resolve_investigation_locations(raw_locations, map_locations)
-
-        phase = Phase(
-            game_id=game.id,
-            phase_type=phase_type,
-            phase_order=i,
-            duration_sec=phase_data.get("duration_sec", 300),
-            investigation_locations=resolved_locations,
-        )
-        db.add(phase)
+    all_locations = _resolve_investigation_locations(list(map_locations.keys()), map_locations)
+    _create_cycle_phases(db, game, all_locations)
 
     game.total_llm_cost_usd += sum(u.estimated_cost_usd for u in usages)
     await db.commit()
@@ -208,6 +194,7 @@ async def investigate_location(
     game_id: str,
     player_id: str,
     location_id: str,
+    feature: str | None = None,
 ) -> tuple[Evidence | None, LLMUsage | None]:
     game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
     game = game_result.scalar_one()
@@ -250,6 +237,9 @@ async def investigate_location(
     existing = existing_result.scalars().all()
     existing_text = "\n".join(f"- {e.title}: {e.content}" for e in existing) if existing else "(なし)"
 
+    feature_name = feature or location.get("name", location_id)
+    location_features = location.get("features", [])
+
     system_prompt = load_template("scenario_system")
     user_prompt = render_template(
         "investigation",
@@ -262,11 +252,18 @@ async def investigate_location(
         player_objective=player.objective or "N/A",
         location_name=location.get("name", location_id),
         location_description=location.get("description", ""),
+        feature_name=feature_name,
+        location_features=", ".join(location_features) if location_features else "(なし)",
         existing_evidence=existing_text,
     )
 
     raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
     result = _parse_scenario_json(raw_response)
+
+    hint = result.get("hint", "")
+    content = result.get("content", "")
+    if hint:
+        content += f"\n\n💡 {hint}"
 
     evidence = Evidence(
         id=str(uuid.uuid4()),
@@ -274,7 +271,7 @@ async def investigate_location(
         player_id=player_id,
         phase_id=phase.id,
         title=result.get("title", "調査結果"),
-        content=result.get("content", ""),
+        content=content,
         source=EvidenceSource.investigation,
     )
     db.add(evidence)
@@ -375,6 +372,40 @@ def _format_speech_logs(logs, id_to_name: dict[str, str]) -> str:
         name = id_to_name.get(log.player_id, "Unknown")
         lines.append(f"[{name}]: {log.transcript}")
     return "\n".join(lines)
+
+
+PHASE_DURATIONS = {
+    PhaseType.planning: 180,
+    PhaseType.investigation: 120,
+    PhaseType.discussion: 300,
+    PhaseType.voting: 180,
+}
+
+
+def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
+    turn_count = game.turn_count or 3
+    phase_order = 0
+
+    for _turn in range(turn_count):
+        for phase_type in (PhaseType.planning, PhaseType.investigation, PhaseType.discussion):
+            locations = all_locations if phase_type in (PhaseType.planning, PhaseType.investigation) else None
+            phase = Phase(
+                game_id=game.id,
+                phase_type=phase_type,
+                phase_order=phase_order,
+                duration_sec=PHASE_DURATIONS[phase_type],
+                investigation_locations=locations,
+            )
+            db.add(phase)
+            phase_order += 1
+
+    voting_phase = Phase(
+        game_id=game.id,
+        phase_type=PhaseType.voting,
+        phase_order=phase_order,
+        duration_sec=PHASE_DURATIONS[PhaseType.voting],
+    )
+    db.add(voting_phase)
 
 
 def _resolve_investigation_locations(raw_locations: list, map_locations: dict) -> list[dict]:

@@ -53,7 +53,16 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         case .investigate(let locationId):
             ws.send(type: "investigate", data: ["location_id": locationId])
         case .selectInvestigation(let locationId):
+            game.selectedLocationId = locationId
+            game.selectedFeature = nil
             ws.send(type: "investigate.select", data: ["location_id": locationId ?? ""])
+        case .selectFeature(let feature):
+            game.selectedFeature = feature
+            if let locationId = game.selectedLocationId {
+                ws.send(type: "investigate.select", data: ["location_id": locationId, "feature": feature])
+            }
+        case .sendRoomMessage(let text):
+            ws.send(type: "room_message.send", data: ["text": text])
         case .vote(let suspectId):
             ws.send(type: "vote.submit", data: ["suspect_player_id": suspectId])
         case .advancePhase:
@@ -162,7 +171,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         errorMessage = nil
 
         do {
-            let response = try await api.createRoom(displayName: room.displayName, password: password)
+            let response = try await api.createRoom(displayName: room.displayName, password: password, turnCount: room.turnCount)
             room.roomCode = response.roomCode
             room.playerId = response.playerId
             room.sessionToken = response.sessionToken
@@ -241,6 +250,9 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         do {
             let info = try await api.getRoomInfo(roomCode: room.roomCode)
             room.players = info.players
+            if let turnCount = info.turnCount {
+                room.turnCount = turnCount
+            }
 
             if let me = room.players.first(where: { $0.id == room.playerId }) {
                 room.hasCreatedCharacter = me.characterName != nil

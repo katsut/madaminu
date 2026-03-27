@@ -49,6 +49,11 @@ struct WSMessageAdapter {
             let title = data["title"] ?? "新しい手がかり"
             let content = data["content"] ?? ""
             store.notebook.evidences.append(EvidenceItem(title: title, content: content))
+        case "room_message.received":
+            let senderId = data["sender_id"] ?? ""
+            let senderName = data["sender_name"] ?? ""
+            let text = data["text"] ?? ""
+            store.game.roomMessages.append(RoomMessage(senderId: senderId, senderName: senderName, text: text))
         case "game.ending":
             applyEnding(data, store: store)
         case "error":
@@ -171,6 +176,8 @@ struct WSMessageAdapter {
                 totalPhases: phase.totalPhases,
                 durationSec: phase.durationSec,
                 remainingSec: remaining,
+                turnNumber: phase.turnNumber,
+                totalTurns: phase.totalTurns,
                 investigationLocations: phase.investigationLocations
             )
         }
@@ -209,6 +216,8 @@ struct WSMessageAdapter {
             totalPhases: data["total_phases"] as? Int ?? 3,
             durationSec: durationSec,
             remainingSec: data["remaining_sec"] as? Int ?? durationSec,
+            turnNumber: data["turn_number"] as? Int ?? (phaseOrder / 3 + 1),
+            totalTurns: data["total_turns"] as? Int ?? 3,
             investigationLocations: locations
         )
     }

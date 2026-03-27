@@ -14,6 +14,9 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var isConnected = false
     @Published var showPhaseTransition = false
     @Published var localRemainingSec: Int = 0
+    @Published var selectedLocationId: String?
+    @Published var selectedFeature: String?
+    @Published var roomMessages: [RoomMessage] = []
 
     // Preparation checklist
     @Published var aiPlayersReady = false
@@ -35,6 +38,9 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         isConnected = false
         showPhaseTransition = false
         localRemainingSec = 0
+        selectedLocationId = nil
+        selectedFeature = nil
+        roomMessages = []
         aiPlayersReady = false
         scenarioReady = false
         sceneImageReady = false

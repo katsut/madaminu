@@ -18,7 +18,13 @@ def _generate_room_code() -> str:
     return "".join(random.choices(chars, k=ROOM_CODE_LENGTH))
 
 
-async def create_room(db: AsyncSession, display_name: str, password: str | None = None, device_id: str | None = None) -> tuple[Game, Player]:
+async def create_room(
+    db: AsyncSession,
+    display_name: str,
+    password: str | None = None,
+    device_id: str | None = None,
+    turn_count: int = 3,
+) -> tuple[Game, Player]:
     for _ in range(10):
         code = _generate_room_code()
         existing = await db.execute(select(Game).where(Game.room_code == code))
@@ -32,6 +38,7 @@ async def create_room(db: AsyncSession, display_name: str, password: str | None 
         room_code=code,
         status=GameStatus.waiting,
         password=password if password else None,
+        turn_count=turn_count,
     )
     db.add(game)
     await db.flush()
