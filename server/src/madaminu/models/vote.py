@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 class Vote(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "votes"
 
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), nullable=False, index=True)
-    voter_player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False)
-    suspect_player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True)
+    voter_player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
+    suspect_player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
 
     game: Mapped[Game] = relationship("Game", back_populates="votes")
