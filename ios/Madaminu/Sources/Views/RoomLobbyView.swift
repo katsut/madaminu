@@ -53,7 +53,7 @@ struct RoomLobbyView: View {
                         }
                     }
 
-                    Text(copied ? "コピーしました" : "\(readyCount)/\(totalWithCharacter) 人が準備完了")
+                    Text(copied ? "コピーしました" : "\(readyCount)/\(store.room.players.count) 人が準備完了")
                         .font(.mdCaption).foregroundStyle(copied ? Color.mdSuccess : Color.mdTextMuted)
                 }
 
