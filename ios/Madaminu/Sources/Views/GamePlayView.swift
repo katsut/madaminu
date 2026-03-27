@@ -658,7 +658,7 @@ struct DiscussionPhaseView: View {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
                     title: "議論フェーズ",
-                    message: "任意のタイミングで証拠を提出することができます。発言をする際には必ず発言ボタンをONにし、マイクを有効にしてください。"
+                    message: "任意のタイミングで証拠を提出することができます。発言をする際には必ず発言ボタンをONにし、マイクを有効にしてください。\n\n📋 口頭の主張: 1点  |  証拠カードの提出: 3点"
                 )
 
                 if let speaker = store.game.currentSpeakerId {
@@ -1133,7 +1133,7 @@ struct PhaseTransitionOverlay: View {
             return [
                 "任意のタイミングで証拠を提出できる",
                 "発言する際は必ず発言ボタンをONにし、マイクを有効にする",
-                "誰が怪しいか話し合おう",
+                "口頭の主張: 1点 / 証拠カードの提出: 3点",
             ]
         case "voting":
             return [
