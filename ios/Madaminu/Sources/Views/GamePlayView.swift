@@ -870,6 +870,25 @@ struct DebugInfoView: View {
                                                     .foregroundStyle(Color.mdTextSecondary)
                                             }
                                         }
+
+                                        if !player.evidences.isEmpty {
+                                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                                Text("手帳 (\(player.evidences.count))")
+                                                    .font(.mdCaption)
+                                                    .foregroundStyle(Color.mdTextMuted)
+                                                ForEach(Array(player.evidences.enumerated()), id: \.offset) { _, ev in
+                                                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                                        Text(ev.title)
+                                                            .font(.mdCaption)
+                                                            .foregroundStyle(Color.mdPrimary)
+                                                        Text(ev.content)
+                                                            .font(.mdCaption)
+                                                            .foregroundStyle(Color.mdTextSecondary)
+                                                    }
+                                                    .padding(.vertical, Spacing.xxs)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

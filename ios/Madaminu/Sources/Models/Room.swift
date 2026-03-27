@@ -157,6 +157,12 @@ struct DebugInfoResponse: Codable, Sendable {
     let players: [DebugPlayerInfo]
 }
 
+struct DebugEvidenceInfo: Codable, Sendable {
+    let title: String
+    let content: String
+    let source: String
+}
+
 struct DebugPlayerInfo: Codable, Identifiable, Sendable {
     let id: String
     let displayName: String
@@ -165,6 +171,7 @@ struct DebugPlayerInfo: Codable, Identifiable, Sendable {
     let secretInfo: String?
     let objective: String?
     let isAI: Bool
+    let evidences: [DebugEvidenceInfo]
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -174,6 +181,7 @@ struct DebugPlayerInfo: Codable, Identifiable, Sendable {
         case secretInfo = "secret_info"
         case objective
         case isAI = "is_ai"
+        case evidences
     }
 
     init(from decoder: Decoder) throws {
@@ -185,6 +193,7 @@ struct DebugPlayerInfo: Codable, Identifiable, Sendable {
         secretInfo = try container.decodeIfPresent(String.self, forKey: .secretInfo)
         objective = try container.decodeIfPresent(String.self, forKey: .objective)
         isAI = try container.decodeIfPresent(Bool.self, forKey: .isAI) ?? false
+        evidences = (try? container.decodeIfPresent([DebugEvidenceInfo].self, forKey: .evidences)) ?? []
     }
 }
 
