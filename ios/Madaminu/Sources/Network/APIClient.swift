@@ -60,6 +60,7 @@ actor APIClient {
         roomCode: String,
         sessionToken: String,
         name: String,
+        nameKana: String,
         gender: String,
         age: String,
         occupation: String,
@@ -69,6 +70,7 @@ actor APIClient {
     ) async throws -> CharacterResponse {
         let body: [String: String] = [
             "character_name": name,
+            "character_name_kana": nameKana,
             "character_gender": gender,
             "character_age": age,
             "character_occupation": occupation,

@@ -69,6 +69,7 @@ Create a complete scenario with the following structure (respond in JSON):
     {
       "character_name": "キャラクター名",
       "role": "criminal|witness|related|innocent",
+      "public_info": "他のプレイヤーに公開される情報（この集まりに来た理由、表向きの立場や目的など。2〜3文）",
       "secret_info": "このキャラクターの秘密（他のプレイヤーには見えない）",
       "objective": "このキャラクターの個人目的",
       "gm_notes": "GMがこの秘密を使ってシナリオを展開するためのメモ"
@@ -123,6 +124,19 @@ Before generating the scenario, review each player's profile. If any field is to
 - If occupation is empty, infer one from the background
 
 Include these enhanced profiles in the player data output (as part of gm_notes).
+
+## Secrets, Objectives, and Relationships
+
+- Each player's secret_info and objective MUST involve relationships with other specific players
+- Examples of relationship-driven elements:
+  - "You must protect Player X because they know your alibi"
+  - "You need to frame Player Y to divert suspicion from yourself"
+  - "Player Z witnessed something that could expose your secret"
+  - "You owe a debt to Player W and cannot betray them"
+- Each player should have at least one ally and one adversary among the other players
+- The criminal's objective should include hiding their crime while achieving a personal goal
+- Non-criminal players should have objectives that may conflict with finding the truth
+- public_info should give other players a reason to interact with this character (why they're here, their stated purpose)
 
 ## Constraints
 
