@@ -142,6 +142,16 @@ Before generating the scenario, review each player's profile. If any field is to
 - If appearance is empty, generate an appropriate appearance based on gender, age, and occupation
 - If occupation is empty, infer one from the background
 
+### CRITICAL: Profile Consistency Check
+
+シナリオ内の全テキスト（secret_info, objective, public_info, relationships）は、各キャラクターの性別・年齢・職業・経歴と矛盾しないこと:
+
+- 50代男性を「一人娘」「令嬢」と呼ばない
+- 20代のキャラクターに「30年前の事件」を経験させない
+- 性別に合った呼称を使う（息子/娘、兄/姉、夫/妻など）
+- 職業と行動の整合性（医者が法律の専門知識を持つなら理由が必要）
+- キャラクター間の関係性が年齢的に成立するか確認する
+
 Include these enhanced profiles in the player data output (as part of gm_notes).
 
 ## Secrets, Objectives, and Relationships
