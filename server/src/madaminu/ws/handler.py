@@ -213,6 +213,9 @@ async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str,
 
 
 async def _handle_investigate_select(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    from madaminu.models import Phase, PhaseType
+    from madaminu.services.scenario_engine import investigate_location
+
     pm = _get_phase_manager(websocket)
     if pm is None:
         return
@@ -224,6 +227,27 @@ async def _handle_investigate_select(db: AsyncSession, room_code: str, player_id
 
     if location_id:
         await _broadcast_colocated_players(db, room_code, location_id, pm)
+
+    if feature and location_id:
+        result = await db.execute(select(Game).where(Game.room_code == room_code))
+        game = result.scalar_one_or_none()
+        if game and game.current_phase_id:
+            phase_result = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
+            phase = phase_result.scalar_one_or_none()
+            if phase and phase.phase_type == PhaseType.investigation:
+                try:
+                    evidence, usage = await investigate_location(db, game.id, player_id, location_id, feature)
+                    if evidence:
+                        await manager.send_to_player(
+                            room_code,
+                            player_id,
+                            WSMessage(
+                                type="investigate.result",
+                                data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
+                            ),
+                        )
+                except Exception:
+                    logger.exception("Immediate investigation failed for %s", player_id)
 
 
 async def _broadcast_colocated_players(db: AsyncSession, room_code: str, location_id: str, pm):

@@ -18,6 +18,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var selectedFeature: String?
     @Published var roomMessages: [RoomMessage] = []
     @Published var colocatedPlayers: [ColocatedPlayer] = []
+    @Published var latestEvidence: EvidenceItem?
 
     // Preparation checklist
     @Published var aiPlayersReady = false
@@ -43,6 +44,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         selectedFeature = nil
         roomMessages = []
         colocatedPlayers = []
+        latestEvidence = nil
         aiPlayersReady = false
         scenarioReady = false
         sceneImageReady = false
