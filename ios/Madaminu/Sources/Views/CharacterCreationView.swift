@@ -3,6 +3,7 @@ import SwiftUI
 
 private struct CharacterTemplate {
     let name: String
+    let nameKana: String
     let gender: String
     let age: String
     let occupation: String
@@ -13,7 +14,8 @@ private struct CharacterTemplate {
 
 private let characterTemplates: [CharacterTemplate] = [
     CharacterTemplate(
-        name: "探偵・明智 小五郎",
+        name: "明智 小五郎",
+        nameKana: "あけち こごろう",
         gender: "男",
         age: "45",
         occupation: "私立探偵",
@@ -22,7 +24,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "警視庁捜査一課の元エース刑事。10年前に担当した事件で無実の人間を追い詰めた過去があり、辞職。以来、私立探偵として活動している。"
     ),
     CharacterTemplate(
-        name: "外科医・白鳥 麗子",
+        name: "白鳥 麗子",
+        nameKana: "しらとり れいこ",
         gender: "女",
         age: "38",
         occupation: "心臓外科医",
@@ -31,7 +34,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "国内トップクラスの大学病院でチーフを務める。最近、論文のデータ改竄疑惑が持ち上がっている。"
     ),
     CharacterTemplate(
-        name: "記者・鷹野 翔太",
+        name: "鷹野 翔太",
+        nameKana: "たかの しょうた",
         gender: "男",
         age: "32",
         occupation: "新聞記者",
@@ -40,7 +44,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "全国紙の社会部エース記者。半年前、同僚が不審な事故で亡くなり、その裏に陰謀があると確信している。"
     ),
     CharacterTemplate(
-        name: "令嬢・桜庭 華",
+        name: "桜庭 華",
+        nameKana: "さくらば はな",
         gender: "女",
         age: "26",
         occupation: "財閥令嬢",
@@ -49,7 +54,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "桜庭財閥の一人娘。父親が急逝した後、若くして実権を握ることになった。父の死が本当に病死だったのか疑問を持ち始めている。"
     ),
     CharacterTemplate(
-        name: "教授・神谷 一郎",
+        name: "神谷 一郎",
+        nameKana: "かみや いちろう",
         gender: "男",
         age: "62",
         occupation: "大学教授",
@@ -58,7 +64,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "東都大学の犯罪心理学教授。30年以上にわたり犯罪事例を分析してきた。退官間近で、最後の大仕事にしたいと考えている。"
     ),
     CharacterTemplate(
-        name: "バーテンダー・蓮",
+        name: "蓮",
+        nameKana: "れん",
         gender: "男",
         age: "50",
         occupation: "バーテンダー",
@@ -67,7 +74,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "銀座の老舗バーのマスター。実は元公安警察官で、潜入捜査中の事件をきっかけに警察を去った。"
     ),
     CharacterTemplate(
-        name: "画家・藤堂 美月",
+        name: "藤堂 美月",
+        nameKana: "とうどう みづき",
         gender: "女",
         age: "29",
         occupation: "画家",
@@ -76,7 +84,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "若くして国際的な美術賞を受賞。代表作のモデルが一年前に失踪し、参考人として事情聴取を受けた過去がある。"
     ),
     CharacterTemplate(
-        name: "実業家・黒崎 剛",
+        name: "黒崎 剛",
+        nameKana: "くろさき つよし",
         gender: "男",
         age: "47",
         occupation: "セキュリティ会社社長",
@@ -85,7 +94,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "元自衛隊の特殊部隊員。除隊後にセキュリティ会社を起業し、10年で業界最大手に成長させた。"
     ),
     CharacterTemplate(
-        name: "占い師・月影 沙耶",
+        name: "月影 沙耶",
+        nameKana: "つきかげ さや",
         gender: "女",
         age: "35",
         occupation: "占い師",
@@ -94,7 +104,8 @@ private let characterTemplates: [CharacterTemplate] = [
         background: "テレビで人気の占い師。元は大学で心理学を研究していたが、倫理問題で学術界を追われた。"
     ),
     CharacterTemplate(
-        name: "シェフ・火野 龍之介",
+        name: "火野 龍之介",
+        nameKana: "ひの りゅうのすけ",
         gender: "男",
         age: "40",
         occupation: "シェフ",
@@ -109,6 +120,7 @@ struct CharacterCreationView: View {
     @State private var currentStep = 0
     @State private var characterName = ""
     @State private var gender = "不明"
+    @State private var nameKana = ""
     @State private var age = ""
     @State private var occupation = ""
     @State private var appearance = ""
@@ -206,16 +218,22 @@ struct CharacterCreationView: View {
 
     private var nameStep: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            MDTextField(label: "キャラクター名", text: $characterName, placeholder: "例: 探偵・明智 小五郎")
+            MDTextField(label: "キャラクター名", text: $characterName, placeholder: "例: 明智 小五郎")
+            MDTextField(label: "読み仮名", text: $nameKana, placeholder: "例: あけち こごろう")
 
             HStack(spacing: Spacing.sm) {
                 MDButton("🎲 名前だけ", style: .ghost) {
-                    withAnimation { characterName = characterTemplates.randomElement()!.name }
+                    let t = characterTemplates.randomElement()!
+                    withAnimation {
+                        characterName = t.name
+                        nameKana = t.nameKana
+                    }
                 }
                 MDButton("🎲 全部おまかせ", style: .ghost) {
                     let t = characterTemplates.randomElement()!
                     withAnimation {
                         characterName = t.name
+                        nameKana = t.nameKana
                         gender = t.gender
                         age = t.age
                         occupation = t.occupation
@@ -341,6 +359,7 @@ struct CharacterCreationView: View {
                 MDButton("作成", isLoading: store.isLoading) {
                     store.dispatch(.createCharacter(
                         name: characterName,
+                        nameKana: nameKana,
                         gender: gender,
                         age: age.isEmpty ? "不明" : age,
                         occupation: occupation,

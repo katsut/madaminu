@@ -26,12 +26,14 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
     let id: String
     let displayName: String
     let characterName: String?
+    let characterNameKana: String?
     let characterGender: String?
     let characterAge: String?
     let characterOccupation: String?
     let characterAppearance: String?
     let characterPersonality: String?
     let characterBackground: String?
+    let publicInfo: String?
     let portraitUrl: String?
     let isHost: Bool
     let isAI: Bool
@@ -42,12 +44,14 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         case id
         case displayName = "display_name"
         case characterName = "character_name"
+        case characterNameKana = "character_name_kana"
         case characterGender = "character_gender"
         case characterAge = "character_age"
         case characterOccupation = "character_occupation"
         case characterAppearance = "character_appearance"
         case characterPersonality = "character_personality"
         case characterBackground = "character_background"
+        case publicInfo = "public_info"
         case portraitUrl = "portrait_url"
         case isHost = "is_host"
         case isAI = "is_ai"
@@ -55,16 +59,18 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         case connectionStatus = "connection_status"
     }
 
-    init(id: String, displayName: String, characterName: String? = nil, characterGender: String? = nil, characterAge: String? = nil, characterOccupation: String? = nil, characterAppearance: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, isReady: Bool = false, connectionStatus: String = "offline") {
+    init(id: String, displayName: String, characterName: String? = nil, characterNameKana: String? = nil, characterGender: String? = nil, characterAge: String? = nil, characterOccupation: String? = nil, characterAppearance: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, publicInfo: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, isReady: Bool = false, connectionStatus: String = "offline") {
         self.id = id
         self.displayName = displayName
         self.characterName = characterName
+        self.characterNameKana = characterNameKana
         self.characterGender = characterGender
         self.characterAge = characterAge
         self.characterOccupation = characterOccupation
         self.characterAppearance = characterAppearance
         self.characterPersonality = characterPersonality
         self.characterBackground = characterBackground
+        self.publicInfo = publicInfo
         self.portraitUrl = portraitUrl
         self.isHost = isHost
         self.isAI = isAI
@@ -77,12 +83,14 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         id = try container.decode(String.self, forKey: .id)
         displayName = try container.decode(String.self, forKey: .displayName)
         characterName = try container.decodeIfPresent(String.self, forKey: .characterName)
+        characterNameKana = try container.decodeIfPresent(String.self, forKey: .characterNameKana)
         characterGender = try container.decodeIfPresent(String.self, forKey: .characterGender)
         characterAge = try container.decodeIfPresent(String.self, forKey: .characterAge)
         characterOccupation = try container.decodeIfPresent(String.self, forKey: .characterOccupation)
         characterAppearance = try container.decodeIfPresent(String.self, forKey: .characterAppearance)
         characterPersonality = try container.decodeIfPresent(String.self, forKey: .characterPersonality)
         characterBackground = try container.decodeIfPresent(String.self, forKey: .characterBackground)
+        publicInfo = try container.decodeIfPresent(String.self, forKey: .publicInfo)
         portraitUrl = try container.decodeIfPresent(String.self, forKey: .portraitUrl)
         isHost = try container.decodeIfPresent(Bool.self, forKey: .isHost) ?? false
         isAI = try container.decodeIfPresent(Bool.self, forKey: .isAI) ?? false

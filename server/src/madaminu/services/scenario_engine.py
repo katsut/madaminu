@@ -23,7 +23,7 @@ from madaminu.models import (
 
 logger = logging.getLogger(__name__)
 
-MAX_INVESTIGATIONS_PER_PHASE = 3
+MAX_INVESTIGATIONS_PER_PHASE = 1
 
 ROLE_MAP = {
     "criminal": PlayerRole.criminal,
@@ -83,6 +83,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         player = name_to_player.get(sp["character_name"])
         if player is None:
             continue
+        player.public_info = sp.get("public_info", "")
         player.secret_info = sp["secret_info"]
         player.objective = sp["objective"]
         player.role = ROLE_MAP.get(sp["role"], PlayerRole.innocent)

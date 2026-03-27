@@ -35,8 +35,8 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             screen = .characterCreation
         case .dismissCharacterCreation:
             screen = .lobby
-        case .createCharacter(let name, let gender, let age, let occupation, let appearance, let personality, let background):
-            Task { @MainActor in await performCreateCharacter(name: name, gender: gender, age: age, occupation: occupation, appearance: appearance, personality: personality, background: background) }
+        case .createCharacter(let name, let nameKana, let gender, let age, let occupation, let appearance, let personality, let background):
+            Task { @MainActor in await performCreateCharacter(name: name, nameKana: nameKana, gender: gender, age: age, occupation: occupation, appearance: appearance, personality: personality, background: background) }
         case .toggleReady:
             Task { @MainActor in await performToggleReady() }
         case .startGame:
@@ -243,7 +243,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         }
     }
 
-    @MainActor private func performCreateCharacter(name: String, gender: String, age: String, occupation: String, appearance: String, personality: String, background: String) async {
+    @MainActor private func performCreateCharacter(name: String, nameKana: String, gender: String, age: String, occupation: String, appearance: String, personality: String, background: String) async {
         guard let token = room.sessionToken else { return }
 
         isLoading = true
@@ -254,6 +254,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
                 roomCode: room.roomCode,
                 sessionToken: token,
                 name: name,
+                nameKana: nameKana,
                 gender: gender,
                 age: age,
                 occupation: occupation,
