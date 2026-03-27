@@ -188,8 +188,8 @@ struct WSMessageAdapter {
                 )
             }
 
-            if let me = store.room.players.first(where: { $0.id == store.room.playerId }) {
-                store.room.isHost = me.isHost
+            if let hostId = data["host_player_id"] {
+                store.room.isHost = (hostId == store.room.playerId)
             }
         }
 
