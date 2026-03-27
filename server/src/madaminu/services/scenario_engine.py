@@ -63,6 +63,10 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt)
     usages.append(usage)
 
+    logger.info("LLM response length: %d chars", len(raw_response))
+    if not raw_response.strip():
+        raise ValueError("LLM returned empty response")
+
     scenario = _parse_scenario_json(raw_response)
 
     game.scenario_skeleton = {

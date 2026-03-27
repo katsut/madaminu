@@ -58,6 +58,10 @@ class LLMClient:
         duration_ms = int((time.monotonic() - start) * 1000)
 
         text = response.choices[0].message.content or ""
+        finish_reason = response.choices[0].finish_reason
+        if finish_reason == "length":
+            logger.warning("LLM response truncated (max_tokens reached)")
+        logger.info("LLM finish_reason=%s, response_length=%d", finish_reason, len(text))
         usage = LLMUsage(
             model=model,
             input_tokens=response.usage.prompt_tokens if response.usage else 0,
@@ -73,7 +77,7 @@ class LLMClient:
         system_prompt: str,
         user_prompt: str,
         model: str = DEFAULT_MODEL,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> tuple[str, LLMUsage]:
         system_with_json = system_prompt + "\n\nIMPORTANT: Respond with valid JSON only. No markdown, no code blocks."
         return await self.generate(system_with_json, user_prompt, model, max_tokens)
