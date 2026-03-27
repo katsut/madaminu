@@ -39,9 +39,10 @@ class PhaseManager:
             game_result = await db.execute(select(Game).where(Game.id == game_id))
             game = game_result.scalar_one()
             game.current_phase_id = first_phase.id
+            total_phases = len(phases)
             await db.commit()
 
-        await self._broadcast_phase_started(room_code, first_phase)
+        await self._broadcast_phase_started(room_code, first_phase, total_phases=total_phases)
         self._start_timer(game_id, room_code, first_phase)
         asyncio.create_task(self._schedule_ai_speeches(game_id, room_code, first_phase))
         return first_phase
@@ -228,8 +229,17 @@ class PhaseManager:
         except Exception:
             logger.exception("Phase adjustment failed for game %s", game_id)
 
-    async def _broadcast_phase_started(self, room_code: str, phase: Phase):
+    async def _broadcast_phase_started(self, room_code: str, phase: Phase, total_phases: int | None = None):
         from madaminu.ws.handler import manager
+
+        if total_phases is None:
+            async with self._session_factory() as db:
+                from sqlalchemy import func
+
+                count_result = await db.execute(
+                    select(func.count()).select_from(Phase).where(Phase.game_id == phase.game_id)
+                )
+                total_phases = count_result.scalar_one()
 
         await manager.broadcast(
             room_code,
@@ -239,6 +249,7 @@ class PhaseManager:
                     phase_id=phase.id,
                     phase_type=phase.phase_type,
                     phase_order=phase.phase_order,
+                    total_phases=total_phases,
                     duration_sec=phase.duration_sec,
                     investigation_locations=phase.investigation_locations,
                 ).model_dump(),

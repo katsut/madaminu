@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from madaminu.models import Game, Phase
@@ -69,6 +69,10 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
     if game.current_phase_id:
         phase_info = await _get_current_phase_dict(db, game.current_phase_id)
         if phase_info:
+            total_result = await db.execute(
+                select(func.count()).select_from(Phase).where(Phase.game_id == game.id)
+            )
+            phase_info["total_phases"] = total_result.scalar_one()
             state["current_phase"] = phase_info
 
     state["current_speaker_id"] = None

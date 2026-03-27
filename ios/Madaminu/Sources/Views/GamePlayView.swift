@@ -16,31 +16,43 @@ struct GamePlayView: View {
             case .intro:
                 IntroView(store: store)
             case .playing:
-                VStack(spacing: 0) {
-                    errorBanner
-                    phaseHeader
-                    Divider().background(Color.mdSurface)
+                ZStack {
+                    VStack(spacing: 0) {
+                        errorBanner
+                        phaseHeader
+                        Divider().background(Color.mdSurface)
 
-                    Group {
-                        if let phase = store.game.currentPhase {
-                            switch phase.phaseType {
-                            case "investigation":
-                                InvestigationPhaseView(store: store)
-                            case "discussion":
-                                DiscussionPhaseView(store: store)
-                            case "voting":
-                                VotingPhaseView(store: store)
-                            default:
+                        Group {
+                            if let phase = store.game.currentPhase {
+                                switch phase.phaseType {
+                                case "investigation":
+                                    InvestigationPhaseView(store: store)
+                                case "discussion":
+                                    DiscussionPhaseView(store: store)
+                                case "voting":
+                                    VotingPhaseView(store: store)
+                                default:
+                                    waitingView
+                                }
+                            } else {
                                 waitingView
                             }
-                        } else {
-                            waitingView
                         }
-                    }
-                    .frame(maxHeight: .infinity)
+                        .frame(maxHeight: .infinity)
 
-                    bottomBar
+                        bottomBar
+                    }
+
+                    if store.game.showPhaseTransition, let phase = store.game.currentPhase {
+                        PhaseTransitionOverlay(
+                            phase: phase,
+                            sceneImageUrl: store.game.scenarioSetting.sceneImageUrl
+                        )
+                        .transition(.opacity)
+                        .zIndex(100)
+                    }
                 }
+                .animation(.easeInOut(duration: 0.5), value: store.game.showPhaseTransition)
             case .ended:
                 endingView
             default:
@@ -83,7 +95,7 @@ struct GamePlayView: View {
                         .fill(phaseColor(phase.phaseType))
                         .frame(width: 10, height: 10)
 
-                    Text(phaseDisplayName(phase.phaseType))
+                    Text("\(phaseDisplayName(phase.phaseType)) \(phase.phaseOrder + 1)/\(phase.totalPhases)")
                         .font(.mdHeadline)
                         .foregroundStyle(Color.mdTextPrimary)
                 }
@@ -265,6 +277,11 @@ struct InvestigationPhaseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
+                GMGuideCard(
+                    title: "調査フェーズ",
+                    message: "気になる場所を調べて手がかりを集めましょう。1フェーズにつき最大3回まで調査できます。発言ボタンで他のプレイヤーと情報を共有することもできます。"
+                )
+
                 if let speaker = store.game.currentSpeakerId {
                     speakerBanner(speaker)
                 }
@@ -338,6 +355,11 @@ struct DiscussionPhaseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
+                GMGuideCard(
+                    title: "議論フェーズ",
+                    message: "集めた証拠をもとに推理を述べましょう。発言ボタンを押して他のプレイヤーと議論してください。誰が怪しいか、何が起きたのかを話し合いましょう。"
+                )
+
                 if let speaker = store.game.currentSpeakerId {
                     let name = store.room.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
                     MDCard {
@@ -356,16 +378,6 @@ struct DiscussionPhaseView: View {
                     TranscriptView(store: store)
                 }
 
-                MDCard {
-                    VStack(alignment: .leading, spacing: Spacing.xs) {
-                        Text("議論フェーズ")
-                            .font(.mdHeadline)
-                            .foregroundStyle(Color.mdPrimary)
-                        Text("発言ボタンを押して、他のプレイヤーと議論しましょう。証拠や推理を共有してください。")
-                            .font(.mdBody)
-                            .foregroundStyle(Color.mdTextSecondary)
-                    }
-                }
             }
             .padding(Spacing.lg)
         }
@@ -379,9 +391,10 @@ struct VotingPhaseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                Text("犯人だと思う人物に投票してください")
-                    .font(.mdHeadline)
-                    .foregroundStyle(Color.mdTextSecondary)
+                GMGuideCard(
+                    title: "投票フェーズ",
+                    message: "調査と議論の結果をもとに、犯人だと思う人物を選んで投票してください。全員の投票が揃うと結果が発表されます。"
+                )
 
                 ForEach(store.room.players) { player in
                     MDCard {
@@ -628,5 +641,86 @@ struct SVGWebView: UIViewRepresentable {
         </html>
         """
         webView.loadHTMLString(html, baseURL: nil)
+    }
+}
+
+struct PhaseTransitionOverlay: View {
+    let phase: PhaseInfo
+    let sceneImageUrl: String?
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.85).ignoresSafeArea()
+
+            if let urlString = sceneImageUrl,
+               let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                AsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.clear
+                }
+                .ignoresSafeArea()
+                .opacity(0.3)
+            }
+
+            VStack(spacing: Spacing.lg) {
+                Text("PHASE \(phase.phaseOrder + 1) / \(phase.totalPhases)")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.mdTextMuted)
+                    .tracking(4)
+
+                Text(phaseTitle(phase.phaseType))
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundStyle(Color.mdTextPrimary)
+
+                Text(phaseSubtitle(phase.phaseType))
+                    .font(.mdBody)
+                    .foregroundStyle(Color.mdTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Spacing.xl)
+            }
+        }
+    }
+
+    private func phaseTitle(_ type: String) -> String {
+        switch type {
+        case "investigation": "調査フェーズ"
+        case "discussion": "議論フェーズ"
+        case "voting": "投票フェーズ"
+        default: type
+        }
+    }
+
+    private func phaseSubtitle(_ type: String) -> String {
+        switch type {
+        case "investigation": "現場を調べて手がかりを集めましょう"
+        case "discussion": "集めた情報をもとに推理を話し合いましょう"
+        case "voting": "犯人だと思う人物に投票してください"
+        default: ""
+        }
+    }
+}
+
+struct GMGuideCard: View {
+    let title: String
+    let message: String
+
+    var body: some View {
+        MDCard {
+            HStack(alignment: .top, spacing: Spacing.sm) {
+                Image(systemName: "theatermasks.fill")
+                    .font(.mdTitle2)
+                    .foregroundStyle(Color.mdPrimary)
+
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text(title)
+                        .font(.mdHeadline)
+                        .foregroundStyle(Color.mdPrimary)
+                    Text(message)
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdTextSecondary)
+                }
+            }
+        }
     }
 }

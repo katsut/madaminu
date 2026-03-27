@@ -12,6 +12,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var isSpeaking = false
     @Published var currentTranscript = ""
     @Published var isConnected = false
+    @Published var showPhaseTransition = false
 
     // Preparation checklist
     @Published var aiPlayersReady = false
@@ -31,6 +32,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         isSpeaking = false
         currentTranscript = ""
         isConnected = false
+        showPhaseTransition = false
         aiPlayersReady = false
         scenarioReady = false
         sceneImageReady = false
