@@ -93,9 +93,9 @@ async def _generate_images_background(game_id: str, room_code: str, session_fact
                             player.id,
                             generate_character_portrait(
                                 client,
-                                player.character_name,
-                                player.character_personality or "",
-                                player.character_background or "",
+                                player.character_gender or "不明",
+                                player.character_age or "不明",
+                                player.character_appearance or "",
                             ),
                         )
                     )
