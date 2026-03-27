@@ -130,7 +130,10 @@ row 0: [前庭]  [温室]  [東屋]
 - Every scenario should produce a different map layout.
 
 ### Guidelines
-- Generate 3-5 areas with a total of 15-20 rooms (including corridors/stairs/entrances)
+- Generate 3-5 areas with a total of 15-20 rooms
+- このうち調査可能な部屋（room_type="room"）は最低8個以上。廊下・階段・入口だけの階はNG
+- 各エリアに最低2つの調査可能な部屋（room_type="room"）を含める
+- 例: 本館1階なら「リビング」「書斎」「キッチン」「ダイニング」+ 廊下・玄関
 - Include at least one lockable or restricted room
 - The crime scene should have at least 2 connections
 - Room IDs from the map are used for investigation locations during gameplay
