@@ -684,6 +684,26 @@ struct DiscussionPhaseView: View {
                         showRevealSheet = true
                     }
                 }
+
+                ForEach(store.game.revealedEvidences) { revealed in
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            HStack {
+                                Image(systemName: "eye.fill")
+                                    .foregroundStyle(Color.mdWarning)
+                                Text("\(revealed.playerName) が証拠を公開しました")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdWarning)
+                            }
+                            Text(revealed.title)
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdTextPrimary)
+                            Text(revealed.content)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextSecondary)
+                        }
+                    }
+                }
             }
             .padding(Spacing.lg)
         }
