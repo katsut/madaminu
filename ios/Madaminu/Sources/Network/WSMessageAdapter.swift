@@ -42,7 +42,9 @@ struct WSMessageAdapter {
         case "investigate.result":
             let title = data["title"] ?? "調査結果"
             let content = data["content"] ?? ""
-            store.notebook.evidences.append(EvidenceItem(title: title, content: content))
+            let evidence = EvidenceItem(title: title, content: content)
+            store.notebook.evidences.append(evidence)
+            store.game.latestEvidence = evidence
         case "investigate.denied":
             store.setError("調査できません", level: .transient)
         case "evidence.received":
@@ -171,6 +173,9 @@ struct WSMessageAdapter {
         let phase = parsePhaseInfo(stringDataToDict(data))
         store.game.currentPhase = phase
         store.game.localRemainingSec = phase?.remainingSec ?? phase?.durationSec ?? 0
+        store.game.latestEvidence = nil
+        store.game.colocatedPlayers = []
+        store.game.roomMessages = []
         store.game.showPhaseTransition = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             store.game.showPhaseTransition = false

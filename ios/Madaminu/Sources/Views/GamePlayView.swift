@@ -503,6 +503,23 @@ struct InvestigationPhaseView: View {
                     }
                 }
 
+                if let evidence = store.game.latestEvidence {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            HStack {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .foregroundStyle(Color.mdSuccess)
+                                Text(evidence.title)
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdPrimary)
+                            }
+                            Text(evidence.content)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
                 if !store.game.colocatedPlayers.isEmpty {
                     ColocatedPlayersView(store: store)
                     RoomChatView(store: store)
