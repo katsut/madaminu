@@ -26,6 +26,8 @@ struct GamePlayView: View {
                         Group {
                             if let phase = store.game.currentPhase {
                                 switch phase.phaseType {
+                                case "planning":
+                                    PlanningPhaseView(store: store)
                                 case "investigation":
                                     InvestigationPhaseView(store: store)
                                 case "discussion":
@@ -113,9 +115,14 @@ struct GamePlayView: View {
                         .fill(phaseColor(phase.phaseType))
                         .frame(width: 10, height: 10)
 
-                    Text("\(phaseDisplayName(phase.phaseType)) \(phase.phaseOrder + 1)/\(phase.totalPhases)")
-                        .font(.mdHeadline)
-                        .foregroundStyle(Color.mdTextPrimary)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("ターン \(phase.turnNumber)/\(phase.totalTurns)")
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdTextMuted)
+                        Text(phaseDisplayName(phase.phaseType))
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdTextPrimary)
+                    }
                 }
 
                 Spacer()
@@ -157,7 +164,7 @@ struct GamePlayView: View {
                 showNotebook = true
             }
 
-            if store.game.currentPhase?.phaseType == "discussion" || store.game.currentPhase?.phaseType == "investigation" {
+            if ["planning", "discussion", "investigation"].contains(store.game.currentPhase?.phaseType) {
                 SpeechButton(store: store)
             }
         }
@@ -242,6 +249,7 @@ struct GamePlayView: View {
 
     private func phaseColor(_ type: String) -> Color {
         switch type {
+        case "planning": .mdWarning
         case "investigation": .mdInfo
         case "discussion": .mdPrimary
         case "voting": .mdAccent
@@ -251,6 +259,7 @@ struct GamePlayView: View {
 
     private func phaseDisplayName(_ type: String) -> String {
         switch type {
+        case "planning": "調査計画"
         case "investigation": "調査フェーズ"
         case "discussion": "議論フェーズ"
         case "voting": "投票フェーズ"
@@ -284,6 +293,128 @@ struct SpeechButton: View {
                 store.dispatch(.requestSpeech)
             }
             .disabled(store.game.currentSpeakerId != nil)
+        }
+    }
+}
+
+struct PlanningPhaseView: View {
+    @ObservedObject var store: AppStore
+    @State private var selectedLocationId: String?
+    @State private var mapSvg: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                GMGuideCard(
+                    title: "調査計画",
+                    message: "みんなで相談して、次に調べる場所を決めましょう。発言ボタンで話し合えます。制限時間になると、選んだ場所で調査が始まります。"
+                )
+
+                if let speaker = store.game.currentSpeakerId {
+                    speakerBanner(speaker)
+                }
+
+                if store.game.isSpeaking {
+                    TranscriptView(store: store)
+                }
+
+                if let svg = mapSvg {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        SVGWebView(svgContent: svg)
+                            .frame(width: 500, height: 220)
+                            .id(selectedLocationId ?? "none")
+                    }
+                    .frame(height: 220)
+                    .background(Color(red: 0.067, green: 0.067, blue: 0.094))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mdSurface, lineWidth: 1)
+                    )
+                }
+
+                if let locations = store.game.currentPhase?.investigationLocations {
+                    Text("調査先を選択")
+                        .font(.mdHeadline)
+                        .foregroundStyle(Color.mdTextSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    ForEach(locations) { location in
+                        let isSelected = selectedLocationId == location.id
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                if isSelected {
+                                    selectedLocationId = nil
+                                    store.dispatch(.selectInvestigation(locationId: nil))
+                                } else {
+                                    selectedLocationId = location.id
+                                    store.dispatch(.selectInvestigation(locationId: location.id))
+                                }
+                            }
+                            Task { await loadMap() }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text(location.name)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    Text(location.description)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(isSelected ? Color.mdTextPrimary : Color.mdTextSecondary)
+                                    if let features = location.features, !features.isEmpty {
+                                        Text(features.joined(separator: "・"))
+                                            .font(.mdCaption)
+                                            .foregroundStyle(Color.mdTextMuted)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(isSelected ? Color.mdSuccess : Color.mdTextMuted)
+                            }
+                            .padding(Spacing.md)
+                            .background(isSelected ? Color.mdPrimary.opacity(0.15) : Color.mdSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: CornerRadius.md)
+                                    .stroke(isSelected ? Color.mdPrimary : Color.mdSurface, lineWidth: isSelected ? 2 : 0)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(Spacing.lg)
+        }
+        .task { await loadMap() }
+    }
+
+    @MainActor private func loadMap() async {
+        guard let mapPath = store.game.scenarioSetting.mapUrl else { return }
+        var urlString = APIClient.defaultBaseURL + mapPath
+        if let locId = selectedLocationId {
+            urlString += "?highlight=\(locId)"
+        }
+        guard let url = URL(string: urlString) else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            mapSvg = String(data: data, encoding: .utf8)
+        } catch {
+            // ignore
+        }
+    }
+
+    private func speakerBanner(_ speakerId: String) -> some View {
+        let name = store.room.players.first(where: { $0.id == speakerId })?.characterName ?? "誰か"
+        return MDCard {
+            HStack {
+                Image(systemName: "mic.fill")
+                    .foregroundStyle(Color.mdAccent)
+                Text("\(name) が発言中")
+                    .font(.mdCallout)
+                    .foregroundStyle(Color.mdTextPrimary)
+                Spacer()
+            }
         }
     }
 }
@@ -746,6 +877,7 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseTitle(_ type: String) -> String {
         switch type {
+        case "planning": "調査計画"
         case "investigation": "調査フェーズ"
         case "discussion": "議論フェーズ"
         case "voting": "投票フェーズ"
@@ -755,7 +887,8 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseSubtitle(_ type: String) -> String {
         switch type {
-        case "investigation": "現場を調べて手がかりを集めましょう"
+        case "planning": "みんなで相談して、次に調べる場所を決めましょう"
+        case "investigation": "選んだ場所で手がかりを探しましょう"
         case "discussion": "集めた情報をもとに推理を話し合いましょう"
         case "voting": "犯人だと思う人物に投票してください"
         default: ""

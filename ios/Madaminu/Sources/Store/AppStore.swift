@@ -162,7 +162,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         errorMessage = nil
 
         do {
-            let response = try await api.createRoom(displayName: room.displayName, password: password)
+            let response = try await api.createRoom(displayName: room.displayName, password: password, turnCount: room.turnCount)
             room.roomCode = response.roomCode
             room.playerId = response.playerId
             room.sessionToken = response.sessionToken
@@ -241,6 +241,9 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         do {
             let info = try await api.getRoomInfo(roomCode: room.roomCode)
             room.players = info.players
+            if let turnCount = info.turnCount {
+                room.turnCount = turnCount
+            }
 
             if let me = room.players.first(where: { $0.id == room.playerId }) {
                 room.hasCreatedCharacter = me.characterName != nil

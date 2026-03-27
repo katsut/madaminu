@@ -87,6 +87,37 @@ struct RoomLobbyView: View {
                     }
                 }
 
+                if store.room.isHost {
+                    MDCard {
+                        HStack {
+                            Text("ターン数")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdTextPrimary)
+                            Spacer()
+                            HStack(spacing: Spacing.sm) {
+                                Button {
+                                    if store.room.turnCount > 2 { store.room.turnCount -= 1 }
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(store.room.turnCount > 2 ? Color.mdPrimary : Color.mdTextMuted)
+                                }
+                                Text("\(store.room.turnCount)")
+                                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                    .frame(width: 30)
+                                Button {
+                                    if store.room.turnCount < 5 { store.room.turnCount += 1 }
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(store.room.turnCount < 5 ? Color.mdPrimary : Color.mdTextMuted)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Spacer()
 
                 if !store.room.hasCreatedCharacter {
