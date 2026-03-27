@@ -210,12 +210,14 @@ async def _handle_intro_ready(db: AsyncSession, room_code: str, player_id: str, 
         select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code)
     )
     game = result.scalar_one_or_none()
-    if game and count >= len(game.players):
-        pm.clear_intro_ready(room_code)
-        await manager.broadcast(
-            room_code,
-            WSMessage(type="intro.all_ready", data={}),
-        )
+    if game:
+        human_count = sum(1 for p in game.players if not p.is_ai)
+        if count >= human_count:
+            pm.clear_intro_ready(room_code)
+            await manager.broadcast(
+                room_code,
+                WSMessage(type="intro.all_ready", data={}),
+            )
 
 
 async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str, msg_type: str, websocket: WebSocket):
