@@ -212,6 +212,10 @@ struct HomeScreen: View {
         .task {
             store.dispatch(.fetchRooms)
             store.dispatch(.fetchMyRooms)
+            while store.screen == .home {
+                try? await Task.sleep(for: .seconds(5))
+                store.dispatch(.fetchRooms)
+            }
         }
         .sheet(isPresented: $showCreateSheet) {
             CreateRoomSheet(store: store, isPresented: $showCreateSheet)
