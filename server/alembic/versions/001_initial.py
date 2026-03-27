@@ -1,8 +1,8 @@
-"""initial
+"""initial - complete schema
 
 Revision ID: 001
 Revises:
-Create Date: 2026-03-26
+Create Date: 2026-03-27
 """
 
 from collections.abc import Sequence
@@ -32,6 +32,7 @@ def upgrade() -> None:
         sa.Column("scene_image", sa.Text(), nullable=True),
         sa.Column("victim_image", sa.Text(), nullable=True),
         sa.Column("total_llm_cost_usd", sa.Float(), nullable=False, server_default="0.0"),
+        sa.Column("turn_count", sa.Integer(), nullable=False, server_default="3"),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
@@ -42,16 +43,24 @@ def upgrade() -> None:
         "players",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("game_id", sa.String(), nullable=False),
+        sa.Column("device_id", sa.String(36), nullable=True),
         sa.Column("session_token", sa.String(36), nullable=False),
         sa.Column("display_name", sa.String(50), nullable=False),
         sa.Column("character_name", sa.String(50), nullable=True),
+        sa.Column("character_name_kana", sa.String(100), nullable=True),
+        sa.Column("character_gender", sa.String(10), nullable=True),
+        sa.Column("character_age", sa.String(10), nullable=True),
+        sa.Column("character_occupation", sa.String(100), nullable=True),
+        sa.Column("character_appearance", sa.Text(), nullable=True),
         sa.Column("character_personality", sa.Text(), nullable=True),
         sa.Column("character_background", sa.Text(), nullable=True),
+        sa.Column("public_info", sa.Text(), nullable=True),
         sa.Column("secret_info", sa.Text(), nullable=True),
         sa.Column("objective", sa.Text(), nullable=True),
         sa.Column("role", sa.Enum("criminal", "witness", "related", "innocent", name="playerrole"), nullable=True),
         sa.Column("is_host", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("is_ai", sa.Boolean(), nullable=False, server_default="false"),
+        sa.Column("is_ready", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("portrait_image", sa.Text(), nullable=True),
         sa.Column("connection_status", sa.Enum("online", "offline", name="connectionstatus"), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
@@ -59,6 +68,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_players_game_id", "players", ["game_id"])
+    op.create_index("ix_players_device_id", "players", ["device_id"])
     op.create_index("ix_players_session_token", "players", ["session_token"], unique=True)
 
     op.create_table(
@@ -78,7 +88,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_phases_game_id", "phases", ["game_id"])
 
-    # Add FKs on games that reference players and phases
     op.create_foreign_key("fk_games_host_player_id", "games", "players", ["host_player_id"], ["id"], use_alter=True)
     op.create_foreign_key("fk_games_current_phase_id", "games", "phases", ["current_phase_id"], ["id"], use_alter=True)
 
