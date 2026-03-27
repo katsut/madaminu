@@ -146,7 +146,11 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             DispatchQueue.main.async {
                 print("[AppStore] WS state: connected=\(connected) error=\(error ?? "nil")")
                 self?.game.isConnected = connected
-                if let error { self?.errorMessage = error }
+                if connected {
+                    self?.errorMessage = nil
+                } else if let error {
+                    self?.errorMessage = error
+                }
             }
         }
         ws.connect(roomCode: room.roomCode, token: token)
