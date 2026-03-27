@@ -12,17 +12,20 @@ async def generate_character_portrait(
     age: str,
     appearance: str,
 ) -> str:
-    gender_desc = {"男": "male", "女": "female"}.get(gender, "person")
+    gender_desc = {"男": "male", "女": "female"}.get(gender, "")
     age_desc = f"{age} years old" if age and age != "不明" else ""
     appearance_desc = appearance if appearance else ""
 
-    subject = " ".join(filter(None, [age_desc, gender_desc]))
+    subject = " ".join(filter(None, [age_desc, gender_desc])) or "character"
 
     prompt = (
-        f"A stylized portrait of a {subject} for a murder mystery game. "
+        f"A portrait of a {subject} for a mystery game. "
         f"{appearance_desc} "
-        "Dark, moody atmosphere with dramatic lighting. Semi-realistic illustration style. "
-        "Show only the person's face and upper body. "
+        "Clean, well-lit background with soft gradient. "
+        "Clear facial features and distinctive appearance visible. "
+        "Semi-realistic illustration style, warm lighting on the face. "
+        "Show face and upper body. "
+        "The character can be human, animal, robot, or any creature. "
         "Absolutely no text, no labels, no names, no words, no letters anywhere in the image."
     )
 
