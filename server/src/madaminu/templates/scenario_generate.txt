@@ -20,41 +20,12 @@ Create a complete scenario with the following structure (respond in JSON):
   },
   "map": {
     "areas": [
-      {
-        "id": "main_1f", "name": "本館1階", "area_type": "indoor",
-        "rooms": [
-          {"id": "entrance", "name": "玄関ホール", "features": ["大鏡", "傘立て", "階段"]},
-          {"id": "living", "name": "リビング", "features": ["暖炉", "ソファ", "本棚"]},
-          {"id": "dining", "name": "食堂", "features": ["長テーブル", "食器棚"]},
-          {"id": "kitchen", "name": "台所", "features": ["包丁セット", "裏口"]}
-        ]
-      },
-      {
-        "id": "main_2f", "name": "本館2階", "area_type": "indoor",
-        "rooms": [
-          {"id": "hallway_2f", "name": "2階廊下", "features": ["窓", "絵画"]},
-          {"id": "bedroom", "name": "寝室", "features": ["ベッド", "クローゼット"]},
-          {"id": "study", "name": "書斎", "features": ["金庫", "デスク", "本棚"]}
-        ]
-      },
-      {
-        "id": "outside", "name": "屋外", "area_type": "outdoor",
-        "rooms": [
-          {"id": "garden", "name": "庭園", "features": ["噴水", "花壇", "ベンチ"]},
-          {"id": "greenhouse", "name": "温室", "features": ["植木棚", "換気窓"]}
-        ]
-      }
+      {"id": "area_id", "name": "エリア名", "area_type": "indoor|outdoor|semi_outdoor", "rooms": [
+        {"id": "room_id", "name": "部屋名", "features": ["特徴1", "特徴2"]}
+      ]}
     ],
     "connections": [
-      {"from": "entrance", "to": "living", "type": "door"},
-      {"from": "entrance", "to": "dining", "type": "door"},
-      {"from": "dining", "to": "kitchen", "type": "door"},
-      {"from": "living", "to": "garden", "type": "window"},
-      {"from": "entrance", "to": "garden", "type": "door"},
-      {"from": "entrance", "to": "hallway_2f", "type": "stairs"},
-      {"from": "hallway_2f", "to": "bedroom", "type": "door"},
-      {"from": "hallway_2f", "to": "study", "type": "door"},
-      {"from": "garden", "to": "greenhouse", "type": "door"}
+      {"from": "room_id_1", "to": "room_id_2", "type": "door|stairs|window|corridor|hidden_passage"}
     ]
   },
   "relationships": [
@@ -93,10 +64,20 @@ The map is a hierarchical graph: **areas** contain **rooms**, and **connections*
 - Each area is a logical zone: a floor of a building, outdoor area, separate building, etc.
 - area_type: "indoor", "outdoor", or "semi_outdoor"
 - Each area has 2-4 rooms
+- Be creative with area design based on the setting. Examples:
+  - 洋館: 本館1階, 本館2階, 中庭, 離れ
+  - リゾートホテル: ロビー階, 客室階, プールサイド, 駐車場
+  - 豪華客船: デッキ, 客室エリア, 機関室, レストラン階
+  - 山荘: 本棟, 別棟, 裏庭, 裏の森の小道
+  - 学校: 校舎1階, 校舎2階, 校庭, 体育館
+- Outdoor areas are important: 中庭, プール, 庭園, 森の小道, 駐車場, テラス, etc.
+- Include interesting/unusual rooms that create mystery: 地下室, 焼却炉, 屋根裏, 隠し部屋, ワインセラー, 物置, 温室, 鐘楼, 展望台, ボイラー室, etc.
 
 ### Rooms (nodes)
 - Each room has a unique id, name, and 2-4 features (objects/furniture)
 - Room ids must be unique across all areas
+- Connections reference ROOM ids only, never area ids
+- An area itself is NOT a room — do not use area ids in connections
 
 ### Connections (edges)
 - Each connection links two rooms by id
@@ -112,6 +93,11 @@ The map is a hierarchical graph: **areas** contain **rooms**, and **connections*
 - Some rooms should be "hub" rooms with many connections (entrance, corridor)
 - Some rooms should be "dead ends" with only one connection (storage, secret room)
 - This topology creates natural alibis: "I was in the kitchen, so I couldn't have been upstairs"
+
+### IMPORTANT: Generate an original map
+- DO NOT copy the schema example. Design a unique map that fits your scenario's setting.
+- The setting determines the map: a cruise ship has decks, a school has classrooms, a mansion has wings.
+- Every scenario should produce a different map with different area names, room names, and connection patterns.
 
 ### Guidelines
 - Generate 2-4 areas with a total of 8-12 rooms
