@@ -52,6 +52,8 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             game.currentTranscript = ""
         case .investigate(let locationId):
             ws.send(type: "investigate", data: ["location_id": locationId])
+        case .selectInvestigation(let locationId):
+            ws.send(type: "investigate.select", data: ["location_id": locationId ?? ""])
         case .vote(let suspectId):
             ws.send(type: "vote.submit", data: ["suspect_player_id": suspectId])
         case .advancePhase:

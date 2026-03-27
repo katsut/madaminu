@@ -24,6 +24,18 @@ class PhaseManager:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self._session_factory = session_factory
         self._timers: dict[str, asyncio.Task] = {}
+        self._investigation_selections: dict[str, dict[str, str | None]] = {}  # room_code -> {player_id: location_id}
+
+    def set_investigation_selection(self, room_code: str, player_id: str, location_id: str | None):
+        if room_code not in self._investigation_selections:
+            self._investigation_selections[room_code] = {}
+        self._investigation_selections[room_code][player_id] = location_id
+
+    def get_investigation_selections(self, room_code: str) -> dict[str, str | None]:
+        return dict(self._investigation_selections.get(room_code, {}))
+
+    def clear_investigation_selections(self, room_code: str):
+        self._investigation_selections.pop(room_code, None)
 
     async def start_first_phase(self, game_id: str, room_code: str) -> Phase:
         async with self._session_factory() as db:
@@ -80,6 +92,9 @@ class PhaseManager:
             await db.commit()
 
         await self._broadcast_phase_ended(room_code, current_phase, next_phase)
+
+        if current_phase.phase_type == PhaseType.investigation:
+            await self._execute_investigation_selections(game_id, room_code)
 
         await self._run_phase_adjustment(game_id, room_code, current_phase.id)
 
@@ -164,6 +179,35 @@ class PhaseManager:
 
         logger.info("Phase timer expired for game %s, phase %s", game_id, phase_id)
         await self.advance_phase(game_id, room_code)
+
+    async def _execute_investigation_selections(self, game_id: str, room_code: str):
+        from madaminu.services.scenario_engine import investigate_location
+        from madaminu.ws.handler import manager
+
+        selections = self.get_investigation_selections(room_code)
+        self.clear_investigation_selections(room_code)
+
+        if not selections:
+            return
+
+        for player_id, location_id in selections.items():
+            if not location_id:
+                continue
+            try:
+                async with self._session_factory() as db:
+                    evidence, usage = await investigate_location(db, game_id, player_id, location_id)
+                    if evidence:
+                        await manager.send_to_player(
+                            room_code,
+                            player_id,
+                            WSMessage(
+                                type="investigate.result",
+                                data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
+                            ),
+                        )
+                        logger.info("Investigation result sent to %s for %s", player_id, location_id)
+            except Exception:
+                logger.exception("Investigation failed for player %s location %s", player_id, location_id)
 
     async def _schedule_ai_speeches(self, game_id: str, room_code: str, phase: Phase):
         if phase.phase_type not in (PhaseType.discussion, PhaseType.investigation):
