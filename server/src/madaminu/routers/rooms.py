@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from madaminu.db import get_db
+from madaminu.models import Game, Player
 from madaminu.routers.schemas import (
     CreateRoomRequest,
     CreateRoomResponse,
@@ -32,9 +35,9 @@ async def list_rooms_endpoint(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=CreateRoomResponse)
-async def create_room_endpoint(req: CreateRoomRequest, db: AsyncSession = Depends(get_db)):
+async def create_room_endpoint(req: CreateRoomRequest, db: AsyncSession = Depends(get_db), x_device_id: str | None = Header(None)):
     try:
-        game, player = await create_room(db, req.display_name, req.password)
+        game, player = await create_room(db, req.display_name, req.password, device_id=x_device_id)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e)) from None
     return CreateRoomResponse(
@@ -45,9 +48,9 @@ async def create_room_endpoint(req: CreateRoomRequest, db: AsyncSession = Depend
 
 
 @router.post("/{room_code}/join", response_model=JoinRoomResponse)
-async def join_room_endpoint(room_code: str, req: JoinRoomRequest, db: AsyncSession = Depends(get_db)):
+async def join_room_endpoint(room_code: str, req: JoinRoomRequest, db: AsyncSession = Depends(get_db), x_device_id: str | None = Header(None)):
     try:
-        _, player = await join_room(db, room_code, req.display_name, req.password)
+        _, player = await join_room(db, room_code, req.display_name, req.password, device_id=x_device_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
     return JoinRoomResponse(
@@ -78,3 +81,50 @@ async def get_room_endpoint(room_code: str, db: AsyncSession = Depends(get_db)):
             for p in game.players
         ],
     )
+
+
+@router.get("/mine/list")
+async def list_my_rooms(x_device_id: str = Header(...), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Player)
+        .options(selectinload(Player.game))
+        .where(Player.device_id == x_device_id)
+        .order_by(Player.created_at.desc())
+        .limit(20)
+    )
+    players = result.scalars().all()
+
+    rooms = []
+    for p in players:
+        g = p.game
+        if g is None:
+            continue
+        rooms.append({
+            "room_code": g.room_code,
+            "status": g.status,
+            "is_host": p.is_host,
+            "display_name": p.display_name,
+            "character_name": p.character_name,
+            "session_token": p.session_token,
+            "player_id": p.id,
+            "created_at": str(g.created_at) if g.created_at else None,
+        })
+    return rooms
+
+
+@router.delete("/{room_code}")
+async def delete_room(room_code: str, x_device_id: str = Header(...), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code)
+    )
+    game = result.scalar_one_or_none()
+    if game is None:
+        raise HTTPException(status_code=404, detail="Room not found") from None
+
+    host = next((p for p in game.players if p.is_host), None)
+    if host is None or host.device_id != x_device_id:
+        raise HTTPException(status_code=403, detail="Only the host can delete this room") from None
+
+    await db.delete(game)
+    await db.commit()
+    return {"status": "deleted"}

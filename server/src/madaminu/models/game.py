@@ -39,7 +39,7 @@ class Game(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     total_llm_cost_usd: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     updated_at: Mapped[str | None] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    players: Mapped[list[Player]] = relationship("Player", back_populates="game", foreign_keys="Player.game_id")
-    phases: Mapped[list[Phase]] = relationship("Phase", back_populates="game", foreign_keys="Phase.game_id")
-    speech_logs: Mapped[list[SpeechLog]] = relationship("SpeechLog", back_populates="game")
-    votes: Mapped[list[Vote]] = relationship("Vote", back_populates="game")
+    players: Mapped[list[Player]] = relationship("Player", back_populates="game", foreign_keys="Player.game_id", cascade="all, delete-orphan", passive_deletes=True)
+    phases: Mapped[list[Phase]] = relationship("Phase", back_populates="game", foreign_keys="Phase.game_id", cascade="all, delete-orphan", passive_deletes=True)
+    speech_logs: Mapped[list[SpeechLog]] = relationship("SpeechLog", back_populates="game", cascade="all, delete-orphan", passive_deletes=True)
+    votes: Mapped[list[Vote]] = relationship("Vote", back_populates="game", cascade="all, delete-orphan", passive_deletes=True)

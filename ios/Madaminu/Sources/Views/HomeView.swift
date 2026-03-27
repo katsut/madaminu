@@ -68,23 +68,74 @@ struct HomeScreen: View {
                         .padding(.top, Spacing.xs)
                 }
 
-                HStack(spacing: Spacing.sm) {
-                    Text("ルーム一覧")
-                        .font(.mdHeadline)
-                        .foregroundStyle(Color.mdTextSecondary)
-                    Spacer()
-                    Button {
-                        store.dispatch(.fetchRooms)
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(Color.mdTextMuted)
-                    }
-                }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.top, Spacing.lg)
-
                 ScrollView {
                     LazyVStack(spacing: Spacing.xs) {
+                        if !store.room.myRooms.isEmpty {
+                            HStack {
+                                Text("自分のルーム")
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                                Spacer()
+                            }
+                            .padding(.top, Spacing.sm)
+
+                            ForEach(store.room.myRooms) { myRoom in
+                                MDCard {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                            HStack(spacing: Spacing.xs) {
+                                                Text(myRoom.roomCode)
+                                                    .font(.mdHeadline)
+                                                    .foregroundStyle(Color.mdPrimary)
+                                                Text(statusLabel(myRoom.status))
+                                                    .font(.mdCaption2)
+                                                    .foregroundStyle(statusColor(myRoom.status))
+                                                    .padding(.horizontal, Spacing.xs)
+                                                    .padding(.vertical, 2)
+                                                    .background(statusColor(myRoom.status).opacity(0.15))
+                                                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                            }
+                                            Text(myRoom.characterName ?? myRoom.displayName)
+                                                .font(.mdCaption)
+                                                .foregroundStyle(Color.mdTextSecondary)
+                                        }
+                                        Spacer()
+                                        if myRoom.status == "waiting" {
+                                            MDButton("再接続", style: .secondary) {
+                                                store.dispatch(.rejoinRoom(
+                                                    sessionToken: myRoom.sessionToken,
+                                                    playerId: myRoom.playerId,
+                                                    roomCode: myRoom.roomCode
+                                                ))
+                                            }
+                                        }
+                                        if myRoom.isHost {
+                                            Button {
+                                                store.dispatch(.deleteRoom(roomCode: myRoom.roomCode))
+                                            } label: {
+                                                Image(systemName: "trash")
+                                                    .foregroundStyle(Color.mdError)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        HStack {
+                            Text("ルーム一覧")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdTextSecondary)
+                            Spacer()
+                            Button {
+                                store.dispatch(.fetchRooms)
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                                    .foregroundStyle(Color.mdTextMuted)
+                            }
+                        }
+                        .padding(.top, Spacing.sm)
+
                         if store.room.availableRooms.isEmpty {
                             Text("ルームがありません")
                                 .font(.mdBody)
@@ -136,12 +187,35 @@ struct HomeScreen: View {
         .onTapGesture {
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
-        .task { store.dispatch(.fetchRooms) }
+        .task {
+            store.dispatch(.fetchRooms)
+            store.dispatch(.fetchMyRooms)
+        }
         .sheet(isPresented: $showCreateSheet) {
             CreateRoomSheet(store: store, isPresented: $showCreateSheet)
         }
         .sheet(isPresented: $showJoinSheet) {
             JoinRoomSheet(store: store, isPresented: $showJoinSheet, joinCode: $joinCode, password: $password)
+        }
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        switch status {
+        case "waiting": "待機中"
+        case "generating": "生成中"
+        case "playing": "プレイ中"
+        case "voting": "投票中"
+        case "ended": "終了"
+        default: status
+        }
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "waiting": Color.mdInfo
+        case "generating", "playing", "voting": Color.mdPrimary
+        case "ended": Color.mdTextMuted
+        default: Color.mdTextMuted
         }
     }
 }
