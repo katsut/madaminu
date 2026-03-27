@@ -65,7 +65,7 @@ struct HomeScreen: View {
                     }
 
                     VStack(spacing: Spacing.xxs) {
-                        Text("マダミヌ")
+                        Text("マダ見ヌ")
                             .font(.system(size: 36, weight: .black))
                             .foregroundStyle(Color.mdPrimary)
                         Text("AI マーダーミステリー")
