@@ -57,7 +57,7 @@ def _validate_hierarchical(map_data: dict, scenario: dict) -> list[str]:
                 errors.append(f"Room '{rid}' has no features")
 
     if len(all_room_ids) < 4:
-        errors.append(f"Too few rooms: {len(all_room_ids)} (minimum 4)")
+        errors.append(f"Too few rooms: {len(all_room_ids)} (minimum 10)")
 
     connected_ids = set()
     for conn in connections:

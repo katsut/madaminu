@@ -63,7 +63,7 @@ The map is a hierarchical graph: **areas** contain **rooms**, and **connections*
 ### Areas
 - Each area is a logical zone: a floor of a building, outdoor area, separate building, etc.
 - area_type: "indoor", "outdoor", or "semi_outdoor"
-- Each area has 2-4 rooms
+- Each area has 3-6 rooms
 - Be creative with area design based on the setting. Examples:
   - 洋館: 本館1階, 本館2階, 中庭, 離れ
   - リゾートホテル: ロビー階, 客室階, プールサイド, 駐車場
@@ -100,7 +100,7 @@ The map is a hierarchical graph: **areas** contain **rooms**, and **connections*
 - Every scenario should produce a different map with different area names, room names, and connection patterns.
 
 ### Guidelines
-- Generate 2-4 areas with a total of 8-12 rooms
+- Generate 3-5 areas with a total of 15-20 rooms
 - Include at least one lockable or restricted room
 - The crime scene should have at least 2 connections
 - Consider sound: rooms connected by "door" or "corridor" can hear each other

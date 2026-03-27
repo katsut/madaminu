@@ -68,10 +68,10 @@ def test_render_contains_room_names():
     assert "庭園" in svg
 
 
-def test_render_contains_features():
+def test_render_room_names_only_no_features():
     svg = render_map_svg(HIERARCHICAL_MAP)
-    assert "暖炉" in svg
-    assert "噴水" in svg
+    assert "リビング" in svg
+    assert "暖炉" not in svg  # features not shown on map
 
 
 def test_render_contains_connection_markers():
