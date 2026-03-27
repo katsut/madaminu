@@ -94,13 +94,16 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
 
     map_data = scenario.get("map", {})
     map_locations = {}
+    skip_types = {"corridor", "entrance", "stairs"}
     if "areas" in map_data:
         for area in map_data["areas"]:
             for room in area.get("rooms", []):
-                map_locations[room["id"]] = room
+                if room.get("room_type") not in skip_types and room.get("features"):
+                    map_locations[room["id"]] = room
     elif "locations" in map_data:
         for loc in map_data["locations"]:
-            map_locations[loc["id"]] = loc
+            if loc.get("room_type") not in skip_types and loc.get("features"):
+                map_locations[loc["id"]] = loc
 
     all_locations = _resolve_investigation_locations(list(map_locations.keys()), map_locations)
     _create_cycle_phases(db, game, all_locations)
