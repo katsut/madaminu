@@ -67,6 +67,13 @@ struct DiscoveryItem: Identifiable, Sendable {
     var isTampered: Bool = false
 }
 
+struct RevealedEvidence: Identifiable, Sendable {
+    let id = UUID()
+    let playerName: String
+    let title: String
+    let content: String
+}
+
 struct ColocatedPlayer: Identifiable, Sendable {
     let id: String
     let characterName: String

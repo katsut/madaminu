@@ -87,10 +87,17 @@ struct WSMessageAdapter {
             let text = data["text"] ?? ""
             store.game.roomMessages.append(RoomMessage(senderId: senderId, senderName: senderName, text: text))
         case "evidence.revealed":
+            let playerId = data["player_id"] ?? ""
             let playerName = data["player_name"] ?? "不明"
             let title = data["title"] ?? ""
             let content = data["content"] ?? ""
-            store.notebook.evidences.append(EvidenceItem(title: "[\(playerName)] \(title)", content: content))
+            store.game.revealedEvidences.insert(
+                RevealedEvidence(playerName: playerName, title: title, content: content),
+                at: 0
+            )
+            if playerId != store.room.playerId {
+                store.notebook.evidences.append(EvidenceItem(title: "[\(playerName)] \(title)", content: content))
+            }
         case "game.ending":
             applyEnding(data, store: store)
         case "error":
