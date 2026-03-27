@@ -76,7 +76,14 @@ def _node_size(node: dict) -> tuple[int, int]:
 
 def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
     areas = map_data.get("areas", [])
+    connections = map_data.get("connections", [])
     floor_conns = map_data.get("floor_connections", [])
+    if not floor_conns:
+        floor_conns = [
+            [c.get("from", ""), c.get("to", "")]
+            for c in connections
+            if c.get("type") == "stairs"
+        ]
 
     if not areas:
         return _empty_svg()
@@ -87,8 +94,6 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
             area["nodes"] = area["rooms"]
         if "edges" not in area and "connections" not in area:
             area["edges"] = []
-
-    connections = map_data.get("connections", [])
 
     # Build node lookup
     _type_map = {"corridor": "passage"}
