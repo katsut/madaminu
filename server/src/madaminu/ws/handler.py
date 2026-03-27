@@ -110,7 +110,9 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
             msg_type = data.get("type", "")
             logger.info("WS message from %s: %s", player_id, msg_type)
 
-            if msg_type in ("phase.advance", "phase.extend"):
+            if msg_type == "intro.ready":
+                await _handle_intro_ready(db, room_code, player_id, websocket)
+            elif msg_type in ("phase.advance", "phase.extend"):
                 await _handle_host_command(db, room_code, player_id, msg_type, websocket)
             elif msg_type == "speech.request":
                 await _handle_speech_request(room_code, player_id, websocket)
@@ -189,6 +191,31 @@ async def _handle_speech_release(room_code: str, player_id: str, data: dict, web
     released = await sm.release_speech(room_code, player_id, transcript)
     if released:
         await sm.broadcast_speech_released(room_code, player_id)
+
+
+async def _handle_intro_ready(db: AsyncSession, room_code: str, player_id: str, websocket: WebSocket):
+    pm = _get_phase_manager(websocket)
+    if pm is None:
+        return
+
+    pm.set_intro_ready(room_code, player_id)
+    count = pm.get_intro_ready_count(room_code)
+
+    await manager.broadcast(
+        room_code,
+        WSMessage(type="intro.ready.count", data={"count": count}),
+    )
+
+    result = await db.execute(
+        select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code)
+    )
+    game = result.scalar_one_or_none()
+    if game and count >= len(game.players):
+        pm.clear_intro_ready(room_code)
+        await manager.broadcast(
+            room_code,
+            WSMessage(type="intro.all_ready", data={}),
+        )
 
 
 async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str, msg_type: str, websocket: WebSocket):

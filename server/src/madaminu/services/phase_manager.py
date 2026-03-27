@@ -25,7 +25,8 @@ class PhaseManager:
         self._session_factory = session_factory
         self._timers: dict[str, asyncio.Task] = {}
         self._investigation_selections: dict[str, dict[str, dict]] = {}
-        self._discoveries: dict[str, dict[str, list[dict]]] = {}  # room_code -> {player_id: [discovery]}
+        self._discoveries: dict[str, dict[str, list[dict]]] = {}
+        self._intro_ready: dict[str, set[str]] = {}  # room_code -> set of player_ids
 
     def set_investigation_selection(self, room_code: str, player_id: str, location_id: str | None, feature: str | None = None):
         if room_code not in self._investigation_selections:
@@ -57,6 +58,17 @@ class PhaseManager:
 
     def clear_discoveries(self, room_code: str):
         self._discoveries.pop(room_code, None)
+
+    def set_intro_ready(self, room_code: str, player_id: str):
+        if room_code not in self._intro_ready:
+            self._intro_ready[room_code] = set()
+        self._intro_ready[room_code].add(player_id)
+
+    def get_intro_ready_count(self, room_code: str) -> int:
+        return len(self._intro_ready.get(room_code, set()))
+
+    def clear_intro_ready(self, room_code: str):
+        self._intro_ready.pop(room_code, None)
 
     async def start_first_phase(self, game_id: str, room_code: str) -> Phase:
         async with self._session_factory() as db:

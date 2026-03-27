@@ -22,6 +22,8 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var keptDiscoveryId: String?
     @Published var revealedEvidences: [RevealedEvidence] = []
     @Published var hasRevealedEvidence = false
+    @Published var introReady = false
+    @Published var introReadyCount = 0
 
     // Preparation checklist
     @Published var aiPlayersReady = false
@@ -51,6 +53,8 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         keptDiscoveryId = nil
         revealedEvidences = []
         hasRevealedEvidence = false
+        introReady = false
+        introReadyCount = 0
         aiPlayersReady = false
         scenarioReady = false
         sceneImageReady = false
