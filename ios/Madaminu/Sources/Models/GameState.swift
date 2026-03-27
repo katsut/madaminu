@@ -58,6 +58,12 @@ struct ObjectiveResult: Codable, Sendable {
     let description: String
 }
 
+struct ColocatedPlayer: Identifiable, Sendable {
+    let id: String
+    let characterName: String
+    let portraitUrl: String?
+}
+
 struct RoomMessage: Identifiable, Sendable {
     let id = UUID()
     let senderId: String

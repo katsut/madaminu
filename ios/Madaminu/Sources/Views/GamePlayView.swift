@@ -503,9 +503,51 @@ struct InvestigationPhaseView: View {
                     }
                 }
 
-                RoomChatView(store: store)
+                if !store.game.colocatedPlayers.isEmpty {
+                    ColocatedPlayersView(store: store)
+                    RoomChatView(store: store)
+                }
             }
             .padding(Spacing.lg)
+        }
+    }
+}
+
+struct ColocatedPlayersView: View {
+    @ObservedObject var store: AppStore
+
+    var body: some View {
+        MDCard {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Text("同行者")
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdTextMuted)
+
+                HStack(spacing: Spacing.md) {
+                    ForEach(store.game.colocatedPlayers) { player in
+                        VStack(spacing: Spacing.xxs) {
+                            if let urlPath = player.portraitUrl,
+                               let url = URL(string: APIClient.defaultBaseURL + urlPath + "?size=64") {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Circle().fill(Color.mdSurface)
+                                }
+                                .frame(width: 40, height: 40)
+                                .clipShape(Circle())
+                            } else {
+                                Circle()
+                                    .fill(Color.mdSurface)
+                                    .frame(width: 40, height: 40)
+                            }
+                            Text(player.characterName)
+                                .font(.mdCaption2)
+                                .foregroundStyle(Color.mdTextSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
         }
     }
 }
