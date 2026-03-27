@@ -33,6 +33,7 @@ class PlayerInfo(BaseModel):
 
 class CreateCharacterRequest(BaseModel):
     character_name: str = Field(..., min_length=1, max_length=50)
+    character_name_kana: str = Field(default="", max_length=100)
     character_gender: str = Field(default="不明", max_length=10)
     character_age: str = Field(default="不明", max_length=10)
     character_occupation: str = Field(default="", max_length=100)
@@ -44,6 +45,7 @@ class CreateCharacterRequest(BaseModel):
 class CharacterResponse(BaseModel):
     player_id: str
     character_name: str
+    character_name_kana: str | None = None
     character_gender: str | None = None
     character_age: str | None = None
     character_occupation: str | None = None

@@ -21,6 +21,7 @@ def format_characters_for_prompt(characters: list[dict]) -> str:
         lines.append(
             f"Player {i}:\n"
             f"  Name: {char['character_name']}\n"
+            f"  Name (kana): {char.get('character_name_kana', '')}\n"
             f"  Gender: {char.get('character_gender', '不明')}\n"
             f"  Age: {char.get('character_age', '不明')}\n"
             f"  Occupation: {char.get('character_occupation', '')}\n"
