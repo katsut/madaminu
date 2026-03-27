@@ -574,6 +574,8 @@ def _resolve_investigation_locations(raw_locations: list, map_locations: dict) -
 
 
 def _parse_scenario_json(raw: str) -> dict:
+    from json_repair import repair_json
+
     cleaned = raw.strip()
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")
@@ -585,15 +587,7 @@ def _parse_scenario_json(raw: str) -> dict:
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
-        # Try to fix common issues: trailing commas, truncated JSON
-        import re
-
-        fixed = re.sub(r",\s*([}\]])", r"\1", cleaned)
-        try:
-            return json.loads(fixed)
-        except json.JSONDecodeError:
-            # Try to close unclosed braces
-            open_braces = fixed.count("{") - fixed.count("}")
-            open_brackets = fixed.count("[") - fixed.count("]")
-            fixed += "]" * open_brackets + "}" * open_braces
-            return json.loads(fixed)
+        repaired = repair_json(cleaned, return_objects=True)
+        if isinstance(repaired, dict):
+            return repaired
+        raise
