@@ -19,23 +19,42 @@ Create a complete scenario with the following structure (respond in JSON):
     "description": "被害者の説明"
   },
   "map": {
-    "locations": [
-      {"id": "garden", "name": "庭園", "description": "手入れされた広い庭。", "area_type": "outdoor", "x": 0, "y": 0, "w": 4, "h": 1, "features": ["噴水", "花壇", "ベンチ"]},
-      {"id": "entrance", "name": "玄関ホール", "description": "広い玄関。", "area_type": "indoor", "x": 0, "y": 1, "w": 1, "h": 1, "features": ["大鏡", "傘立て"]},
-      {"id": "living", "name": "リビング", "description": "暖炉のある居間。", "area_type": "indoor", "x": 1, "y": 1, "w": 1, "h": 1, "features": ["暖炉", "ソファ", "本棚"]},
-      {"id": "dining", "name": "食堂", "description": "長テーブルのある食堂。", "area_type": "indoor", "x": 2, "y": 1, "w": 1, "h": 1, "features": ["長テーブル", "食器棚"]},
-      {"id": "kitchen", "name": "台所", "description": "業務用の広い台所。", "area_type": "indoor", "x": 3, "y": 1, "w": 1, "h": 1, "features": ["包丁セット", "裏口"]},
-      {"id": "study", "name": "書斎", "description": "鍵付きの書斎。", "area_type": "indoor", "x": 0, "y": 2, "w": 1, "h": 1, "features": ["金庫", "デスク", "本棚"]},
-      {"id": "bedroom", "name": "寝室", "description": "主寝室。", "area_type": "indoor", "x": 1, "y": 2, "w": 1, "h": 1, "features": ["ベッド", "クローゼット"]}
+    "areas": [
+      {
+        "id": "main_1f", "name": "本館1階", "area_type": "indoor",
+        "rooms": [
+          {"id": "entrance", "name": "玄関ホール", "features": ["大鏡", "傘立て", "階段"]},
+          {"id": "living", "name": "リビング", "features": ["暖炉", "ソファ", "本棚"]},
+          {"id": "dining", "name": "食堂", "features": ["長テーブル", "食器棚"]},
+          {"id": "kitchen", "name": "台所", "features": ["包丁セット", "裏口"]}
+        ]
+      },
+      {
+        "id": "main_2f", "name": "本館2階", "area_type": "indoor",
+        "rooms": [
+          {"id": "hallway_2f", "name": "2階廊下", "features": ["窓", "絵画"]},
+          {"id": "bedroom", "name": "寝室", "features": ["ベッド", "クローゼット"]},
+          {"id": "study", "name": "書斎", "features": ["金庫", "デスク", "本棚"]}
+        ]
+      },
+      {
+        "id": "outside", "name": "屋外", "area_type": "outdoor",
+        "rooms": [
+          {"id": "garden", "name": "庭園", "features": ["噴水", "花壇", "ベンチ"]},
+          {"id": "greenhouse", "name": "温室", "features": ["植木棚", "換気窓"]}
+        ]
+      }
     ],
     "connections": [
-      {"from": "entrance", "to": "garden", "type": "door", "side": "north"},
-      {"from": "entrance", "to": "living", "type": "door", "side": "east"},
-      {"from": "living", "to": "garden", "type": "window", "side": "north"},
-      {"from": "living", "to": "dining", "type": "door", "side": "east"},
-      {"from": "dining", "to": "kitchen", "type": "door", "side": "east"},
-      {"from": "entrance", "to": "study", "type": "door", "side": "south"},
-      {"from": "living", "to": "bedroom", "type": "door", "side": "south"}
+      {"from": "entrance", "to": "living", "type": "door"},
+      {"from": "entrance", "to": "dining", "type": "door"},
+      {"from": "dining", "to": "kitchen", "type": "door"},
+      {"from": "living", "to": "garden", "type": "window"},
+      {"from": "entrance", "to": "garden", "type": "door"},
+      {"from": "entrance", "to": "hallway_2f", "type": "stairs"},
+      {"from": "hallway_2f", "to": "bedroom", "type": "door"},
+      {"from": "hallway_2f", "to": "study", "type": "door"},
+      {"from": "garden", "to": "greenhouse", "type": "door"}
     ]
   },
   "relationships": [
@@ -66,51 +85,41 @@ Create a complete scenario with the following structure (respond in JSON):
   "gm_strategy": "GMがゲーム全体をどう展開させるかの戦略メモ"
 }
 
-## Map Layout Rules
+## Map Structure
 
-Think of the map as a grid (graph paper). Each location occupies a rectangle on this grid.
+The map is a hierarchical graph: **areas** contain **rooms**, and **connections** (edges) link rooms.
 
-- **x, y**: top-left corner of the location on the grid (integers, starting from 0)
-- **w, h**: width and height in grid cells (minimum 1, most rooms should be 1x1)
-- **area_type**: "indoor", "outdoor", or "semi_outdoor"
+### Areas
+- Each area is a logical zone: a floor of a building, outdoor area, separate building, etc.
+- area_type: "indoor", "outdoor", or "semi_outdoor"
+- Each area has 2-4 rooms
 
-### CRITICAL layout constraints:
-- **All x values must be >= 0** (no negative coordinates)
-- **All y values must be >= 0** (no negative coordinates)
-- **Locations MUST NOT overlap** on the grid
-- **Every non-stairs connection requires the two rooms to share an edge** (be horizontally or vertically adjacent)
-- **Total grid must fit within 4 columns (x: 0-3) and 4 rows (y: 0-3)**
-- Some rooms CAN be isolated (e.g., a greenhouse only accessible through one room) — this is OK for mystery purposes
+### Rooms (nodes)
+- Each room has a unique id, name, and 2-4 features (objects/furniture)
+- Room ids must be unique across all areas
 
-### Layout pattern:
-Follow this building layout pattern for a coherent floor plan:
+### Connections (edges)
+- Each connection links two rooms by id
+- type: "door", "corridor", "stairs", "window", "hidden_passage"
+- "stairs" connects rooms in different areas (floors)
+- Other types connect rooms within the same area or adjacent areas
+- Every room must be reachable from at least one other room
 
-```
-y=0: [outdoor/garden areas spanning the top row]
-y=1: [entrance/hallway] [main rooms like living room, reception]
-y=2: [utility rooms like kitchen, dining] [more rooms]
-y=3: [private rooms like study, bedroom] [storage]
-```
+### Route constraints (important for alibis and mystery logic)
+- Think about how people move through the building
+- Example: "廊下からしか裏庭に出られない" → the corridor is a bottleneck; anyone going outside was seen in the corridor
+- Example: "階段からしか2階に上がれない" → the staircase room is the only link between floors
+- Some rooms should be "hub" rooms with many connections (entrance, corridor)
+- Some rooms should be "dead ends" with only one connection (storage, secret room)
+- This topology creates natural alibis: "I was in the kitchen, so I couldn't have been upstairs"
 
-- Outdoor areas: y=0, spanning full width (e.g., x=0, y=0, w=4, h=1)
-- Entrance/hallway: center of y=1 row, connecting to outdoor above and rooms on sides
-- Most rooms should be 1x1. Only outdoor areas or large halls can be wider
-- Place rooms in a compact rectangular layout — no L-shapes or gaps
-
-### Connections:
-- "side" indicates where the passage is on the "from" room: "north", "south", "east", "west"
-- A "north" connection from room at y=1 connects to the room at y=0 above it
-- A "east" connection from room at x=0 connects to the room at x=1 beside it
-
-## Map Guidelines
-
-- Generate 6-8 locations that form a coherent floor plan
-- Each location must have 2-4 features (objects, furniture, notable details)
-- Connections define how locations are linked: "door", "corridor", "stairs", "window", "hidden_passage"
-- Include at least one location that is lockable or restricted
-- The crime scene should be connected to at least 2 other locations
-- Consider sight lines and sound: adjacent rooms can hear loud noises
-- investigation_locations in phases reference location IDs from the map
+### Guidelines
+- Generate 2-4 areas with a total of 8-12 rooms
+- Include at least one lockable or restricted room
+- The crime scene should have at least 2 connections
+- Consider sound: rooms connected by "door" or "corridor" can hear each other
+- Rooms connected by "window" have line of sight but limited sound
+- investigation_locations in phases reference room IDs from the map
 
 ## Character Profile Enhancement
 

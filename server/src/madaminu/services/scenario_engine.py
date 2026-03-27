@@ -92,7 +92,16 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         player.objective = sp["objective"]
         player.role = ROLE_MAP.get(sp["role"], PlayerRole.innocent)
 
-    map_locations = {loc["id"]: loc for loc in (scenario.get("map", {}).get("locations", []))}
+    map_data = scenario.get("map", {})
+    map_locations = {}
+    # Support both old flat structure and new hierarchical structure
+    if "areas" in map_data:
+        for area in map_data["areas"]:
+            for room in area.get("rooms", []):
+                map_locations[room["id"]] = room
+    elif "locations" in map_data:
+        for loc in map_data["locations"]:
+            map_locations[loc["id"]] = loc
 
     for i, phase_data in enumerate(scenario.get("phases", [])):
         phase_type_str = phase_data.get("phase_type", "investigation")

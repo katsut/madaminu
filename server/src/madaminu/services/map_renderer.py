@@ -1,122 +1,170 @@
-"""Generate SVG map from grid-based location data."""
+"""Generate SVG map from hierarchical area/room map data."""
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-CELL_SIZE = 90
-PADDING = 24
-FONT_SIZE = 13
-WALL_WIDTH = 3
-DOOR_GAP = 26
-WINDOW_DASH = "4,4"
+ROOM_W = 120
+ROOM_H = 50
+ROOM_GAP = 12
+AREA_PAD = 16
+AREA_GAP = 24
+AREA_HEADER = 28
+PADDING = 20
+FONT_SIZE = 12
+FEATURE_FONT = 9
 
 COLORS = {
-    "indoor": {"fill": "#2a2a3a", "stroke": "#8888aa"},
-    "outdoor": {"fill": "#1a2a1a", "stroke": "#558855"},
-    "semi_outdoor": {"fill": "#222a2a", "stroke": "#667766"},
+    "indoor": {"fill": "#1e1e2e", "stroke": "#5555aa", "header": "#3a3a5a"},
+    "outdoor": {"fill": "#1a2a1a", "stroke": "#448844", "header": "#2a4a2a"},
+    "semi_outdoor": {"fill": "#1e2a2a", "stroke": "#558866", "header": "#2a3a3a"},
+    "room": {"fill": "#2a2a3e", "stroke": "#6666aa"},
+    "room_outdoor": {"fill": "#223322", "stroke": "#669966"},
+    "text": "#cccccc",
+    "text_dim": "#888899",
+    "background": "#111118",
     "door": "#cc9944",
     "window": "#6699cc",
     "stairs": "#aa77cc",
-    "text": "#cccccc",
-    "text_feature": "#888899",
-    "background": "#111118",
+    "corridor": "#999999",
+    "hidden_passage": "#666666",
+}
+
+CONNECTION_COLORS = {
+    "door": COLORS["door"],
+    "window": COLORS["window"],
+    "stairs": COLORS["stairs"],
+    "corridor": COLORS["corridor"],
+    "hidden_passage": COLORS["hidden_passage"],
 }
 
 
 def render_map_svg(map_data: dict) -> str:
-    """Render map data to SVG string."""
-    locations = map_data.get("locations", [])
+    """Render map data to SVG string. Supports both flat and hierarchical format."""
+    areas = map_data.get("areas")
+    if areas is None:
+        return _render_flat_map(map_data)
+    return _render_hierarchical_map(map_data)
+
+
+def _render_hierarchical_map(map_data: dict) -> str:
+    areas = map_data.get("areas", [])
     connections = map_data.get("connections", [])
 
-    if not locations:
+    if not areas:
         return _empty_svg()
 
-    # Calculate grid bounds
-    min_x = min(loc.get("x", 0) for loc in locations)
-    min_y = min(loc.get("y", 0) for loc in locations)
-    max_x = max(loc.get("x", 0) + loc.get("w", 1) for loc in locations)
-    max_y = max(loc.get("y", 0) + loc.get("h", 1) for loc in locations)
+    # Layout: areas side by side, rooms stacked vertically in each area
+    area_layouts = []
+    room_positions = {}
+    x_cursor = PADDING
 
-    width = (max_x - min_x) * CELL_SIZE + PADDING * 2
-    height = (max_y - min_y) * CELL_SIZE + PADDING * 2
+    for area in areas:
+        rooms = area.get("rooms", [])
+        area_type = area.get("area_type", "indoor")
+        max_rooms = len(rooms)
+
+        area_content_h = max_rooms * (ROOM_H + ROOM_GAP) - ROOM_GAP if max_rooms > 0 else ROOM_H
+        area_w = ROOM_W + AREA_PAD * 2
+        area_h = AREA_HEADER + area_content_h + AREA_PAD * 2
+
+        area_x = x_cursor
+        area_y = PADDING
+
+        area_layouts.append({
+            "area": area,
+            "x": area_x,
+            "y": area_y,
+            "w": area_w,
+            "h": area_h,
+            "area_type": area_type,
+        })
+
+        for i, room in enumerate(rooms):
+            rx = area_x + AREA_PAD
+            ry = area_y + AREA_HEADER + AREA_PAD + i * (ROOM_H + ROOM_GAP)
+            room_positions[room["id"]] = {
+                "x": rx, "y": ry,
+                "cx": rx + ROOM_W // 2,
+                "cy": ry + ROOM_H // 2,
+                "area_type": area_type,
+            }
+
+        x_cursor += area_w + AREA_GAP
+
+    total_w = x_cursor - AREA_GAP + PADDING
+    total_h = max((a["y"] + a["h"] for a in area_layouts), default=200) + PADDING
 
     svg = Element("svg", {
         "xmlns": "http://www.w3.org/2000/svg",
-        "viewBox": f"0 0 {width} {height}",
-        "width": str(width),
-        "height": str(height),
+        "viewBox": f"0 0 {total_w} {total_h}",
+        "width": str(total_w),
+        "height": str(total_h),
     })
 
-    # Background
-    SubElement(svg, "rect", {
-        "width": str(width),
-        "height": str(height),
-        "fill": COLORS["background"],
-    })
+    SubElement(svg, "rect", {"width": str(total_w), "height": str(total_h), "fill": COLORS["background"]})
 
-    # Offset for coordinate normalization
-    ox = -min_x * CELL_SIZE + PADDING
-    oy = -min_y * CELL_SIZE + PADDING
+    # Draw areas
+    for al in area_layouts:
+        _draw_area(svg, al)
 
-    loc_by_id = {loc["id"]: loc for loc in locations}
-
-    # Draw locations
-    for loc in locations:
-        _draw_location(svg, loc, ox, oy)
+    # Draw rooms
+    for area in areas:
+        area_type = area.get("area_type", "indoor")
+        for room in area.get("rooms", []):
+            pos = room_positions[room["id"]]
+            _draw_room(svg, room, pos["x"], pos["y"], area_type)
 
     # Draw connections
     for conn in connections:
-        loc_from = loc_by_id.get(conn["from"])
-        loc_to = loc_by_id.get(conn["to"])
-        if loc_from and loc_to:
-            _draw_connection(svg, conn, loc_from, loc_to, ox, oy)
+        from_pos = room_positions.get(conn["from"])
+        to_pos = room_positions.get(conn["to"])
+        if from_pos and to_pos:
+            _draw_connection(svg, conn, from_pos, to_pos)
 
     return tostring(svg, encoding="unicode")
 
 
-def _empty_svg() -> str:
-    svg = Element("svg", {
-        "xmlns": "http://www.w3.org/2000/svg",
-        "viewBox": "0 0 200 100",
-        "width": "200",
-        "height": "100",
-    })
-    SubElement(svg, "rect", {"width": "200", "height": "100", "fill": COLORS["background"]})
-    text = SubElement(svg, "text", {
-        "x": "100", "y": "55", "text-anchor": "middle",
-        "fill": COLORS["text"], "font-size": "14",
-    })
-    text.text = "マップなし"
-    return tostring(svg, encoding="unicode")
-
-
-def _draw_location(svg: Element, loc: dict, ox: int, oy: int):
-    area_type = loc.get("area_type", "indoor")
+def _draw_area(svg: Element, layout: dict):
+    area = layout["area"]
+    area_type = layout["area_type"]
     colors = COLORS.get(area_type, COLORS["indoor"])
 
-    x = loc.get("x", 0) * CELL_SIZE + ox
-    y = loc.get("y", 0) * CELL_SIZE + oy
-    w = loc.get("w", 1) * CELL_SIZE
-    h = loc.get("h", 1) * CELL_SIZE
-
     attrs = {
-        "x": str(x + 1),
-        "y": str(y + 1),
-        "width": str(w - 2),
-        "height": str(h - 2),
-        "fill": colors["fill"],
+        "x": str(layout["x"]),
+        "y": str(layout["y"]),
+        "width": str(layout["w"]),
+        "height": str(layout["h"]),
+        "fill": "none",
         "stroke": colors["stroke"],
-        "stroke-width": str(WALL_WIDTH),
-        "rx": "4",
+        "stroke-width": "2",
+        "rx": "8",
     }
     if area_type == "outdoor":
         attrs["stroke-dasharray"] = "6,3"
 
     SubElement(svg, "rect", attrs)
 
-    # Room name
+    # Area header background
+    SubElement(svg, "rect", {
+        "x": str(layout["x"]),
+        "y": str(layout["y"]),
+        "width": str(layout["w"]),
+        "height": str(AREA_HEADER),
+        "fill": colors["header"],
+        "rx": "8",
+    })
+    # Bottom corners of header should be square
+    SubElement(svg, "rect", {
+        "x": str(layout["x"]),
+        "y": str(layout["y"] + AREA_HEADER - 8),
+        "width": str(layout["w"]),
+        "height": "8",
+        "fill": colors["header"],
+    })
+
+    # Area name
     text = SubElement(svg, "text", {
-        "x": str(x + w // 2),
-        "y": str(y + h // 2 - 2),
+        "x": str(layout["x"] + layout["w"] // 2),
+        "y": str(layout["y"] + AREA_HEADER // 2 + 1),
         "text-anchor": "middle",
         "dominant-baseline": "central",
         "fill": COLORS["text"],
@@ -124,141 +172,137 @@ def _draw_location(svg: Element, loc: dict, ox: int, oy: int):
         "font-weight": "bold",
         "font-family": "sans-serif",
     })
-    text.text = loc.get("name", loc["id"])
+    text.text = area.get("name", area["id"])
 
-    # Features (small text below name)
-    features = loc.get("features", [])
+
+def _draw_room(svg: Element, room: dict, x: int, y: int, area_type: str):
+    room_colors = COLORS["room_outdoor"] if area_type == "outdoor" else COLORS["room"]
+
+    SubElement(svg, "rect", {
+        "x": str(x), "y": str(y),
+        "width": str(ROOM_W), "height": str(ROOM_H),
+        "fill": room_colors["fill"],
+        "stroke": room_colors["stroke"],
+        "stroke-width": "1.5",
+        "rx": "4",
+    })
+
+    # Room name
+    name_text = SubElement(svg, "text", {
+        "x": str(x + ROOM_W // 2),
+        "y": str(y + 18),
+        "text-anchor": "middle",
+        "fill": COLORS["text"],
+        "font-size": str(FONT_SIZE),
+        "font-weight": "bold",
+        "font-family": "sans-serif",
+    })
+    name_text.text = room.get("name", room["id"])
+
+    # Features
+    features = room.get("features", [])
     if features:
-        feature_text = "・".join(features[:3])
         ft = SubElement(svg, "text", {
-            "x": str(x + w // 2),
-            "y": str(y + h // 2 + FONT_SIZE),
+            "x": str(x + ROOM_W // 2),
+            "y": str(y + 34),
             "text-anchor": "middle",
-            "dominant-baseline": "central",
-            "fill": COLORS["text_feature"],
-            "font-size": str(FONT_SIZE - 3),
+            "fill": COLORS["text_dim"],
+            "font-size": str(FEATURE_FONT),
             "font-family": "sans-serif",
         })
-        ft.text = feature_text
+        ft.text = "・".join(features[:3])
 
 
-def _draw_connection(svg: Element, conn: dict, loc_from: dict, loc_to: dict, ox: int, oy: int):
+def _draw_connection(svg: Element, conn: dict, from_pos: dict, to_pos: dict):
     conn_type = conn.get("type", "door")
+    color = CONNECTION_COLORS.get(conn_type, COLORS["door"])
 
-    # Calculate center points
-    fx = loc_from.get("x", 0) * CELL_SIZE + loc_from.get("w", 1) * CELL_SIZE // 2 + ox
-    fy = loc_from.get("y", 0) * CELL_SIZE + loc_from.get("h", 1) * CELL_SIZE // 2 + oy
-    tx = loc_to.get("x", 0) * CELL_SIZE + loc_to.get("w", 1) * CELL_SIZE // 2 + ox
-    ty = loc_to.get("y", 0) * CELL_SIZE + loc_to.get("h", 1) * CELL_SIZE // 2 + oy
+    fx, fy = from_pos["cx"], from_pos["cy"]
+    tx, ty = to_pos["cx"], to_pos["cy"]
 
-    # Find midpoint (where the wall is)
+    # Adjust start/end to room edges
+    if abs(fx - tx) > abs(fy - ty):
+        # Horizontal connection
+        if fx < tx:
+            fx = from_pos["x"] + ROOM_W
+            tx = to_pos["x"]
+        else:
+            fx = from_pos["x"]
+            tx = to_pos["x"] + ROOM_W
+        fy = from_pos["cy"]
+        ty = to_pos["cy"]
+    else:
+        # Vertical connection
+        if fy < ty:
+            fy = from_pos["y"] + ROOM_H
+            ty = to_pos["y"]
+        else:
+            fy = from_pos["y"]
+            ty = to_pos["y"] + ROOM_H
+        fx = from_pos["cx"]
+        tx = to_pos["cx"]
+
+    attrs = {
+        "x1": str(fx), "y1": str(fy),
+        "x2": str(tx), "y2": str(ty),
+        "stroke": color,
+        "stroke-width": "2",
+        "stroke-linecap": "round",
+    }
+
+    if conn_type in ("stairs", "hidden_passage"):
+        attrs["stroke-dasharray"] = "6,4"
+    if conn_type == "window":
+        attrs["stroke-dasharray"] = "3,3"
+
+    SubElement(svg, "line", attrs)
+
+    # Label at midpoint
     mx = (fx + tx) // 2
     my = (fy + ty) // 2
 
-    color = COLORS.get(conn_type, COLORS["door"])
-
-    if conn_type == "door":
-        _draw_door_marker(svg, mx, my, fx, fy, tx, ty, color)
-    elif conn_type == "window":
-        _draw_window_marker(svg, mx, my, fx, fy, tx, ty, color)
-    elif conn_type == "stairs":
-        _draw_stairs_marker(svg, fx, fy, tx, ty, color)
-    elif conn_type == "hidden_passage":
-        _draw_hidden_marker(svg, mx, my, fx, fy, tx, ty)
-    else:
-        _draw_door_marker(svg, mx, my, fx, fy, tx, ty, color)
-
-
-def _draw_door_marker(svg: Element, mx: int, my: int, fx: int, fy: int, tx: int, ty: int, color: str):
-    is_horizontal = abs(fx - tx) > abs(fy - ty)
-    half = DOOR_GAP // 2
-
-    # Clear the wall first (background-colored gap)
-    if is_horizontal:
+    label = {"door": "🚪", "stairs": "⇅", "window": "◇", "hidden_passage": "?", "corridor": "─"}.get(conn_type, "")
+    if label:
+        # Background for label
         SubElement(svg, "rect", {
-            "x": str(mx - 2), "y": str(my - half),
-            "width": "4", "height": str(DOOR_GAP),
-            "fill": COLORS["background"],
+            "x": str(mx - 8), "y": str(my - 8),
+            "width": "16", "height": "16",
+            "fill": COLORS["background"], "rx": "3",
         })
-        SubElement(svg, "line", {
-            "x1": str(mx), "y1": str(my - half),
-            "x2": str(mx), "y2": str(my + half),
-            "stroke": color, "stroke-width": "4", "stroke-linecap": "round",
+        lt = SubElement(svg, "text", {
+            "x": str(mx), "y": str(my + 1),
+            "text-anchor": "middle",
+            "dominant-baseline": "central",
+            "fill": color,
+            "font-size": "11",
         })
-    else:
-        SubElement(svg, "rect", {
-            "x": str(mx - half), "y": str(my - 2),
-            "width": str(DOOR_GAP), "height": "4",
-            "fill": COLORS["background"],
-        })
-        SubElement(svg, "line", {
-            "x1": str(mx - half), "y1": str(my),
-            "x2": str(mx + half), "y2": str(my),
-            "stroke": color, "stroke-width": "4", "stroke-linecap": "round",
-        })
+        lt.text = label
 
 
-def _draw_window_marker(svg: Element, mx: int, my: int, fx: int, fy: int, tx: int, ty: int, color: str):
-    is_horizontal = abs(fx - tx) > abs(fy - ty)
-    half = DOOR_GAP // 2
+def _render_flat_map(map_data: dict) -> str:
+    """Fallback renderer for old flat location format."""
+    locations = map_data.get("locations", [])
+    if not locations:
+        return _empty_svg()
 
-    if is_horizontal:
-        SubElement(svg, "line", {
-            "x1": str(mx), "y1": str(my - half),
-            "x2": str(mx), "y2": str(my + half),
-            "stroke": color, "stroke-width": "2",
-            "stroke-dasharray": WINDOW_DASH, "stroke-linecap": "round",
-        })
-        SubElement(svg, "line", {
-            "x1": str(mx - 2), "y1": str(my - half),
-            "x2": str(mx - 2), "y2": str(my + half),
-            "stroke": color, "stroke-width": "1",
-            "stroke-dasharray": WINDOW_DASH, "stroke-linecap": "round",
-        })
-    else:
-        SubElement(svg, "line", {
-            "x1": str(mx - half), "y1": str(my),
-            "x2": str(mx + half), "y2": str(my),
-            "stroke": color, "stroke-width": "2",
-            "stroke-dasharray": WINDOW_DASH, "stroke-linecap": "round",
-        })
-        SubElement(svg, "line", {
-            "x1": str(mx - half), "y1": str(my - 2),
-            "x2": str(mx + half), "y2": str(my - 2),
-            "stroke": color, "stroke-width": "1",
-            "stroke-dasharray": WINDOW_DASH, "stroke-linecap": "round",
-        })
+    # Convert to hierarchical format
+    hierarchical = {
+        "areas": [{"id": "main", "name": "マップ", "area_type": "indoor", "rooms": locations}],
+        "connections": map_data.get("connections", []),
+    }
+    return _render_hierarchical_map(hierarchical)
 
 
-def _draw_stairs_marker(svg: Element, fx: int, fy: int, tx: int, ty: int, color: str):
-    # Dashed line connecting the two rooms
-    SubElement(svg, "line", {
-        "x1": str(fx), "y1": str(fy),
-        "x2": str(tx), "y2": str(ty),
-        "stroke": color, "stroke-width": "2",
-        "stroke-dasharray": "8,4", "stroke-linecap": "round",
+def _empty_svg() -> str:
+    svg = Element("svg", {
+        "xmlns": "http://www.w3.org/2000/svg",
+        "viewBox": "0 0 200 100",
+        "width": "200", "height": "100",
     })
-    # Stairs icon at midpoint
-    mx = (fx + tx) // 2
-    my = (fy + ty) // 2
-    text = SubElement(svg, "text", {
-        "x": str(mx), "y": str(my),
-        "text-anchor": "middle", "dominant-baseline": "central",
-        "fill": color, "font-size": "16",
+    SubElement(svg, "rect", {"width": "200", "height": "100", "fill": COLORS["background"]})
+    t = SubElement(svg, "text", {
+        "x": "100", "y": "55", "text-anchor": "middle",
+        "fill": COLORS["text"], "font-size": "14",
     })
-    text.text = "⇅"
-
-
-def _draw_hidden_marker(svg: Element, mx: int, my: int, fx: int, fy: int, tx: int, ty: int):
-    SubElement(svg, "line", {
-        "x1": str(fx), "y1": str(fy),
-        "x2": str(tx), "y2": str(ty),
-        "stroke": "#666666", "stroke-width": "1",
-        "stroke-dasharray": "2,6", "stroke-linecap": "round",
-    })
-    text = SubElement(svg, "text", {
-        "x": str(mx), "y": str(my),
-        "text-anchor": "middle", "dominant-baseline": "central",
-        "fill": "#666666", "font-size": "12",
-    })
-    text.text = "?"
+    t.text = "マップなし"
+    return tostring(svg, encoding="unicode")
