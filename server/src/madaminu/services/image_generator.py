@@ -21,9 +21,9 @@ async def generate_character_portrait(
     prompt = (
         f"A portrait of a {subject} for a mystery game. "
         f"{appearance_desc} "
-        "Clean, well-lit background with soft gradient. "
-        "Clear facial features and distinctive appearance visible. "
-        "Semi-realistic illustration style, warm lighting on the face. "
+        "Light gray or white plain background. "
+        "Bright, even studio lighting. Clear facial features visible. "
+        "Semi-realistic illustration style. "
         "Show face and upper body. "
         "The character can be human, animal, robot, or any creature. "
         "Absolutely no text, no labels, no names, no words, no letters anywhere in the image."

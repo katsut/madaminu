@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import io
 from functools import lru_cache
 
@@ -18,17 +19,29 @@ router = APIRouter(prefix="/api/v1/images", tags=["images"])
 MAX_SIZE = 1024
 CACHE_HEADERS = {"Cache-Control": "public, max-age=86400, immutable"}
 
+_resize_cache: dict[str, bytes] = {}
+_CACHE_MAX = 200
+
 
 def _resize_image(image_bytes: bytes, size: int) -> bytes:
     if size >= MAX_SIZE:
         return image_bytes
+
+    cache_key = hashlib.md5(image_bytes[:256]).hexdigest() + f"_{size}"
+    if cache_key in _resize_cache:
+        return _resize_cache[cache_key]
 
     img = Image.open(io.BytesIO(image_bytes))
     img.thumbnail((size, size), Image.LANCZOS)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
-    return buf.getvalue()
+    result = buf.getvalue()
+
+    if len(_resize_cache) < _CACHE_MAX:
+        _resize_cache[cache_key] = result
+
+    return result
 
 
 @router.get("/player/{player_id}")
