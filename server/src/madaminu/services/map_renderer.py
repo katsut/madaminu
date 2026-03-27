@@ -192,7 +192,16 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
             max_below_stacks = max(max_below_stacks, below_idx)
 
         n_backbone = len(backbone)
-        content_w = n_backbone * (PASSAGE_W + PASSAGE_GAP) - PASSAGE_GAP
+        backbone_w = n_backbone * (PASSAGE_W + PASSAGE_GAP) - PASSAGE_GAP
+
+        # Calculate max width considering branch rooms
+        max_room_w = 0
+        for pid in backbone:
+            for rid in branches.get(pid, []):
+                rw, _ = _node_size(node_map[rid])
+                max_room_w = max(max_room_w, rw)
+        content_w = max(backbone_w, n_backbone * max(PASSAGE_W + PASSAGE_GAP, max_room_w + BRANCH_GAP) - BRANCH_GAP) if max_room_w > 0 else backbone_w
+
         above_h = max_above_stacks * (CELL + BRANCH_GAP) if max_above_stacks else 0
         below_h = max_below_stacks * (CELL + BRANCH_GAP) if max_below_stacks else 0
         content_h = above_h + PASSAGE_H + below_h
@@ -233,6 +242,8 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
 
         # Position room branches using room_placement
         rp = block["room_placement"]
+        area_left = block["x"] + AREA_PAD
+        area_right = block["x"] + block["w"] - AREA_PAD
         for pid in block["backbone"]:
             rooms = block["branches"].get(pid, [])
             pp = node_positions[pid]
@@ -240,6 +251,7 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
                 node = block["node_map"][rid]
                 rw, rh = _node_size(node)
                 rx = pp["cx"] - rw // 2
+                rx = max(area_left, min(rx, area_right - rw))
                 placement = rp.get(rid, {"side": "above", "stack": 0})
                 stack = placement["stack"]
                 if placement["side"] == "above":
