@@ -14,6 +14,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "alembic>=1.18.4",
     "pillow>=12.1.1",
+    "json-repair>=0.58.7",
 ]
 
 [dependency-groups]
