@@ -421,123 +421,88 @@ struct PlanningPhaseView: View {
 
 struct InvestigationPhaseView: View {
     @ObservedObject var store: AppStore
-    @State private var selectedLocationId: String?
-    @State private var mapSvg: String?
+
+    private var selectedLocation: InvestigationLocation? {
+        guard let locationId = store.game.selectedLocationId,
+              let locations = store.game.currentPhase?.investigationLocations else { return nil }
+        return locations.first(where: { $0.id == locationId })
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
                     title: "調査フェーズ",
-                    message: "調査したい場所を1つ選んでください。制限時間になると自動的に調査が実行されます。発言ボタンで他のプレイヤーと相談もできます。"
+                    message: "調べたいものを選んでください。制限時間になると自動的に調査が実行されます。"
                 )
 
-                if let speaker = store.game.currentSpeakerId {
-                    speakerBanner(speaker)
-                }
-
-                if store.game.isSpeaking {
-                    TranscriptView(store: store)
-                }
-
-                // Embedded map
-                if let svg = mapSvg {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        SVGWebView(svgContent: svg)
-                            .frame(width: 500, height: 220)
-                            .id(selectedLocationId ?? "none")
-                    }
-                    .frame(height: 220)
-                    .background(Color(red: 0.067, green: 0.067, blue: 0.094))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.mdSurface, lineWidth: 1)
-                    )
-                }
-
-                if let locations = store.game.currentPhase?.investigationLocations {
-                    Text("調査先を選択")
-                        .font(.mdHeadline)
-                        .foregroundStyle(Color.mdTextSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    ForEach(locations) { location in
-                        let isSelected = selectedLocationId == location.id
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                if isSelected {
-                                    selectedLocationId = nil
-                                    store.dispatch(.selectInvestigation(locationId: nil))
-                                } else {
-                                    selectedLocationId = location.id
-                                    store.dispatch(.selectInvestigation(locationId: location.id))
-                                }
-                            }
-                            Task { await loadMap() }
-                        } label: {
+                if let location = selectedLocation {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
                             HStack {
-                                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                    Text(location.name)
+                                Image(systemName: "mappin.circle.fill")
+                                    .foregroundStyle(Color.mdInfo)
+                                Text(location.name)
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                            Text(location.description)
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextSecondary)
+                        }
+                    }
+
+                    if let features = location.features, !features.isEmpty {
+                        Text("何を調べますか？")
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdTextSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        ForEach(features, id: \.self) { feature in
+                            let isSelected = store.game.selectedFeature == feature
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    store.dispatch(.selectFeature(feature: feature))
+                                }
+                            } label: {
+                                HStack {
+                                    Text(feature)
                                         .font(.mdHeadline)
                                         .foregroundStyle(Color.mdTextPrimary)
-                                    Text(location.description)
-                                        .font(.mdCaption)
-                                        .foregroundStyle(isSelected ? Color.mdTextPrimary : Color.mdTextSecondary)
-                                    if let features = location.features, !features.isEmpty {
-                                        Text(features.joined(separator: "・"))
-                                            .font(.mdCaption)
-                                            .foregroundStyle(Color.mdTextMuted)
-                                    }
+                                    Spacer()
+                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(isSelected ? Color.mdSuccess : Color.mdTextMuted)
                                 }
-                                Spacer()
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(isSelected ? Color.mdSuccess : Color.mdTextMuted)
+                                .padding(Spacing.md)
+                                .background(isSelected ? Color.mdInfo.opacity(0.15) : Color.mdSurface)
+                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: CornerRadius.md)
+                                        .stroke(isSelected ? Color.mdInfo : Color.mdSurface, lineWidth: isSelected ? 2 : 0)
+                                )
                             }
-                            .padding(Spacing.md)
-                            .background(isSelected ? Color.mdPrimary.opacity(0.15) : Color.mdSurface)
-                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: CornerRadius.md)
-                                    .stroke(isSelected ? Color.mdPrimary : Color.mdSurface, lineWidth: isSelected ? 2 : 0)
-                            )
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
+                    }
+                } else {
+                    MDCard {
+                        VStack(spacing: Spacing.sm) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.mdLargeTitle)
+                                .foregroundStyle(Color.mdTextMuted)
+                            Text("調査計画で場所が選ばれていません")
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextSecondary)
+                            Text("制限時間後、ランダムな場所で調査が行われます")
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextMuted)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
             .padding(Spacing.lg)
-        }
-        .task { await loadMap() }
-    }
-
-    @MainActor private func loadMap() async {
-        guard let mapPath = store.game.scenarioSetting.mapUrl else { return }
-        var urlString = APIClient.defaultBaseURL + mapPath
-        if let locId = selectedLocationId {
-            urlString += "?highlight=\(locId)"
-        }
-        guard let url = URL(string: urlString) else { return }
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            mapSvg = String(data: data, encoding: .utf8)
-        } catch {
-            // ignore
-        }
-    }
-
-    private func speakerBanner(_ speakerId: String) -> some View {
-        let name = store.room.players.first(where: { $0.id == speakerId })?.characterName ?? "誰か"
-        return MDCard {
-            HStack {
-                Image(systemName: "mic.fill")
-                    .foregroundStyle(Color.mdAccent)
-                Text("\(name) が発言中")
-                    .font(.mdCallout)
-                    .foregroundStyle(Color.mdTextPrimary)
-                Spacer()
-            }
         }
     }
 }

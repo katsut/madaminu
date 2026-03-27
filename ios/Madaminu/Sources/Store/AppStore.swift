@@ -53,7 +53,14 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         case .investigate(let locationId):
             ws.send(type: "investigate", data: ["location_id": locationId])
         case .selectInvestigation(let locationId):
+            game.selectedLocationId = locationId
+            game.selectedFeature = nil
             ws.send(type: "investigate.select", data: ["location_id": locationId ?? ""])
+        case .selectFeature(let feature):
+            game.selectedFeature = feature
+            if let locationId = game.selectedLocationId {
+                ws.send(type: "investigate.select", data: ["location_id": locationId, "feature": feature])
+            }
         case .vote(let suspectId):
             ws.send(type: "vote.submit", data: ["suspect_player_id": suspectId])
         case .advancePhase:

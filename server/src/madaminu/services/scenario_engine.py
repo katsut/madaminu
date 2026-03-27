@@ -194,6 +194,7 @@ async def investigate_location(
     game_id: str,
     player_id: str,
     location_id: str,
+    feature: str | None = None,
 ) -> tuple[Evidence | None, LLMUsage | None]:
     game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
     game = game_result.scalar_one()
@@ -236,6 +237,9 @@ async def investigate_location(
     existing = existing_result.scalars().all()
     existing_text = "\n".join(f"- {e.title}: {e.content}" for e in existing) if existing else "(なし)"
 
+    feature_name = feature or location.get("name", location_id)
+    location_features = location.get("features", [])
+
     system_prompt = load_template("scenario_system")
     user_prompt = render_template(
         "investigation",
@@ -248,11 +252,18 @@ async def investigate_location(
         player_objective=player.objective or "N/A",
         location_name=location.get("name", location_id),
         location_description=location.get("description", ""),
+        feature_name=feature_name,
+        location_features=", ".join(location_features) if location_features else "(なし)",
         existing_evidence=existing_text,
     )
 
     raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
     result = _parse_scenario_json(raw_response)
+
+    hint = result.get("hint", "")
+    content = result.get("content", "")
+    if hint:
+        content += f"\n\n💡 {hint}"
 
     evidence = Evidence(
         id=str(uuid.uuid4()),
@@ -260,7 +271,7 @@ async def investigate_location(
         player_id=player_id,
         phase_id=phase.id,
         title=result.get("title", "調査結果"),
-        content=result.get("content", ""),
+        content=content,
         source=EvidenceSource.investigation,
     )
     db.add(evidence)
