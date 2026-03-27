@@ -120,6 +120,8 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 await _handle_investigate(db, room_code, player_id, data, websocket)
             elif msg_type == "investigate.select":
                 await _handle_investigate_select(db, room_code, player_id, data, websocket)
+            elif msg_type == "evidence.reveal":
+                await _handle_evidence_reveal(db, room_code, player_id, data, websocket)
             elif msg_type == "investigate.keep":
                 await _handle_investigate_keep(db, room_code, player_id, data, websocket)
             elif msg_type == "investigate.tamper":
@@ -331,6 +333,38 @@ async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, 
         WSMessage(
             type="investigate.result",
             data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
+        ),
+    )
+
+
+async def _handle_evidence_reveal(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    from madaminu.models import Evidence
+
+    evidence_id = data.get("data", {}).get("evidence_id", "")
+    if not evidence_id:
+        return
+
+    result = await db.execute(
+        select(Evidence).where(Evidence.id == evidence_id, Evidence.player_id == player_id)
+    )
+    evidence = result.scalar_one_or_none()
+    if evidence is None:
+        return
+
+    player_result = await db.execute(select(Player).where(Player.id == player_id))
+    player = player_result.scalar_one_or_none()
+    player_name = player.character_name or player.display_name if player else "不明"
+
+    await manager.broadcast(
+        room_code,
+        WSMessage(
+            type="evidence.revealed",
+            data={
+                "player_id": player_id,
+                "player_name": player_name,
+                "title": evidence.title,
+                "content": evidence.content,
+            },
         ),
     )
 

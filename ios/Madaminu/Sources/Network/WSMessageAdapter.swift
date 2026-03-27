@@ -66,7 +66,9 @@ struct WSMessageAdapter {
         case "evidence.received":
             let title = data["title"] ?? "新しい手がかり"
             let content = data["content"] ?? ""
-            store.notebook.evidences.append(EvidenceItem(title: title, content: content))
+            var item = EvidenceItem(title: title, content: content)
+            item.evidenceId = data["evidence_id"]
+            store.notebook.evidences.append(item)
         case "location.colocated":
             if let playersJSON = data["players"],
                let playersData = playersJSON.data(using: .utf8),
@@ -84,6 +86,11 @@ struct WSMessageAdapter {
             let senderName = data["sender_name"] ?? ""
             let text = data["text"] ?? ""
             store.game.roomMessages.append(RoomMessage(senderId: senderId, senderName: senderName, text: text))
+        case "evidence.revealed":
+            let playerName = data["player_name"] ?? "不明"
+            let title = data["title"] ?? ""
+            let content = data["content"] ?? ""
+            store.notebook.evidences.append(EvidenceItem(title: "[\(playerName)] \(title)", content: content))
         case "game.ending":
             applyEnding(data, store: store)
         case "error":
@@ -191,6 +198,7 @@ struct WSMessageAdapter {
         store.game.localRemainingSec = phase?.remainingSec ?? phase?.durationSec ?? 0
         store.game.discoveries = []
         store.game.keptDiscoveryId = nil
+        store.game.hasRevealedEvidence = false
         store.game.colocatedPlayers = []
         store.game.roomMessages = []
         store.game.showPhaseTransition = true

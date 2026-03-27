@@ -65,6 +65,8 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             ws.send(type: "investigate.keep", data: ["discovery_id": discoveryId])
         case .tamperEvidence(let discoveryId):
             ws.send(type: "investigate.tamper", data: ["discovery_id": discoveryId])
+        case .revealEvidence(let evidenceId):
+            ws.send(type: "evidence.reveal", data: ["evidence_id": evidenceId])
         case .sendRoomMessage(let text):
             ws.send(type: "room_message.send", data: ["text": text])
         case .vote(let suspectId):

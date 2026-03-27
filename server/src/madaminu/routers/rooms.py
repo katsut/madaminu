@@ -143,9 +143,21 @@ async def delete_room(room_code: str, x_device_id: str = Header(...), db: AsyncS
     if host is None or host.device_id != x_device_id:
         raise HTTPException(status_code=403, detail="Only the host can delete this room") from None
 
-    # Clear self-referencing FKs before cascade delete
+    from sqlalchemy import delete as sa_delete
+
+    from madaminu.models import Evidence, Phase, SpeechLog, Vote
+    from madaminu.models.game_ending import GameEnding
+    from madaminu.models.note import Note
+
     game.host_player_id = None
     game.current_phase_id = None
+    await db.flush()
+
+    await db.execute(sa_delete(Vote).where(Vote.game_id == game.id))
+    await db.execute(sa_delete(SpeechLog).where(SpeechLog.game_id == game.id))
+    await db.execute(sa_delete(Evidence).where(Evidence.game_id == game.id))
+    await db.execute(sa_delete(GameEnding).where(GameEnding.game_id == game.id))
+    await db.execute(sa_delete(Note).where(Note.game_id == game.id))
     await db.flush()
 
     await db.delete(game)

@@ -15,6 +15,7 @@ enum AppAction {
     case selectFeature(feature: String)
     case keepEvidence(discoveryId: String)
     case tamperEvidence(discoveryId: String)
+    case revealEvidence(evidenceId: String)
     case sendRoomMessage(text: String)
     case vote(suspectId: String)
     case advancePhase

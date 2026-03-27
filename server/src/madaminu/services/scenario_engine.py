@@ -121,6 +121,55 @@ async def validate_scenario(scenario: dict) -> tuple[dict, LLMUsage]:
     return validation, usage
 
 
+async def generate_initial_evidence(db: AsyncSession, game_id: str) -> tuple[list[dict], LLMUsage]:
+    game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
+    game = game_result.scalar_one()
+
+    players_info = _format_players_for_adjustment(game.players)
+    first_phase = None
+    phase_result = await db.execute(
+        select(Phase).where(Phase.game_id == game_id).order_by(Phase.phase_order).limit(1)
+    )
+    first_phase = phase_result.scalar_one_or_none()
+    phase_id = first_phase.id if first_phase else ""
+
+    system_prompt = load_template("scenario_system")
+    user_prompt = render_template(
+        "initial_evidence",
+        scenario_skeleton=json.dumps(game.scenario_skeleton or {}, ensure_ascii=False, indent=2),
+        gm_internal_state=json.dumps(game.gm_internal_state or {}, ensure_ascii=False, indent=2),
+        players_info=players_info,
+    )
+
+    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
+    result = _parse_scenario_json(raw_response)
+
+    distributed = []
+    for item in result.get("items", []):
+        owner_ids = item.get("owner_ids", [])
+        title = item.get("title", "")
+        content = item.get("content", "")
+        for owner_id in owner_ids:
+            player = next((p for p in game.players if p.id == owner_id), None)
+            if player is None:
+                continue
+            evidence = Evidence(
+                id=str(uuid.uuid4()),
+                game_id=game_id,
+                player_id=owner_id,
+                phase_id=phase_id,
+                title=title,
+                content=content,
+                source=EvidenceSource.gm_push,
+            )
+            db.add(evidence)
+            distributed.append({"player_id": owner_id, "evidence_id": evidence.id, "title": title, "content": content})
+
+    game.total_llm_cost_usd += usage.estimated_cost_usd
+    await db.commit()
+    return distributed, usage
+
+
 async def adjust_phase(db: AsyncSession, game_id: str, ended_phase_id: str) -> tuple[dict, LLMUsage]:
     game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
     game = game_result.scalar_one()
