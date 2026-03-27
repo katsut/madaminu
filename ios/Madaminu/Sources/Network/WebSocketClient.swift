@@ -17,7 +17,7 @@ final class WebSocketClient: Sendable {
     }
 
     private let state = NSLockProtected(State())
-    private let maxRetries = 3
+    private let maxRetries = 10
     private let logger = Logger(subsystem: "com.katsut.madaminu", category: "WebSocket")
 
     init() {}
@@ -181,7 +181,7 @@ final class WebSocketClient: Sendable {
             return
         }
 
-        let delay = UInt64(pow(2.0, Double(currentRetry + 1)))
+        let delay = min(UInt64(pow(2.0, Double(currentRetry + 1))), 30)
         logger.info("Reconnecting in \(delay)s (attempt \(currentRetry + 1)/\(self.maxRetries))")
 
         try? await Task.sleep(for: .seconds(delay))
