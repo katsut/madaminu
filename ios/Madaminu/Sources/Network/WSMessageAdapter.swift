@@ -229,7 +229,7 @@ struct WSMessageAdapter {
         }
 
         if status == "playing" || status == "voting" {
-            if store.screen != .playing && store.screen != .intro {
+            if store.screen == .generating || store.screen == .lobby || store.screen == .home {
                 if store.game.scenarioSetting.sceneImageUrl != nil {
                     store.screen = .intro
                 } else {
