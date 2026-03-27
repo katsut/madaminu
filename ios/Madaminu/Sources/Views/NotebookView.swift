@@ -6,7 +6,13 @@ struct NotebookView: View {
     @Binding var isPresented: Bool
     @State private var selectedTab = 0
 
-    private let tabs = ["自分", "登場人物", "証拠", "メモ"]
+    private var tabs: [String] {
+        var t = ["自分", "登場人物", "証拠", "メモ"]
+        if store.game.scenarioSetting.mapUrl != nil {
+            t.insert("マップ", at: 2)
+        }
+        return t
+    }
 
     var body: some View {
         ZStack {
@@ -60,11 +66,18 @@ struct NotebookView: View {
     }
 
     private var tabContent: some View {
-        TabView(selection: $selectedTab) {
+        let hasMap = store.game.scenarioSetting.mapUrl != nil
+        return TabView(selection: $selectedTab) {
             myInfoPage.tag(0)
             playersPage.tag(1)
-            evidencePage.tag(2)
-            notesPage.tag(3)
+            if hasMap {
+                mapPage.tag(2)
+                evidencePage.tag(3)
+                notesPage.tag(4)
+            } else {
+                evidencePage.tag(2)
+                notesPage.tag(3)
+            }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .animation(.easeInOut(duration: 0.2), value: selectedTab)
@@ -208,6 +221,12 @@ struct NotebookView: View {
             }
             .padding(Spacing.lg)
         }
+    }
+
+    // MARK: - Tab: Map
+
+    private var mapPage: some View {
+        MapSheetView(store: store)
     }
 
     // MARK: - Tab 3: Evidence

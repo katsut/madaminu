@@ -149,7 +149,9 @@ struct WSMessageAdapter {
     }
 
     private static func applyPhaseStarted(_ data: [String: String], store: AppStore) {
-        store.game.currentPhase = parsePhaseInfo(stringDataToDict(data))
+        let phase = parsePhaseInfo(stringDataToDict(data))
+        store.game.currentPhase = phase
+        store.game.localRemainingSec = phase?.remainingSec ?? phase?.durationSec ?? 0
         store.game.showPhaseTransition = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             store.game.showPhaseTransition = false
@@ -158,6 +160,7 @@ struct WSMessageAdapter {
 
     private static func applyPhaseTimer(_ data: [String: String], store: AppStore) {
         guard let remainingStr = data["remaining_sec"], let remaining = Int(remainingStr) else { return }
+        store.game.localRemainingSec = remaining
         if let phase = store.game.currentPhase {
             store.game.currentPhase = PhaseInfo(
                 phaseId: phase.phaseId,

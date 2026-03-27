@@ -6,6 +6,7 @@ struct GamePlayView: View {
     @ObservedObject var store: AppStore
     @State private var showNotebook = false
     @State private var showDebug = false
+    @State private var timer: Timer?
 
     var body: some View {
         ZStack {
@@ -65,6 +66,23 @@ struct GamePlayView: View {
         .sheet(isPresented: $showDebug) {
             DebugInfoView(store: store)
         }
+        .onAppear { startLocalTimer() }
+        .onDisappear { stopLocalTimer() }
+    }
+
+    private func startLocalTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            DispatchQueue.main.async {
+                if store.game.localRemainingSec > 0 {
+                    store.game.localRemainingSec -= 1
+                }
+            }
+        }
+    }
+
+    private func stopLocalTimer() {
+        timer?.invalidate()
+        timer = nil
     }
 
     private var errorBanner: some View {
@@ -102,9 +120,9 @@ struct GamePlayView: View {
 
                 Spacer()
 
-                Text(formatTime(phase.remainingSec))
+                Text(formatTime(store.game.localRemainingSec))
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
-                    .foregroundStyle(phase.remainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
+                    .foregroundStyle(store.game.localRemainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
             } else {
                 Text(store.screen == .ended ? "ゲーム終了" : "準備中...")
                     .font(.mdHeadline)
