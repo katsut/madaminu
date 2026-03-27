@@ -71,12 +71,24 @@ async def _cleanup_old_rooms():
         logger.exception("Room cleanup failed")
 
 
-DEPLOY_VERSION = "2026-03-27T03"
+DEPLOY_VERSION = "2026-03-27T04"
 
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "version": DEPLOY_VERSION}
+
+
+@app.get("/debug/llm-test")
+async def llm_test():
+    from madaminu.llm.client import llm_client
+    try:
+        text, usage = await llm_client.generate(
+            "You are a test assistant.", "Say hello in JSON: {\"message\": \"hello\"}", max_tokens=100
+        )
+        return {"text": text, "usage": str(usage), "model": usage.model}
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
 
 
 @app.websocket("/ws/{room_code}")
