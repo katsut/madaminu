@@ -187,6 +187,10 @@ struct WSMessageAdapter {
                     connectionStatus: dict["connection_status"] as? String ?? "offline"
                 )
             }
+
+            if let me = store.room.players.first(where: { $0.id == store.room.playerId }) {
+                store.room.isHost = me.isHost
+            }
         }
 
         if let phaseJSON = data["current_phase"],
