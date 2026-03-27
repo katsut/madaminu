@@ -58,6 +58,14 @@ struct ObjectiveResult: Codable, Sendable {
     let description: String
 }
 
+struct DiscoveryItem: Identifiable, Sendable {
+    let id: String
+    let title: String
+    var content: String
+    var canTamper: Bool
+    var isTampered: Bool = false
+}
+
 struct ColocatedPlayer: Identifiable, Sendable {
     let id: String
     let characterName: String

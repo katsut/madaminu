@@ -39,12 +39,28 @@ struct WSMessageAdapter {
             store.game.currentSpeakerId = data["player_id"]
         case "speech.released":
             store.game.currentSpeakerId = nil
+        case "investigate.discovery":
+            let id = data["id"] ?? UUID().uuidString
+            let title = data["title"] ?? "調査結果"
+            let content = data["content"] ?? ""
+            let canTamper = data["can_tamper"] == "1" || data["can_tamper"] == "true"
+            store.game.discoveries.append(DiscoveryItem(id: id, title: title, content: content, canTamper: canTamper))
+        case "investigate.kept":
+            let title = data["title"] ?? "調査結果"
+            let content = data["content"] ?? ""
+            store.notebook.evidences.append(EvidenceItem(title: title, content: content))
+            if let id = data["id"] { store.game.keptDiscoveryId = id }
+        case "investigate.tampered":
+            if let id = data["id"] {
+                if let idx = store.game.discoveries.firstIndex(where: { $0.id == id }) {
+                    store.game.discoveries[idx].content = data["content"] ?? store.game.discoveries[idx].content
+                    store.game.discoveries[idx].isTampered = true
+                }
+            }
         case "investigate.result":
             let title = data["title"] ?? "調査結果"
             let content = data["content"] ?? ""
-            let evidence = EvidenceItem(title: title, content: content)
-            store.notebook.evidences.append(evidence)
-            store.game.latestEvidence = evidence
+            store.notebook.evidences.append(EvidenceItem(title: title, content: content))
         case "investigate.denied":
             store.setError("調査できません", level: .transient)
         case "evidence.received":
@@ -173,7 +189,8 @@ struct WSMessageAdapter {
         let phase = parsePhaseInfo(stringDataToDict(data))
         store.game.currentPhase = phase
         store.game.localRemainingSec = phase?.remainingSec ?? phase?.durationSec ?? 0
-        store.game.latestEvidence = nil
+        store.game.discoveries = []
+        store.game.keptDiscoveryId = nil
         store.game.colocatedPlayers = []
         store.game.roomMessages = []
         store.game.showPhaseTransition = true
