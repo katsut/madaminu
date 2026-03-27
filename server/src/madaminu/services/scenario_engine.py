@@ -92,30 +92,6 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         player.objective = sp["objective"]
         player.role = ROLE_MAP.get(sp["role"], PlayerRole.innocent)
 
-        initial_ev = sp.get("initial_evidence")
-        if initial_ev:
-            db.add(Evidence(
-                id=str(uuid.uuid4()),
-                game_id=game.id,
-                player_id=player.id,
-                phase_id="initial",
-                title=initial_ev.get("title", "証拠"),
-                content=initial_ev.get("content", ""),
-                source=EvidenceSource.gm_push,
-            ))
-
-        initial_alibi = sp.get("initial_alibi")
-        if initial_alibi:
-            db.add(Evidence(
-                id=str(uuid.uuid4()),
-                game_id=game.id,
-                player_id=player.id,
-                phase_id="initial",
-                title=initial_alibi.get("title", "アリバイ"),
-                content=initial_alibi.get("content", ""),
-                source=EvidenceSource.gm_push,
-            ))
-
     map_data = scenario.get("map", {})
     map_locations = {}
     if "areas" in map_data:
@@ -128,6 +104,42 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
 
     all_locations = _resolve_investigation_locations(list(map_locations.keys()), map_locations)
     _create_cycle_phases(db, game, all_locations)
+
+    await db.flush()
+
+    first_phase_result = await db.execute(
+        select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order).limit(1)
+    )
+    first_phase = first_phase_result.scalar_one()
+
+    for sp in scenario["players"]:
+        player = name_to_player.get(sp["character_name"])
+        if player is None:
+            continue
+
+        initial_ev = sp.get("initial_evidence")
+        if initial_ev:
+            db.add(Evidence(
+                id=str(uuid.uuid4()),
+                game_id=game.id,
+                player_id=player.id,
+                phase_id=first_phase.id,
+                title=initial_ev.get("title", "証拠"),
+                content=initial_ev.get("content", ""),
+                source=EvidenceSource.gm_push,
+            ))
+
+        initial_alibi = sp.get("initial_alibi")
+        if initial_alibi:
+            db.add(Evidence(
+                id=str(uuid.uuid4()),
+                game_id=game.id,
+                player_id=player.id,
+                phase_id=first_phase.id,
+                title=initial_alibi.get("title", "アリバイ"),
+                content=initial_alibi.get("content", ""),
+                source=EvidenceSource.gm_push,
+            ))
 
     game.total_llm_cost_usd += sum(u.estimated_cost_usd for u in usages)
     await db.commit()
