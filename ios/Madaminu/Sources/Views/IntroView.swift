@@ -432,7 +432,7 @@ struct IntroView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.lg)
 
-            Text("\(store.game.introReadyCount)/\(store.room.players.count) 人が準備完了")
+            Text("\(store.game.introReadyCount)/\(store.room.players.filter { !$0.isAI }.count) 人が準備完了")
                 .font(.mdHeadline)
                 .foregroundStyle(Color.mdTextMuted)
 
