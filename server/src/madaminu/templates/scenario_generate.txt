@@ -21,7 +21,7 @@ Create a complete scenario with the following structure (respond in JSON):
   "map": {
     "areas": [
       {"id": "area_id", "name": "エリア名", "area_type": "indoor|outdoor|semi_outdoor", "rooms": [
-        {"id": "room_id", "name": "部屋名", "room_type": "room|corridor|entrance|stairs", "row": 0, "col": 0, "features": ["特徴1", "特徴2"]}
+        {"id": "room_id", "name": "部屋名", "room_type": "room|corridor|entrance|stairs", "size": 1, "row": 0, "col": 0, "features": ["特徴1", "特徴2", "特徴3"]}
       ]}
     ],
     "connections": [
@@ -71,10 +71,11 @@ Each room has: id, name, room_type, row, col, features.
 - `"entrance"` — 玄関/出入口。屋内と屋外を結ぶ。特別なアイコン付き
 - `"stairs"` — 階段室。別フロア(エリア)への接続点。段々模様で表示
 
-**size** — 部屋の広さ。1=小部屋, 2=中部屋, 4=大部屋。広い部屋ほど features を多くする:
-- size 1: features 1-2個
-- size 2: features 2-3個
-- size 4: features 3-5個
+**size** — 部屋の広さ。1=小部屋, 2=中部屋, 3=大部屋。広い部屋ほど調査ポイント(features)を多くする:
+- size 1: features 3個（小部屋: クローゼット、物置、トイレなど）
+- size 2: features 6個（中部屋: 書斎、寝室、キッチンなど）
+- size 3: features 9個（大部屋: リビング、ホール、庭園など）
+- 廊下・階段・入口: features 1-2個
 廊下・階段・玄関には size 不要。
 
 **row, col** — グリッド座標 (0始まり)。実際の間取りに合わせて配置する。

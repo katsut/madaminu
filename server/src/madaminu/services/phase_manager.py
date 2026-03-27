@@ -129,11 +129,17 @@ class PhaseManager:
         if current_phase.phase_type == PhaseType.investigation:
             self.clear_discoveries(room_code)
 
-        await self._run_phase_adjustment(game_id, room_code, current_phase.id)
+        if current_phase.phase_type != PhaseType.planning:
+            await self._run_phase_adjustment(game_id, room_code, current_phase.id)
 
         await self._broadcast_phase_started(room_code, next_phase)
         self._start_timer(game_id, room_code, next_phase)
-        asyncio.create_task(self._schedule_ai_speeches(game_id, room_code, next_phase))
+
+        if next_phase.phase_type == PhaseType.investigation:
+            asyncio.create_task(self._generate_room_discoveries(game_id, room_code))
+        else:
+            asyncio.create_task(self._schedule_ai_speeches(game_id, room_code, next_phase))
+
         return next_phase
 
     async def extend_phase(self, game_id: str, room_code: str, extra_sec: int = EXTEND_DURATION_SEC) -> Phase:
@@ -212,6 +218,71 @@ class PhaseManager:
 
         logger.info("Phase timer expired for game %s, phase %s", game_id, phase_id)
         await self.advance_phase(game_id, room_code)
+
+    async def _generate_room_discoveries(self, game_id: str, room_code: str):
+        from madaminu.services.scenario_engine import investigate_location
+        from madaminu.ws.handler import manager
+
+        selections = self.get_investigation_selections(room_code)
+        if not selections:
+            return
+
+        try:
+            for player_id, sel in selections.items():
+                location_id = sel.get("location_id")
+                if not location_id:
+                    continue
+
+                async with self._session_factory() as db:
+                    game_result = await db.execute(
+                        select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+                    )
+                    game = game_result.scalar_one()
+                    map_data = (game.scenario_skeleton or {}).get("map", {})
+                    location = None
+                    for area in map_data.get("areas", []):
+                        for room in area.get("rooms", []):
+                            if room["id"] == location_id:
+                                location = room
+                                break
+
+                    if location is None:
+                        continue
+
+                    features = location.get("features", [])
+                    if not features:
+                        continue
+
+                    is_alone = all(
+                        other_sel.get("location_id") != location_id
+                        for other_id, other_sel in selections.items()
+                        if other_id != player_id
+                    )
+
+                    discoveries = []
+                    for feature in features:
+                        try:
+                            discovery, usage = await investigate_location(
+                                db, game_id, player_id, location_id, feature
+                            )
+                            if discovery:
+                                discovery["can_tamper"] = is_alone
+                                discoveries.append(discovery)
+                                self.add_discovery(room_code, player_id, discovery)
+                        except Exception:
+                            logger.exception("Discovery generation failed: %s/%s", location_id, feature)
+
+                    if discoveries:
+                        await manager.send_to_player(
+                            room_code,
+                            player_id,
+                            WSMessage(
+                                type="investigate.discoveries",
+                                data={"discoveries": discoveries},
+                            ),
+                        )
+        except Exception:
+            logger.exception("Room discovery generation failed for game %s", game_id)
 
     async def _execute_investigation_selections(self, game_id: str, room_code: str):
         from madaminu.services.scenario_engine import investigate_location

@@ -44,6 +44,18 @@ struct WSMessageAdapter {
             if !transcript.isEmpty {
                 store.game.speechHistory.append(SpeechEntry(characterName: characterName, transcript: transcript))
             }
+        case "investigate.discoveries":
+            if let discJSON = data["discoveries"],
+               let discData = discJSON.data(using: .utf8),
+               let discArray = try? JSONSerialization.jsonObject(with: discData) as? [[String: Any]] {
+                store.game.discoveries = discArray.compactMap { d in
+                    guard let id = d["id"] as? String,
+                          let title = d["title"] as? String,
+                          let content = d["content"] as? String else { return nil }
+                    let canTamper = d["can_tamper"] as? Bool ?? false
+                    return DiscoveryItem(id: id, title: title, content: content, canTamper: canTamper)
+                }
+            }
         case "investigate.discovery":
             let id = data["id"] ?? UUID().uuidString
             let title = data["title"] ?? "調査結果"
