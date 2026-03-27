@@ -44,3 +44,9 @@ class SpeechActiveData(BaseModel):
 
 class SpeechReleasedData(BaseModel):
     player_id: str
+
+
+class RoomMessageData(BaseModel):
+    sender_id: str
+    sender_name: str
+    text: str

@@ -58,6 +58,13 @@ struct ObjectiveResult: Codable, Sendable {
     let description: String
 }
 
+struct RoomMessage: Identifiable, Sendable {
+    let id = UUID()
+    let senderId: String
+    let senderName: String
+    let text: String
+}
+
 struct ScenarioSettingData {
     var location: String?
     var situation: String?

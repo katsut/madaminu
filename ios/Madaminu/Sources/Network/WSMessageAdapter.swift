@@ -49,6 +49,11 @@ struct WSMessageAdapter {
             let title = data["title"] ?? "新しい手がかり"
             let content = data["content"] ?? ""
             store.notebook.evidences.append(EvidenceItem(title: title, content: content))
+        case "room_message.received":
+            let senderId = data["sender_id"] ?? ""
+            let senderName = data["sender_name"] ?? ""
+            let text = data["text"] ?? ""
+            store.game.roomMessages.append(RoomMessage(senderId: senderId, senderName: senderName, text: text))
         case "game.ending":
             applyEnding(data, store: store)
         case "error":
