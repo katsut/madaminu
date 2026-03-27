@@ -143,6 +143,10 @@ struct WSMessageAdapter {
 
     private static func applyPhaseStarted(_ data: [String: String], store: AppStore) {
         store.game.currentPhase = parsePhaseInfo(stringDataToDict(data))
+        store.game.showPhaseTransition = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            store.game.showPhaseTransition = false
+        }
     }
 
     private static func applyPhaseTimer(_ data: [String: String], store: AppStore) {
@@ -152,6 +156,7 @@ struct WSMessageAdapter {
                 phaseId: phase.phaseId,
                 phaseType: phase.phaseType,
                 phaseOrder: phase.phaseOrder,
+                totalPhases: phase.totalPhases,
                 durationSec: phase.durationSec,
                 remainingSec: remaining,
                 investigationLocations: phase.investigationLocations
@@ -189,6 +194,7 @@ struct WSMessageAdapter {
             phaseId: phaseId,
             phaseType: phaseType,
             phaseOrder: phaseOrder,
+            totalPhases: data["total_phases"] as? Int ?? 3,
             durationSec: durationSec,
             remainingSec: data["remaining_sec"] as? Int ?? durationSec,
             investigationLocations: locations
