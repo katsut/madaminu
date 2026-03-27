@@ -56,6 +56,10 @@ struct IntroView: View {
         HStack(spacing: Spacing.md) {
             if currentPage > 0 {
                 MDButton("← 戻る", style: .secondary) { currentPage -= 1 }
+            } else {
+                Button { store.dispatch(.leaveRoom) } label: {
+                    Text("退出").font(.mdCallout).foregroundStyle(Color.mdTextSecondary)
+                }
             }
             Spacer()
             if currentPage < pageCount - 1 {

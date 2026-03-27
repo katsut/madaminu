@@ -60,14 +60,15 @@ struct HomeScreen: View {
                         )
                         .overlay(
                             VStack(spacing: 4) {
-                                Text("まだみぬ")
-                                    .font(.system(size: 36, weight: .black))
-                                    .foregroundStyle(Color(red: 0.95, green: 0.85, blue: 0.5))
-                                    .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 2)
-                                    .shadow(color: .black, radius: 8, x: 0, y: 0)
-                                Text("AI マーダーミステリー")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.8, green: 0.75, blue: 0.6))
+                                Text("マダ見ヌ")
+                                    .font(.custom("HiraMinProN-W6", size: 40))
+                                    .tracking(8)
+                                    .foregroundStyle(Color(red: 0.9, green: 0.2, blue: 0.15))
+                                    .shadow(color: .black, radius: 6, x: 0, y: 3)
+                                    .shadow(color: .red.opacity(0.3), radius: 12, x: 0, y: 0)
+                                Text("〜まだ誰も見たことのないミステリー〜")
+                                    .font(.custom("HiraMinProN-W3", size: 12))
+                                    .foregroundStyle(Color(red: 0.8, green: 0.7, blue: 0.55))
                                     .shadow(color: .black.opacity(0.8), radius: 3, x: 0, y: 1)
                             }
                             .padding(.top, 20)
@@ -344,6 +345,18 @@ struct GeneratingView: View {
             Color.mdBackground.ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: Spacing.lg) {
+                HStack {
+                    Button { store.dispatch(.leaveRoom) } label: {
+                        HStack(spacing: Spacing.xxs) {
+                            Image(systemName: "chevron.left")
+                            Text("退出")
+                        }
+                        .font(.mdCallout)
+                        .foregroundStyle(Color.mdTextSecondary)
+                    }
+                    Spacer()
+                }
+
                 Spacer()
 
                 Text("ゲームを準備中")

@@ -89,7 +89,7 @@ class LLMClient:
         system_prompt: str,
         user_prompt: str,
         model: str = DEFAULT_MODEL,
-        max_tokens: int = 8192,
+        max_tokens: int = 16384,
     ) -> tuple[str, LLMUsage]:
         system_with_json = system_prompt + "\n\nIMPORTANT: Respond with valid JSON only. No markdown, no code blocks."
         return await self.generate(system_with_json, user_prompt, model, max_tokens)
