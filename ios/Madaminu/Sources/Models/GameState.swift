@@ -7,6 +7,8 @@ struct PhaseInfo: Codable, Sendable {
     let totalPhases: Int
     let durationSec: Int
     let remainingSec: Int
+    let turnNumber: Int
+    let totalTurns: Int
     let investigationLocations: [InvestigationLocation]?
 
     enum CodingKeys: String, CodingKey {
@@ -16,6 +18,8 @@ struct PhaseInfo: Codable, Sendable {
         case totalPhases = "total_phases"
         case durationSec = "duration_sec"
         case remainingSec = "remaining_sec"
+        case turnNumber = "turn_number"
+        case totalTurns = "total_turns"
         case investigationLocations = "investigation_locations"
     }
 }

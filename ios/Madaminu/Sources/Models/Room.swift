@@ -193,11 +193,13 @@ struct RoomInfoResponse: Codable, Sendable {
     let status: String
     let players: [PlayerInfo]
     let hostPlayerId: String?
+    let turnCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case roomCode = "room_code"
         case status
         case players
         case hostPlayerId = "host_player_id"
+        case turnCount = "turn_count"
     }
 }

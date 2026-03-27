@@ -171,6 +171,8 @@ struct WSMessageAdapter {
                 totalPhases: phase.totalPhases,
                 durationSec: phase.durationSec,
                 remainingSec: remaining,
+                turnNumber: phase.turnNumber,
+                totalTurns: phase.totalTurns,
                 investigationLocations: phase.investigationLocations
             )
         }
@@ -209,6 +211,8 @@ struct WSMessageAdapter {
             totalPhases: data["total_phases"] as? Int ?? 3,
             durationSec: durationSec,
             remainingSec: data["remaining_sec"] as? Int ?? durationSec,
+            turnNumber: data["turn_number"] as? Int ?? (phaseOrder / 3 + 1),
+            totalTurns: data["total_turns"] as? Int ?? 3,
             investigationLocations: locations
         )
     }
