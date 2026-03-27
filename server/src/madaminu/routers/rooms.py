@@ -76,11 +76,28 @@ async def get_room_endpoint(room_code: str, db: AsyncSession = Depends(get_db)):
                 display_name=p.display_name,
                 character_name=p.character_name,
                 is_host=p.is_host,
+                is_ready=p.is_ready,
                 connection_status=p.connection_status,
             )
             for p in game.players
         ],
     )
+
+
+@router.post("/{room_code}/ready")
+async def toggle_ready(room_code: str, x_session_token: str = Header(...), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Player)
+        .join(Game, Player.game_id == Game.id)
+        .where(Game.room_code == room_code, Player.session_token == x_session_token)
+    )
+    player = result.scalar_one_or_none()
+    if player is None:
+        raise HTTPException(status_code=403, detail="Invalid token") from None
+
+    player.is_ready = not player.is_ready
+    await db.commit()
+    return {"is_ready": player.is_ready}
 
 
 @router.get("/mine/list")

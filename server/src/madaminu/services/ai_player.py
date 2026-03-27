@@ -103,6 +103,7 @@ async def fill_ai_players(db: AsyncSession, game_id: str, target_count: int = 4)
             character_background=template["character_background"],
             is_host=False,
             is_ai=True,
+            is_ready=True,
             connection_status=ConnectionStatus.online,
         )
         db.add(player)

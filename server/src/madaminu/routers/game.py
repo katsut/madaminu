@@ -259,6 +259,11 @@ async def start_game(
     if player is None or not player.is_host:
         raise HTTPException(status_code=403, detail="Only the host can start the game") from None
 
+    not_ready = [p for p in game.players if not p.is_ready and not p.is_ai]
+    if not_ready:
+        names = ", ".join(p.display_name for p in not_ready)
+        raise HTTPException(status_code=400, detail=f"Not all players are ready: {names}") from None
+
     characters_ready = sum(1 for p in game.players if p.character_name)
     if characters_ready < 4:
         ai_added = await fill_ai_players(db, game.id, target_count=4)
