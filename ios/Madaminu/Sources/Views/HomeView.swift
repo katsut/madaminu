@@ -44,14 +44,36 @@ struct HomeScreen: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                HStack {
-                    Text("マダミヌ")
-                        .font(.mdLargeTitle)
-                        .foregroundStyle(Color.mdPrimary)
-                    Spacer()
+                // Title with logo
+                ZStack {
+                    if let logoImage = UIImage(named: "logo", in: .module, compatibleWith: nil) {
+                        Image(uiImage: logoImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 160)
+                            .clipped()
+                            .overlay(
+                                LinearGradient(
+                                    colors: [Color.mdBackground.opacity(0), Color.mdBackground],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    } else {
+                        Color.mdBackgroundSecondary
+                            .frame(height: 120)
+                    }
+
+                    VStack(spacing: Spacing.xxs) {
+                        Text("マダミヌ")
+                            .font(.system(size: 36, weight: .black))
+                            .foregroundStyle(Color.mdPrimary)
+                        Text("AI マーダーミステリー")
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdTextMuted)
+                    }
+                    .padding(.top, Spacing.xl)
                 }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.top, Spacing.lg)
 
                 MDTextField(label: "あなたの名前", text: Binding(
                     get: { store.room.displayName },
