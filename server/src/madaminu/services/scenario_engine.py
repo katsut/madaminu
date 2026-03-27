@@ -92,6 +92,30 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         player.objective = sp["objective"]
         player.role = ROLE_MAP.get(sp["role"], PlayerRole.innocent)
 
+        initial_ev = sp.get("initial_evidence")
+        if initial_ev:
+            db.add(Evidence(
+                id=str(uuid.uuid4()),
+                game_id=game.id,
+                player_id=player.id,
+                phase_id="initial",
+                title=initial_ev.get("title", "証拠"),
+                content=initial_ev.get("content", ""),
+                source=EvidenceSource.gm_push,
+            ))
+
+        initial_alibi = sp.get("initial_alibi")
+        if initial_alibi:
+            db.add(Evidence(
+                id=str(uuid.uuid4()),
+                game_id=game.id,
+                player_id=player.id,
+                phase_id="initial",
+                title=initial_alibi.get("title", "アリバイ"),
+                content=initial_alibi.get("content", ""),
+                source=EvidenceSource.gm_push,
+            ))
+
     map_data = scenario.get("map", {})
     map_locations = {}
     if "areas" in map_data:

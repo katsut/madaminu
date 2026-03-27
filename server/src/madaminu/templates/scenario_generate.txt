@@ -42,6 +42,8 @@ Create a complete scenario with the following structure (respond in JSON):
       "public_info": "他のプレイヤー全員に公開される情報。プロフィールや経歴とは別の、この事件・集まりに関する情報。3〜5文。",
       "secret_info": "このキャラクターの秘密（他のプレイヤーには見えない）",
       "objective": "このキャラクターの個人目的",
+      "initial_evidence": {"title": "証拠のタイトル", "content": "事件発生時に持っていた証拠の内容（2〜3文）"},
+      "initial_alibi": {"title": "アリバイのタイトル", "content": "事件発生時のアリバイの内容（2〜3文）", "partner": "アリバイ相手のキャラクター名"},
       "gm_notes": "GMがこの秘密を使ってシナリオを展開するためのメモ"
     }
   ],
@@ -175,6 +177,16 @@ Include these enhanced profiles in the player data output (as part of gm_notes).
   - Example: "被害者の古い友人として招待された。田中健二と一緒に来館し、到着時にロビーで他の客と談笑していた。夕食前に被害者と二人で書斎に入るのが目撃されている。"
   - Each public_info should mention at least one other character by name
 
+## Initial Evidence & Alibis
+
+Each player receives exactly 1 evidence card and 1 alibi card at the start:
+
+- **initial_evidence**: 個人的に目撃・発見した情報。犯人のものは犯行と無関係に見えるがあとで重要になる曖昧な証拠
+- **initial_alibi**: 事件発生時に他のキャラクターと一緒にいたことの証言
+  - **partner** フィールドに相手のキャラクター名を記載
+  - **アリバイの整合性**: AのアリバイでpartnerがBなら、Bのアリバイでもpartnerが必ずAで、同じ内容であること
+  - 犯人のアリバイは偽り（実際は犯行時間に不在だった）
+
 ## Constraints
 
 - Exactly one player must be the criminal
@@ -184,3 +196,4 @@ Include these enhanced profiles in the player data output (as part of gm_notes).
 - Do NOT include a "phases" field — phases are managed by the server
 - All text content must be in Japanese
 - The map layout must support the crime's logic (alibis, escape routes, evidence placement)
+- Alibi pairs MUST be consistent: if A's alibi partner is B, then B's alibi partner MUST be A with matching content

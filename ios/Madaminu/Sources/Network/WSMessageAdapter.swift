@@ -210,6 +210,18 @@ struct WSMessageAdapter {
             }
         }
 
+        if let evJSON = data["my_evidences"],
+           let evData = evJSON.data(using: .utf8),
+           let evArray = try? JSONSerialization.jsonObject(with: evData) as? [[String: Any]] {
+            store.notebook.evidences = evArray.compactMap { dict in
+                guard let title = dict["title"] as? String,
+                      let content = dict["content"] as? String else { return nil }
+                var item = EvidenceItem(title: title, content: content)
+                item.evidenceId = dict["evidence_id"] as? String
+                return item
+            }
+        }
+
         if let phaseJSON = data["current_phase"],
            let phaseData = phaseJSON.data(using: .utf8),
            let phaseDict = try? JSONSerialization.jsonObject(with: phaseData) as? [String: Any] {
