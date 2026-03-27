@@ -22,6 +22,8 @@ class PhaseStartedData(BaseModel):
     phase_order: int
     total_phases: int
     duration_sec: int
+    turn_number: int = 1
+    total_turns: int = 3
     investigation_locations: list[dict] | None = None
 
 

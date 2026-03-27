@@ -210,7 +210,7 @@ class PhaseManager:
                 logger.exception("Investigation failed for player %s location %s", player_id, location_id)
 
     async def _schedule_ai_speeches(self, game_id: str, room_code: str, phase: Phase):
-        if phase.phase_type not in (PhaseType.discussion, PhaseType.investigation):
+        if phase.phase_type != PhaseType.discussion:
             return
 
         try:
@@ -276,6 +276,7 @@ class PhaseManager:
     async def _broadcast_phase_started(self, room_code: str, phase: Phase, total_phases: int | None = None):
         from madaminu.ws.handler import manager
 
+        total_turns = 3
         if total_phases is None:
             async with self._session_factory() as db:
                 from sqlalchemy import func
@@ -284,6 +285,14 @@ class PhaseManager:
                     select(func.count()).select_from(Phase).where(Phase.game_id == phase.game_id)
                 )
                 total_phases = count_result.scalar_one()
+
+                game_result = await db.execute(select(Game).where(Game.id == phase.game_id))
+                game = game_result.scalar_one()
+                total_turns = game.turn_count or 3
+        else:
+            total_turns = max(1, (total_phases - 1) // 3)
+
+        turn_number = phase.phase_order // 3 + 1
 
         await manager.broadcast(
             room_code,
@@ -295,6 +304,8 @@ class PhaseManager:
                     phase_order=phase.phase_order,
                     total_phases=total_phases,
                     duration_sec=phase.duration_sec,
+                    turn_number=turn_number,
+                    total_turns=total_turns,
                     investigation_locations=phase.investigation_locations,
                 ).model_dump(),
             ),
