@@ -277,7 +277,9 @@ class PhaseManager:
         from madaminu.ws.handler import manager
 
         selections = self.get_investigation_selections(room_code)
+        logger.info("Generating discoveries for %s: %d selections", room_code, len(selections))
         if not selections:
+            logger.warning("No selections found for room %s", room_code)
             return
 
         try:
@@ -300,11 +302,15 @@ class PhaseManager:
                                 break
 
                     if location is None:
+                        logger.warning("Location %s not found in map for player %s", location_id, player_id)
                         continue
 
                     features = location.get("features", [])
                     if not features:
+                        logger.warning("No features for location %s", location_id)
                         continue
+
+                    logger.info("Generating %d discoveries for player %s at %s", len(features), player_id, location_id)
 
                     is_alone = all(
                         other_sel.get("location_id") != location_id
