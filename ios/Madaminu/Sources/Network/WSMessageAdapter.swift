@@ -188,11 +188,12 @@ struct WSMessageAdapter {
         }
 
         if status == "playing" || status == "voting" {
-            if (store.screen == .generating || store.screen == .lobby) && store.game.allReady && store.game.scenarioSetting.sceneImageUrl != nil {
-                store.screen = .intro
-            } else if store.screen == .home {
-                // Rejoin mid-game: skip intro, go directly to playing
-                store.screen = .playing
+            if store.screen != .playing && store.screen != .intro {
+                if store.game.scenarioSetting.sceneImageUrl != nil {
+                    store.screen = .intro
+                } else {
+                    store.screen = .playing
+                }
             }
         } else if status == "ended" {
             store.screen = .ended
