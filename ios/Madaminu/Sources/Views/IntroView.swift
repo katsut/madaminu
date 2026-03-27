@@ -119,15 +119,32 @@ struct IntroView: View {
 
                 if let urlString = store.game.scenarioSetting.victimImageUrl,
                    let url = URL(string: APIClient.defaultBaseURL + urlString) {
-                    AsyncImage(url: url) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Image(systemName: "person.slash.fill")
-                            .font(.system(size: 60))
-                            .foregroundStyle(Color.mdAccent.opacity(0.5))
+                    ZStack {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Image(systemName: "person.slash.fill")
+                                .font(.system(size: 60))
+                                .foregroundStyle(Color.mdAccent.opacity(0.5))
+                        }
+                        .frame(width: 120, height: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                        // Red diagonal line
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.clear)
+                            .frame(width: 120, height: 120)
+                            .overlay {
+                                GeometryReader { geo in
+                                    Path { path in
+                                        path.move(to: CGPoint(x: geo.size.width, y: 0))
+                                        path.addLine(to: CGPoint(x: 0, y: geo.size.height))
+                                    }
+                                    .stroke(Color.mdAccent, lineWidth: 3)
+                                }
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .frame(width: 120, height: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     Image(systemName: "person.slash.fill")
                         .font(.system(size: 60))
