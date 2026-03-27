@@ -67,6 +67,12 @@ struct DiscoveryItem: Identifiable, Sendable {
     var isTampered: Bool = false
 }
 
+struct SpeechEntry: Identifiable, Sendable {
+    let id = UUID()
+    let characterName: String
+    let transcript: String
+}
+
 struct RevealedEvidence: Identifiable, Sendable {
     let id = UUID()
     let playerName: String

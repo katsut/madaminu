@@ -39,6 +39,11 @@ struct WSMessageAdapter {
             store.game.currentSpeakerId = data["player_id"]
         case "speech.released":
             store.game.currentSpeakerId = nil
+            let characterName = data["character_name"] ?? ""
+            let transcript = data["transcript"] ?? ""
+            if !transcript.isEmpty {
+                store.game.speechHistory.append(SpeechEntry(characterName: characterName, transcript: transcript))
+            }
         case "investigate.discovery":
             let id = data["id"] ?? UUID().uuidString
             let title = data["title"] ?? "調査結果"

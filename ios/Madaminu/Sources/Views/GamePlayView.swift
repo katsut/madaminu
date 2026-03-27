@@ -384,6 +384,8 @@ struct PlanningPhaseView: View {
                         .buttonStyle(.plain)
                     }
                 }
+
+                SpeechHistoryView(store: store)
             }
             .padding(Spacing.lg)
         }
@@ -704,11 +706,42 @@ struct DiscussionPhaseView: View {
                         }
                     }
                 }
+
+                SpeechHistoryView(store: store)
             }
             .padding(Spacing.lg)
         }
         .sheet(isPresented: $showRevealSheet) {
             EvidenceRevealSheet(store: store, isPresented: $showRevealSheet)
+        }
+    }
+}
+
+struct SpeechHistoryView: View {
+    @ObservedObject var store: AppStore
+
+    var body: some View {
+        if !store.game.speechHistory.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Text("発言履歴")
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdTextMuted)
+
+                ForEach(store.game.speechHistory) { entry in
+                    HStack(alignment: .top, spacing: Spacing.xs) {
+                        Text(entry.characterName)
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdPrimary)
+                            .frame(width: 70, alignment: .leading)
+                        Text(entry.transcript)
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdTextSecondary)
+                    }
+                }
+            }
+            .padding(Spacing.md)
+            .background(Color.mdSurface)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
         }
     }
 }

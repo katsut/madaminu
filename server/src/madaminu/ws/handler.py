@@ -205,7 +205,7 @@ async def _handle_speech_release(room_code: str, player_id: str, data: dict, web
     transcript = data.get("data", {}).get("transcript", "")
     released = await sm.release_speech(room_code, player_id, transcript)
     if released:
-        await sm.broadcast_speech_released(room_code, player_id)
+        await sm.broadcast_speech_released(room_code, player_id, transcript)
 
 
 async def _handle_intro_ready(db: AsyncSession, room_code: str, player_id: str, websocket: WebSocket):
