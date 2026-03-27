@@ -98,6 +98,12 @@ struct WSMessageAdapter {
             if playerId != store.room.playerId {
                 store.notebook.evidences.append(EvidenceItem(title: "[\(playerName)] \(title)", content: content))
             }
+        case "intro.ready.count":
+            if let countStr = data["count"], let count = Int(countStr) {
+                store.game.introReadyCount = count
+            }
+        case "intro.all_ready":
+            store.screen = .playing
         case "game.ending":
             applyEnding(data, store: store)
         case "error":

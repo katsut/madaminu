@@ -43,6 +43,9 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             Task { @MainActor in await performStartGame() }
         case .dismissIntro:
             screen = .playing
+        case .introReady:
+            game.introReady = true
+            ws.send(type: "intro.ready")
         case .requestSpeech:
             ws.send(type: "speech.request")
         case .releaseSpeech:

@@ -418,27 +418,33 @@ struct IntroView: View {
         VStack(spacing: Spacing.lg) {
             Spacer()
 
-            Image(systemName: "play.circle.fill")
+            Image(systemName: store.game.introReady ? "checkmark.circle.fill" : "play.circle.fill")
                 .font(.system(size: 80))
-                .foregroundStyle(Color.mdPrimary)
+                .foregroundStyle(store.game.introReady ? Color.mdSuccess : Color.mdPrimary)
 
-            Text("準備完了")
+            Text(store.game.introReady ? "準備完了！" : "準備はいいですか？")
                 .font(.mdLargeTitle)
                 .foregroundStyle(Color.mdPrimary)
 
-            Text("全員の情報を確認しましたか？\nゲームを始めると調査フェーズに入ります。")
+            Text("全員の情報を確認しましたか？\n全員が準備完了すると調査計画フェーズが始まります。")
                 .font(.mdBody)
                 .foregroundStyle(Color.mdTextSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.lg)
 
+            Text("\(store.game.introReadyCount)/\(store.room.players.count) 人が準備完了")
+                .font(.mdHeadline)
+                .foregroundStyle(Color.mdTextMuted)
+
             Spacer()
 
-            MDButton("ゲームを始める") {
-                withAnimation { store.dispatch(.dismissIntro) }
+            if !store.game.introReady {
+                MDButton("準備完了") {
+                    store.dispatch(.introReady)
+                }
+                .padding(.horizontal, Spacing.lg)
+                .padding(.bottom, Spacing.md)
             }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.bottom, Spacing.md)
         }
     }
 
