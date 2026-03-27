@@ -275,23 +275,6 @@ struct IntroView: View {
                     }
                 }
                 .padding(.horizontal, Spacing.lg)
-
-                // Other players' public info
-                ForEach(store.room.players.filter { $0.id != store.room.playerId }) { player in
-                    if let publicInfo = player.publicInfo, !publicInfo.isEmpty {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.xs) {
-                                Text(player.characterName ?? player.displayName)
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                                Text(publicInfo)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextSecondary)
-                            }
-                        }
-                        .padding(.horizontal, Spacing.lg)
-                    }
-                }
             }
 
             Spacer()
