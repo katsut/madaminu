@@ -20,42 +20,22 @@ Create a complete scenario with the following structure (respond in JSON):
   },
   "map": {
     "locations": [
-      {
-        "id": "living_room",
-        "name": "リビング",
-        "description": "広いリビングルーム。暖炉がある。",
-        "area_type": "indoor",
-        "x": 1,
-        "y": 1,
-        "w": 2,
-        "h": 1,
-        "features": ["暖炉", "大きな窓", "本棚"]
-      },
-      {
-        "id": "garden",
-        "name": "庭園",
-        "description": "手入れされた広い庭。",
-        "area_type": "outdoor",
-        "x": 0,
-        "y": 0,
-        "w": 3,
-        "h": 1,
-        "features": ["噴水", "花壇", "ベンチ"]
-      }
+      {"id": "garden", "name": "庭園", "description": "手入れされた広い庭。", "area_type": "outdoor", "x": 0, "y": 0, "w": 4, "h": 1, "features": ["噴水", "花壇", "ベンチ"]},
+      {"id": "entrance", "name": "玄関ホール", "description": "広い玄関。", "area_type": "indoor", "x": 0, "y": 1, "w": 1, "h": 1, "features": ["大鏡", "傘立て"]},
+      {"id": "living", "name": "リビング", "description": "暖炉のある居間。", "area_type": "indoor", "x": 1, "y": 1, "w": 1, "h": 1, "features": ["暖炉", "ソファ", "本棚"]},
+      {"id": "dining", "name": "食堂", "description": "長テーブルのある食堂。", "area_type": "indoor", "x": 2, "y": 1, "w": 1, "h": 1, "features": ["長テーブル", "食器棚"]},
+      {"id": "kitchen", "name": "台所", "description": "業務用の広い台所。", "area_type": "indoor", "x": 3, "y": 1, "w": 1, "h": 1, "features": ["包丁セット", "裏口"]},
+      {"id": "study", "name": "書斎", "description": "鍵付きの書斎。", "area_type": "indoor", "x": 0, "y": 2, "w": 1, "h": 1, "features": ["金庫", "デスク", "本棚"]},
+      {"id": "bedroom", "name": "寝室", "description": "主寝室。", "area_type": "indoor", "x": 1, "y": 2, "w": 1, "h": 1, "features": ["ベッド", "クローゼット"]}
     ],
     "connections": [
-      {
-        "from": "living_room",
-        "to": "kitchen",
-        "type": "door",
-        "side": "east"
-      },
-      {
-        "from": "living_room",
-        "to": "garden",
-        "type": "window",
-        "side": "north"
-      }
+      {"from": "entrance", "to": "garden", "type": "door", "side": "north"},
+      {"from": "entrance", "to": "living", "type": "door", "side": "east"},
+      {"from": "living", "to": "garden", "type": "window", "side": "north"},
+      {"from": "living", "to": "dining", "type": "door", "side": "east"},
+      {"from": "dining", "to": "kitchen", "type": "door", "side": "east"},
+      {"from": "entrance", "to": "study", "type": "door", "side": "south"},
+      {"from": "living", "to": "bedroom", "type": "door", "side": "south"}
     ]
   },
   "relationships": [
@@ -90,24 +70,43 @@ Create a complete scenario with the following structure (respond in JSON):
 
 Think of the map as a grid (graph paper). Each location occupies a rectangle on this grid.
 
-- **x, y**: top-left corner of the location on the grid (integers, 0-based)
-- **w, h**: width and height in grid cells (minimum 1)
+- **x, y**: top-left corner of the location on the grid (integers, starting from 0)
+- **w, h**: width and height in grid cells (minimum 1, most rooms should be 1x1)
 - **area_type**: "indoor", "outdoor", or "semi_outdoor"
-- **Locations MUST NOT overlap** on the grid
-- Place locations so that connected rooms are adjacent on the grid
-- Use y=0 row for outdoor areas (garden, parking, etc.)
-- Use y=1+ rows for indoor areas (1F, 2F, etc.)
-- Total grid should fit within roughly 6x5 cells
 
-Connection side indicates where the passage is on the "from" room:
-- "north", "south", "east", "west" (which wall the door/window is on)
+### CRITICAL layout constraints:
+- **All x values must be >= 0** (no negative coordinates)
+- **All y values must be >= 0** (no negative coordinates)
+- **Locations MUST NOT overlap** on the grid
+- **Every non-stairs connection requires the two rooms to share an edge** (be horizontally or vertically adjacent)
+- **Total grid must fit within 4 columns (x: 0-3) and 4 rows (y: 0-3)**
+- Some rooms CAN be isolated (e.g., a greenhouse only accessible through one room) — this is OK for mystery purposes
+
+### Layout pattern:
+Follow this building layout pattern for a coherent floor plan:
+
+```
+y=0: [outdoor/garden areas spanning the top row]
+y=1: [entrance/hallway] [main rooms like living room, reception]
+y=2: [utility rooms like kitchen, dining] [more rooms]
+y=3: [private rooms like study, bedroom] [storage]
+```
+
+- Outdoor areas: y=0, spanning full width (e.g., x=0, y=0, w=4, h=1)
+- Entrance/hallway: center of y=1 row, connecting to outdoor above and rooms on sides
+- Most rooms should be 1x1. Only outdoor areas or large halls can be wider
+- Place rooms in a compact rectangular layout — no L-shapes or gaps
+
+### Connections:
+- "side" indicates where the passage is on the "from" room: "north", "south", "east", "west"
+- A "north" connection from room at y=1 connects to the room at y=0 above it
+- A "east" connection from room at x=0 connects to the room at x=1 beside it
 
 ## Map Guidelines
 
-- Generate 6-10 locations that form a coherent floor plan
+- Generate 6-8 locations that form a coherent floor plan
 - Each location must have 2-4 features (objects, furniture, notable details)
 - Connections define how locations are linked: "door", "corridor", "stairs", "window", "hidden_passage"
-- The map must be spatially consistent (no impossible layouts)
 - Include at least one location that is lockable or restricted
 - The crime scene should be connected to at least 2 other locations
 - Consider sight lines and sound: adjacent rooms can hear loud noises

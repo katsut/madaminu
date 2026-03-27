@@ -2,11 +2,11 @@
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-CELL_SIZE = 80
-PADDING = 20
+CELL_SIZE = 90
+PADDING = 24
 FONT_SIZE = 13
 WALL_WIDTH = 3
-DOOR_GAP = 20
+DOOR_GAP = 26
 WINDOW_DASH = "4,4"
 
 COLORS = {
@@ -173,17 +173,28 @@ def _draw_door_marker(svg: Element, mx: int, my: int, fx: int, fy: int, tx: int,
     is_horizontal = abs(fx - tx) > abs(fy - ty)
     half = DOOR_GAP // 2
 
+    # Clear the wall first (background-colored gap)
     if is_horizontal:
+        SubElement(svg, "rect", {
+            "x": str(mx - 2), "y": str(my - half),
+            "width": "4", "height": str(DOOR_GAP),
+            "fill": COLORS["background"],
+        })
         SubElement(svg, "line", {
             "x1": str(mx), "y1": str(my - half),
             "x2": str(mx), "y2": str(my + half),
-            "stroke": color, "stroke-width": "3", "stroke-linecap": "round",
+            "stroke": color, "stroke-width": "4", "stroke-linecap": "round",
         })
     else:
+        SubElement(svg, "rect", {
+            "x": str(mx - half), "y": str(my - 2),
+            "width": str(DOOR_GAP), "height": "4",
+            "fill": COLORS["background"],
+        })
         SubElement(svg, "line", {
             "x1": str(mx - half), "y1": str(my),
             "x2": str(mx + half), "y2": str(my),
-            "stroke": color, "stroke-width": "3", "stroke-linecap": "round",
+            "stroke": color, "stroke-width": "4", "stroke-linecap": "round",
         })
 
 
