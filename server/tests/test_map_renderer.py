@@ -76,7 +76,7 @@ def test_render_room_names_only_no_features():
 
 def test_render_contains_connection_markers():
     svg = render_map_svg(HIERARCHICAL_MAP)
-    assert "⇅" in svg  # stairs marker
+    assert ">S<" in svg  # stairs marker
 
 
 def test_render_flat_map_fallback():
