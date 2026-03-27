@@ -1,7 +1,10 @@
 import base64
+import io
+from functools import lru_cache
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,9 +15,28 @@ from madaminu.services.map_renderer import render_map_svg
 
 router = APIRouter(prefix="/api/v1/images", tags=["images"])
 
+MAX_SIZE = 1024
+CACHE_HEADERS = {"Cache-Control": "public, max-age=86400, immutable"}
+
+
+def _resize_image(image_bytes: bytes, size: int) -> bytes:
+    if size >= MAX_SIZE:
+        return image_bytes
+
+    img = Image.open(io.BytesIO(image_bytes))
+    img.thumbnail((size, size), Image.LANCZOS)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
 
 @router.get("/player/{player_id}")
-async def get_player_portrait(player_id: str, db: AsyncSession = Depends(get_db)):
+async def get_player_portrait(
+    player_id: str,
+    size: int = Query(default=MAX_SIZE, ge=32, le=MAX_SIZE),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Player).where(Player.id == player_id))
     player = result.scalar_one_or_none()
     if player is None:
@@ -23,11 +45,16 @@ async def get_player_portrait(player_id: str, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=404, detail="Portrait not yet generated") from None
 
     image_bytes = base64.b64decode(player.portrait_image)
-    return Response(content=image_bytes, media_type="image/png")
+    resized = _resize_image(image_bytes, size)
+    return Response(content=resized, media_type="image/png", headers=CACHE_HEADERS)
 
 
 @router.get("/game/{room_code}/scene")
-async def get_scene_image(room_code: str, db: AsyncSession = Depends(get_db)):
+async def get_scene_image(
+    room_code: str,
+    size: int = Query(default=MAX_SIZE, ge=32, le=MAX_SIZE),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
@@ -36,11 +63,16 @@ async def get_scene_image(room_code: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Scene image not yet generated") from None
 
     image_bytes = base64.b64decode(game.scene_image)
-    return Response(content=image_bytes, media_type="image/png")
+    resized = _resize_image(image_bytes, size)
+    return Response(content=resized, media_type="image/png", headers=CACHE_HEADERS)
 
 
 @router.get("/game/{room_code}/victim")
-async def get_victim_image(room_code: str, db: AsyncSession = Depends(get_db)):
+async def get_victim_image(
+    room_code: str,
+    size: int = Query(default=MAX_SIZE, ge=32, le=MAX_SIZE),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Game).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
@@ -49,7 +81,8 @@ async def get_victim_image(room_code: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Victim image not yet generated") from None
 
     image_bytes = base64.b64decode(game.victim_image)
-    return Response(content=image_bytes, media_type="image/png")
+    resized = _resize_image(image_bytes, size)
+    return Response(content=resized, media_type="image/png", headers=CACHE_HEADERS)
 
 
 @router.get("/game/{room_code}/map")
@@ -62,4 +95,4 @@ async def get_map_svg(room_code: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Map not yet generated") from None
 
     svg = render_map_svg(game.scenario_skeleton["map"])
-    return Response(content=svg, media_type="image/svg+xml")
+    return Response(content=svg, media_type="image/svg+xml", headers=CACHE_HEADERS)

@@ -671,7 +671,7 @@ struct PhaseTransitionOverlay: View {
             Color.black.opacity(0.85).ignoresSafeArea()
 
             if let urlString = sceneImageUrl,
-               let url = URL(string: APIClient.defaultBaseURL + urlString) {
+               let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=512") {
                 AsyncImage(url: url) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
