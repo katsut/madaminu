@@ -136,8 +136,13 @@ struct WSMessageAdapter {
             store.game.currentPhase = parsePhaseInfo(phaseDict)
         }
 
-        if status == "playing" && (store.screen == .generating || store.screen == .lobby) {
-            store.screen = .intro
+        if status == "playing" || status == "voting" {
+            if store.screen == .generating || store.screen == .lobby {
+                store.screen = .intro
+            } else if store.screen == .home {
+                // Rejoin mid-game: skip intro, go directly to playing
+                store.screen = .playing
+            }
         } else if status == "ended" {
             store.screen = .ended
         }
