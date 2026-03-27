@@ -335,6 +335,11 @@ def _find_backbone(nodes, edges, passage_ids):
             if nb not in visited:
                 queue.append(nb)
 
+    # Add any disconnected passage nodes not yet visited
+    for pid in passage_ids:
+        if pid not in visited:
+            chain.append(pid)
+
     return chain
 
 
