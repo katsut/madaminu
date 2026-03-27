@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 class Note(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "notes"
 
-    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False, index=True)
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), nullable=False)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False, index=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
     content: Mapped[str] = mapped_column(Text, default="", nullable=False)
     updated_at: Mapped[str] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 

@@ -15,8 +15,8 @@ class PaymentStatus(enum.StrEnum):
 class Payment(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "payments"
 
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), nullable=False)
-    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
     receipt_data: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), default=PaymentStatus.pending, nullable=False)
     verified_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)

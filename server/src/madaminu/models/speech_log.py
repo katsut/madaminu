@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 class SpeechLog(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "speech_logs"
 
-    game_id: Mapped[str] = mapped_column(ForeignKey("games.id"), nullable=False, index=True)
-    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False)
-    phase_id: Mapped[str] = mapped_column(ForeignKey("phases.id"), nullable=False)
+    game_id: Mapped[str] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
+    phase_id: Mapped[str] = mapped_column(ForeignKey("phases.id", ondelete="CASCADE"), nullable=False)
     transcript: Mapped[str] = mapped_column(Text, nullable=False)
     corrected_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
 
