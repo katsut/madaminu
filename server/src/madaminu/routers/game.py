@@ -165,7 +165,7 @@ async def _generate_scenario_background(
                     )
                     break
             except Exception:
-                logger.warning("Scenario generation attempt %d failed for %s", attempt + 1, room_code)
+                logger.exception("Scenario generation attempt %d failed for %s", attempt + 1, room_code)
                 if attempt == 2:
                     raise
 
