@@ -20,6 +20,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var colocatedPlayers: [ColocatedPlayer] = []
     @Published var discoveries: [DiscoveryItem] = []
     @Published var keptDiscoveryId: String?
+    @Published var hasRevealedEvidence = false
 
     // Preparation checklist
     @Published var aiPlayersReady = false
@@ -47,6 +48,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         colocatedPlayers = []
         discoveries = []
         keptDiscoveryId = nil
+        hasRevealedEvidence = false
         aiPlayersReady = false
         scenarioReady = false
         sceneImageReady = false

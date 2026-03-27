@@ -33,6 +33,7 @@ struct InvestigationLocation: Codable, Identifiable, Sendable {
 
 struct EvidenceItem: Codable, Identifiable, Sendable {
     let id = UUID()
+    var evidenceId: String?
     let title: String
     let content: String
 

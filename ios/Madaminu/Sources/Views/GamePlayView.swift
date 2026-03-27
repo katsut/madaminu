@@ -651,13 +651,14 @@ struct RoomChatView: View {
 
 struct DiscussionPhaseView: View {
     @ObservedObject var store: AppStore
+    @State private var showRevealSheet = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
                     title: "議論フェーズ",
-                    message: "集めた証拠をもとに推理を述べましょう。発言ボタンを押して他のプレイヤーと議論してください。誰が怪しいか、何が起きたのかを話し合いましょう。"
+                    message: "発言ボタンで推理や情報を共有しましょう。手持ちの証拠を1つ公開することもできます。"
                 )
 
                 if let speaker = store.game.currentSpeakerId {
@@ -678,8 +679,62 @@ struct DiscussionPhaseView: View {
                     TranscriptView(store: store)
                 }
 
+                if !store.notebook.evidences.isEmpty && !store.game.hasRevealedEvidence {
+                    MDButton("証拠を公開する", style: .secondary) {
+                        showRevealSheet = true
+                    }
+                }
             }
             .padding(Spacing.lg)
+        }
+        .sheet(isPresented: $showRevealSheet) {
+            EvidenceRevealSheet(store: store, isPresented: $showRevealSheet)
+        }
+    }
+}
+
+struct EvidenceRevealSheet: View {
+    @ObservedObject var store: AppStore
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.mdBackground.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: Spacing.md) {
+                        Text("公開する証拠を選択")
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextSecondary)
+
+                        ForEach(store.notebook.evidences) { evidence in
+                            MDCard {
+                                VStack(alignment: .leading, spacing: Spacing.sm) {
+                                    Text(evidence.title)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    Text(evidence.content)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                    MDButton("これを公開") {
+                                        store.dispatch(.revealEvidence(evidenceId: evidence.evidenceId ?? evidence.id.uuidString))
+                                        store.game.hasRevealedEvidence = true
+                                        isPresented = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(Spacing.lg)
+                }
+            }
+            .navigationTitle("証拠の公開")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("やめる") { isPresented = false }
+                }
+            }
         }
     }
 }
