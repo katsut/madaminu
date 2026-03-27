@@ -55,7 +55,7 @@ def upgrade() -> None:
         sa.Column("portrait_image", sa.Text(), nullable=True),
         sa.Column("connection_status", sa.Enum("online", "offline", name="connectionstatus"), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["game_id"], ["games.id"]),
+        sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_players_game_id", "players", ["game_id"])
@@ -65,7 +65,7 @@ def upgrade() -> None:
         "phases",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("game_id", sa.String(), nullable=False),
-        sa.Column("phase_type", sa.Enum("investigation", "discussion", "voting", name="phasetype"), nullable=False),
+        sa.Column("phase_type", sa.Enum("planning", "investigation", "discussion", "voting", name="phasetype"), nullable=False),
         sa.Column("phase_order", sa.Integer(), nullable=False),
         sa.Column("duration_sec", sa.Integer(), nullable=False),
         sa.Column("scenario_update", sa.JSON(), nullable=True),
@@ -73,7 +73,7 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(), nullable=True),
         sa.Column("ended_at", sa.DateTime(), nullable=True),
         sa.Column("deadline_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(["game_id"], ["games.id"]),
+        sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_phases_game_id", "phases", ["game_id"])
@@ -91,9 +91,9 @@ def upgrade() -> None:
         sa.Column("transcript", sa.Text(), nullable=False),
         sa.Column("corrected_transcript", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["game_id"], ["games.id"]),
-        sa.ForeignKeyConstraint(["player_id"], ["players.id"]),
-        sa.ForeignKeyConstraint(["phase_id"], ["phases.id"]),
+        sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["player_id"], ["players.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["phase_id"], ["phases.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_speech_logs_game_id", "speech_logs", ["game_id"])
@@ -105,9 +105,9 @@ def upgrade() -> None:
         sa.Column("voter_player_id", sa.String(), nullable=False),
         sa.Column("suspect_player_id", sa.String(), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["game_id"], ["games.id"]),
-        sa.ForeignKeyConstraint(["voter_player_id"], ["players.id"]),
-        sa.ForeignKeyConstraint(["suspect_player_id"], ["players.id"]),
+        sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["voter_player_id"], ["players.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["suspect_player_id"], ["players.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_votes_game_id", "votes", ["game_id"])
@@ -122,9 +122,9 @@ def upgrade() -> None:
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("source", sa.Enum("investigation", "gm_push", name="evidencesource"), nullable=False),
         sa.Column("revealed_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["game_id"], ["games.id"]),
-        sa.ForeignKeyConstraint(["player_id"], ["players.id"]),
-        sa.ForeignKeyConstraint(["phase_id"], ["phases.id"]),
+        sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["player_id"], ["players.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["phase_id"], ["phases.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_evidences_game_id", "evidences", ["game_id"])
@@ -138,8 +138,8 @@ def upgrade() -> None:
         sa.Column("true_criminal_id", sa.String(), nullable=False),
         sa.Column("objective_results", sa.JSON(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["game_id"], ["games.id"]),
-        sa.ForeignKeyConstraint(["true_criminal_id"], ["players.id"]),
+        sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["true_criminal_id"], ["players.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("game_id"),
     )
@@ -151,8 +151,8 @@ def upgrade() -> None:
         sa.Column("game_id", sa.String(), nullable=False),
         sa.Column("content", sa.Text(), nullable=False, server_default=""),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["player_id"], ["players.id"]),
-        sa.ForeignKeyConstraint(["game_id"], ["games.id"]),
+        sa.ForeignKeyConstraint(["player_id"], ["players.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_notes_player_id", "notes", ["player_id"])
@@ -165,8 +165,8 @@ def upgrade() -> None:
         sa.Column("receipt_data", sa.Text(), nullable=False),
         sa.Column("status", sa.Enum("pending", "verified", "failed", name="paymentstatus"), nullable=False),
         sa.Column("verified_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(["game_id"], ["games.id"]),
-        sa.ForeignKeyConstraint(["player_id"], ["players.id"]),
+        sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["player_id"], ["players.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
 
