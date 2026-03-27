@@ -3,36 +3,47 @@
 from madaminu.services.map_renderer import render_map_svg
 
 
-HIERARCHICAL_MAP = {
+GRAPH_MAP = {
     "areas": [
         {
             "id": "main_1f", "name": "本館1階", "area_type": "indoor",
-            "rooms": [
-                {"id": "entrance", "name": "玄関", "features": ["鏡", "傘立て"]},
-                {"id": "living", "name": "リビング", "features": ["暖炉", "ソファ"]},
-                {"id": "kitchen", "name": "台所", "features": ["包丁"]},
+            "nodes": [
+                {"id": "entrance", "name": "玄関", "type": "entrance"},
+                {"id": "corridor_1", "name": "廊下", "type": "passage"},
+                {"id": "stairs_1f", "name": "階段", "type": "stairs"},
+                {"id": "living", "name": "リビング", "type": "room", "features": ["暖炉", "ソファ"]},
+                {"id": "kitchen", "name": "台所", "type": "room", "features": ["包丁"]},
+            ],
+            "edges": [
+                ["entrance", "corridor_1"],
+                ["corridor_1", "stairs_1f"],
+                ["corridor_1", "living"],
+                ["corridor_1", "kitchen"],
             ],
         },
         {
             "id": "main_2f", "name": "本館2階", "area_type": "indoor",
-            "rooms": [
-                {"id": "hallway_2f", "name": "2階廊下", "features": ["窓"]},
-                {"id": "bedroom", "name": "寝室", "features": ["ベッド"]},
+            "nodes": [
+                {"id": "stairs_2f", "name": "階段", "type": "stairs"},
+                {"id": "corridor_2", "name": "廊下", "type": "passage"},
+                {"id": "bedroom", "name": "寝室", "type": "room", "features": ["ベッド"]},
+            ],
+            "edges": [
+                ["stairs_2f", "corridor_2"],
+                ["corridor_2", "bedroom"],
             ],
         },
         {
             "id": "outside", "name": "屋外", "area_type": "outdoor",
-            "rooms": [
-                {"id": "garden", "name": "庭園", "features": ["噴水"]},
+            "nodes": [
+                {"id": "garden", "name": "庭園", "type": "room", "features": ["噴水"]},
             ],
+            "edges": [],
         },
     ],
-    "connections": [
-        {"from": "entrance", "to": "living", "type": "door"},
-        {"from": "living", "to": "kitchen", "type": "door"},
-        {"from": "entrance", "to": "hallway_2f", "type": "stairs"},
-        {"from": "hallway_2f", "to": "bedroom", "type": "door"},
-        {"from": "entrance", "to": "garden", "type": "door"},
+    "floor_connections": [
+        ["stairs_1f", "stairs_2f"],
+        ["entrance", "garden"],
     ],
 }
 
@@ -47,36 +58,68 @@ FLAT_MAP = {
 }
 
 
-def test_render_hierarchical_produces_svg():
-    svg = render_map_svg(HIERARCHICAL_MAP)
+def test_render_produces_svg():
+    svg = render_map_svg(GRAPH_MAP)
     assert svg.startswith("<svg")
     assert "</svg>" in svg
 
 
 def test_render_contains_area_names():
-    svg = render_map_svg(HIERARCHICAL_MAP)
+    svg = render_map_svg(GRAPH_MAP)
     assert "本館1階" in svg
     assert "本館2階" in svg
     assert "屋外" in svg
 
 
 def test_render_contains_room_names():
-    svg = render_map_svg(HIERARCHICAL_MAP)
+    svg = render_map_svg(GRAPH_MAP)
     assert "玄関" in svg
     assert "リビング" in svg
     assert "寝室" in svg
     assert "庭園" in svg
 
 
-def test_render_room_names_only_no_features():
-    svg = render_map_svg(HIERARCHICAL_MAP)
-    assert "リビング" in svg
-    assert "暖炉" not in svg  # features not shown on map
+def test_render_no_features_on_map():
+    svg = render_map_svg(GRAPH_MAP)
+    assert "暖炉" not in svg
 
 
-def test_render_contains_connection_markers():
-    svg = render_map_svg(HIERARCHICAL_MAP)
-    assert ">S<" in svg  # stairs marker
+def test_render_contains_stairs():
+    svg = render_map_svg(GRAPH_MAP)
+    assert "階段" in svg
+
+
+def test_render_contains_legend():
+    svg = render_map_svg(GRAPH_MAP)
+    assert "部屋" in svg
+    assert "廊下" in svg
+    assert "階段" in svg
+
+
+def test_render_has_aria_label():
+    svg = render_map_svg(GRAPH_MAP)
+    assert 'aria-label="マップ"' in svg
+
+
+def test_render_highlight_has_glow():
+    svg = render_map_svg(GRAPH_MAP, highlight_room="entrance")
+    assert "url(#glow)" in svg
+
+
+def test_render_area_icons():
+    svg = render_map_svg(GRAPH_MAP)
+    assert "🏠" in svg
+    assert "🌳" in svg
+
+
+def test_render_svg_title():
+    svg = render_map_svg(GRAPH_MAP)
+    assert "ゲームマップ" in svg
+
+
+def test_render_area_aria_group():
+    svg = render_map_svg(GRAPH_MAP)
+    assert 'aria-label="本館1階"' in svg
 
 
 def test_render_flat_map_fallback():
@@ -90,14 +133,6 @@ def test_render_empty_map():
     assert "マップなし" in svg
 
 
-def test_render_empty_connections():
-    svg = render_map_svg({
-        "areas": [{"id": "a", "name": "A", "area_type": "indoor", "rooms": [{"id": "r1", "name": "R1", "features": ["x"]}]}],
-        "connections": [],
-    })
-    assert "R1" in svg
-
-
-def test_outdoor_area_has_dashed_border():
-    svg = render_map_svg(HIERARCHICAL_MAP)
+def test_render_outdoor_area_has_dashed_border():
+    svg = render_map_svg(GRAPH_MAP)
     assert "stroke-dasharray" in svg

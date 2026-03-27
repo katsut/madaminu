@@ -1,347 +1,530 @@
-"""Generate SVG map from hierarchical area/room map data."""
+"""Generate SVG floor-plan from graph-based map data.
+
+Map structure (sugoroku style):
+- Passage nodes (corridor, entrance, stairs) form the backbone
+- Room nodes branch off passage nodes (dead ends)
+- Stairs nodes connect floors
+"""
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-ROOM_W = 110
-ROOM_H = 34
-ROOM_GAP = 8
-AREA_PAD = 14
-AREA_GAP = 40
-AREA_HEADER = 26
-PADDING = 20
-CONN_MARGIN = 18  # space on left/right of areas for routing lines
-FONT_SIZE = 11
+CELL = 44
+PASSAGE_W = 44
+PASSAGE_H = 18
+PASSAGE_GAP = 36
+BRANCH_GAP = 6
+AREA_PAD = 8
+AREA_HEADER = 20
+INTER_GAP = 16
+PADDING = 10
+FONT_SIZE = 10
+LEGEND_FONT_SIZE = 10
 
 COLORS = {
-    "indoor": {"fill": "#1e1e2e", "stroke": "#5555aa", "header": "#3a3a5a"},
-    "outdoor": {"fill": "#1a2a1a", "stroke": "#448844", "header": "#2a4a2a"},
-    "semi_outdoor": {"fill": "#1e2a2a", "stroke": "#558866", "header": "#2a3a3a"},
-    "room": {"fill": "#2a2a3e", "stroke": "#6666aa"},
-    "room_outdoor": {"fill": "#223322", "stroke": "#669966"},
-    "text": "#cccccc",
-    "text_dim": "#888899",
+    "indoor": {"stroke": "#6666bb", "header": "#3a3a5a", "bg": "#1a1a28"},
+    "outdoor": {"stroke": "#55aa55", "header": "#2a4a2a", "bg": "#171f17"},
+    "semi_outdoor": {"stroke": "#55aa88", "header": "#2a3a3a", "bg": "#181f1f"},
+    "room": "#2d2d44",
+    "room_stroke": "#7777bb",
+    "room_outdoor": "#263626",
+    "room_outdoor_stroke": "#55aa55",
+    "passage": "#222238",
+    "passage_stroke": "#444466",
+    "entrance": "#2a2a3a",
+    "entrance_stroke": "#cc9944",
+    "stairs_fill": "#2a2240",
+    "stairs_stroke": "#9977bb",
+    "stairs_step": "#7755aa",
+    "edge": "#444466",
+    "branch_edge": "#555577",
+    "text": "#e0e0e8",
+    "text_dim": "#9999aa",
+    "text_passage": "#8888aa",
     "background": "#111118",
-    "door": "#cc9944",
-    "window": "#6699cc",
-    "stairs": "#aa77cc",
-    "corridor": "#999999",
-    "hidden_passage": "#666666",
+    "highlight_fill": "#3d2d15",
+    "highlight_stroke": "#ddaa44",
+    "highlight_glow": "#ddaa4433",
+    "floor_conn": "#9977bb",
 }
 
-CONNECTION_COLORS = {
-    "door": COLORS["door"],
-    "window": COLORS["window"],
-    "stairs": COLORS["stairs"],
-    "corridor": COLORS["corridor"],
-    "hidden_passage": COLORS["hidden_passage"],
-}
-
-CONN_ICONS = {"door": "D", "stairs": "S", "window": "W", "hidden_passage": "?", "corridor": "="}
+AREA_ICONS = {"indoor": "🏠", "outdoor": "🌳", "semi_outdoor": "⛺"}
 
 
 def render_map_svg(map_data: dict, highlight_room: str | None = None) -> str:
     areas = map_data.get("areas")
     if areas is None:
         return _render_flat_map(map_data, highlight_room)
-    return _render_hierarchical_map(map_data, highlight_room)
+    return _render_map(map_data, highlight_room)
 
 
-def _render_hierarchical_map(map_data: dict, highlight_room: str | None = None) -> str:
+def _node_size(node: dict) -> tuple[int, int]:
+    """Return (width, height) in pixels based on node size and type."""
+    ntype = node.get("type", "room")
+    if ntype in ("passage", "entrance", "stairs"):
+        return CELL, CELL
+    size = node.get("size", 1)
+    if size >= 4:
+        return CELL * 2, CELL * 2
+    if size >= 2:
+        return CELL * 2, CELL
+    return CELL, CELL
+
+
+def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
     areas = map_data.get("areas", [])
-    connections = map_data.get("connections", [])
+    floor_conns = map_data.get("floor_connections", [])
 
     if not areas:
         return _empty_svg()
 
-    # Build room-to-area index
-    room_area = {}
+    # Build node lookup
+    all_nodes: dict[str, dict] = {}
     for area in areas:
-        for room in area.get("rooms", []):
-            room_area[room["id"]] = area["id"]
+        for node in area.get("nodes", []):
+            all_nodes[node["id"]] = node
 
-    # Sort rooms within each area: connected rooms should be adjacent
-    for area in areas:
-        area["rooms"] = _sort_rooms_by_connections(area["rooms"], connections)
+    # Layout each area
+    area_blocks: list[dict] = []
+    node_positions: dict[str, dict] = {}
 
-    # Classify connections
-    intra_conns = []  # same area
-    inter_conns = []  # cross area
-    for conn in connections:
-        fa = room_area.get(conn["from"])
-        ta = room_area.get(conn["to"])
-        if fa and ta and fa == ta:
-            intra_conns.append(conn)
-        elif fa and ta:
-            inter_conns.append(conn)
-
-    # Layout areas
-    area_layouts = []
-    room_positions = {}
-    x_cursor = PADDING + CONN_MARGIN
+    max_block_w = 0
 
     for area in areas:
-        rooms = area.get("rooms", [])
+        nodes = area.get("nodes", [])
+        edges = area.get("edges", [])
         area_type = area.get("area_type", "indoor")
-        n = len(rooms)
 
-        content_h = n * (ROOM_H + ROOM_GAP) - ROOM_GAP if n > 0 else ROOM_H
-        area_w = ROOM_W + AREA_PAD * 2
-        area_h = AREA_HEADER + content_h + AREA_PAD * 2
+        # Find backbone: chain of passage/entrance/stairs nodes
+        passage_ids = {n["id"] for n in nodes if n.get("type") in ("passage", "entrance", "stairs")}
+        room_ids = {n["id"] for n in nodes if n.get("type") == "room"}
+        node_map = {n["id"]: n for n in nodes}
 
-        area_x = x_cursor
-        area_y = PADDING
+        # Build adjacency
+        adj: dict[str, list[str]] = {n["id"]: [] for n in nodes}
+        for e in edges:
+            a, b = e[0], e[1]
+            if a in adj and b in adj:
+                adj[a].append(b)
+                adj[b].append(a)
 
-        area_layouts.append({
-            "area": area, "x": area_x, "y": area_y,
-            "w": area_w, "h": area_h, "area_type": area_type,
+        # Find backbone order (BFS from entrance or first passage)
+        backbone = _find_backbone(nodes, edges, passage_ids)
+        if not backbone:
+            backbone = [n["id"] for n in nodes]
+
+        # Find which rooms branch from which passage node
+        branches: dict[str, list[str]] = {pid: [] for pid in backbone}
+        for rid in room_ids:
+            for nb in adj.get(rid, []):
+                if nb in passage_ids:
+                    branches.setdefault(nb, []).append(rid)
+                    break
+
+        # Decide above/below placement per room to avoid overlaps
+        # room_side: rid -> "above" or "below"
+        room_side: dict[str, str] = {}
+        prev_above_wide = False
+        for pid in backbone:
+            rooms = branches.get(pid, [])
+            for j, rid in enumerate(rooms):
+                rw, _ = _node_size(node_map[rid])
+                is_wide = rw > CELL
+                if j == 0:
+                    if prev_above_wide and is_wide:
+                        room_side[rid] = "below"
+                    else:
+                        room_side[rid] = "above"
+                else:
+                    room_side[rid] = "below" if room_side.get(rooms[0]) == "above" else "above"
+            # Track if this passage has a wide room above for next iteration
+            first_room = rooms[0] if rooms else None
+            if first_room:
+                rw, _ = _node_size(node_map[first_room])
+                prev_above_wide = room_side.get(first_room) == "above" and rw > CELL
+            else:
+                prev_above_wide = False
+
+        # Calculate dimensions
+        n_backbone = len(backbone)
+        has_above = False
+        has_below = False
+        max_room_h_above = CELL
+        max_room_h_below = CELL
+        for pid in backbone:
+            for rid in branches.get(pid, []):
+                _, rh = _node_size(node_map[rid])
+                if room_side.get(rid) == "above":
+                    has_above = True
+                    max_room_h_above = max(max_room_h_above, rh)
+                else:
+                    has_below = True
+                    max_room_h_below = max(max_room_h_below, rh)
+        if not has_above and not has_below:
+            for pid in backbone:
+                if branches.get(pid):
+                    has_above = True
+                    break
+
+        content_w = n_backbone * (PASSAGE_W + PASSAGE_GAP) - PASSAGE_GAP
+        above_h = (max_room_h_above + BRANCH_GAP) if has_above else 0
+        below_h = (max_room_h_below + BRANCH_GAP) if has_below else 0
+        content_h = above_h + PASSAGE_H + below_h
+
+        block_w = content_w + AREA_PAD * 2
+        block_h = AREA_HEADER + content_h + AREA_PAD * 2
+        if block_w > max_block_w:
+            max_block_w = block_w
+
+        area_blocks.append({
+            "area": area, "backbone": backbone, "branches": branches,
+            "node_map": node_map, "edges": edges, "room_side": room_side,
+            "w": block_w, "h": block_h,
+            "content_w": content_w,
+            "above_h": above_h, "below_h": below_h,
+            "area_type": area_type,
         })
 
-        for i, room in enumerate(rooms):
-            rx = area_x + AREA_PAD
-            ry = area_y + AREA_HEADER + AREA_PAD + i * (ROOM_H + ROOM_GAP)
-            room_positions[room["id"]] = {
-                "x": rx, "y": ry,
-                "cx": rx + ROOM_W // 2, "cy": ry + ROOM_H // 2,
-                "area_id": area["id"], "index": i,
+    # Position blocks vertically
+    y_cursor = PADDING
+    for block in area_blocks:
+        block["x"] = PADDING + (max_block_w - block["w"]) // 2
+        block["y"] = y_cursor
+
+        ox = block["x"] + AREA_PAD
+        oy = block["y"] + AREA_HEADER + AREA_PAD
+        above_h = block["above_h"]
+
+        # Position backbone nodes (PASSAGE_W x PASSAGE_H, thin)
+        for i, nid in enumerate(block["backbone"]):
+            px = ox + i * (PASSAGE_W + PASSAGE_GAP)
+            py = oy + above_h
+            node_positions[nid] = {
+                "x": px, "y": py, "w": PASSAGE_W, "h": PASSAGE_H,
+                "cx": px + PASSAGE_W // 2, "cy": py + PASSAGE_H // 2,
+                "is_backbone": True,
             }
 
-        x_cursor += area_w + AREA_GAP
+        # Position room branches using room_side
+        rs = block["room_side"]
+        for pid in block["backbone"]:
+            rooms = block["branches"].get(pid, [])
+            pp = node_positions[pid]
+            for rid in rooms:
+                node = block["node_map"][rid]
+                rw, rh = _node_size(node)
+                rx = pp["cx"] - rw // 2
+                if rs.get(rid, "above") == "above":
+                    ry = oy + above_h - rh - BRANCH_GAP
+                else:
+                    ry = oy + above_h + PASSAGE_H + BRANCH_GAP
+                node_positions[rid] = {
+                    "x": rx, "y": ry, "w": rw, "h": rh,
+                    "cx": rx + rw // 2, "cy": ry + rh // 2,
+                    "is_backbone": False,
+                }
 
-    total_w = x_cursor - AREA_GAP + CONN_MARGIN + PADDING
-    max_area_bottom = max((a["y"] + a["h"] for a in area_layouts), default=200)
-    inter_routing_y = max_area_bottom + 20
-    total_h = inter_routing_y + len(inter_conns) * 14 + PADDING
+        y_cursor += block["h"] + INTER_GAP
+
+    total_w = max_block_w + PADDING * 2
+    legend_h = 36
+    # Add space for floor connections
+    floor_conn_h = len(floor_conns) * 8 if floor_conns else 0
+    total_h = y_cursor + floor_conn_h + legend_h
 
     svg = Element("svg", {
         "xmlns": "http://www.w3.org/2000/svg",
         "viewBox": f"0 0 {total_w} {total_h}",
         "width": str(total_w), "height": str(total_h),
+        "role": "img", "aria-label": "マップ",
     })
+    SubElement(svg, "title").text = "ゲームマップ"
+    defs = SubElement(svg, "defs")
+    _add_glow_filter(defs)
     SubElement(svg, "rect", {"width": str(total_w), "height": str(total_h), "fill": COLORS["background"]})
 
-    # Draw areas
-    for al in area_layouts:
-        _draw_area(svg, al)
+    # Draw floor connections first (behind everything)
+    for fc in floor_conns:
+        p1 = node_positions.get(fc[0])
+        p2 = node_positions.get(fc[1])
+        if p1 and p2:
+            _draw_floor_connection(svg, p1, p2)
 
-    # Draw rooms
-    for area in areas:
-        at = area.get("area_type", "indoor")
-        for room in area.get("rooms", []):
-            pos = room_positions[room["id"]]
-            _draw_room(svg, room, pos["x"], pos["y"], at, highlighted=room["id"] == highlight_room)
+    # Draw area blocks
+    for block in area_blocks:
+        _draw_area(svg, block, node_positions, highlight_room)
 
-    # Draw intra-area connections (left side brackets)
-    for conn in intra_conns:
-        fp = room_positions.get(conn["from"])
-        tp = room_positions.get(conn["to"])
-        if fp and tp:
-            _draw_intra_connection(svg, conn, fp, tp)
-
-    # Draw inter-area connections (routed below)
-    for i, conn in enumerate(inter_conns):
-        fp = room_positions.get(conn["from"])
-        tp = room_positions.get(conn["to"])
-        if fp and tp:
-            route_y = inter_routing_y + i * 14
-            _draw_inter_connection(svg, conn, fp, tp, route_y)
-
+    _draw_legend(svg, PADDING, total_h - legend_h + 4, total_w)
     return tostring(svg, encoding="unicode")
 
 
-def _sort_rooms_by_connections(rooms: list[dict], connections: list[dict]) -> list[dict]:
-    """Sort rooms so connected rooms are adjacent."""
-    if len(rooms) <= 2:
-        return rooms
+def _find_backbone(nodes, edges, passage_ids):
+    """Find the backbone chain of passage nodes.
 
-    room_ids = [r["id"] for r in rooms]
-    room_map = {r["id"]: r for r in rooms}
-    adj: dict[str, list[str]] = {rid: [] for rid in room_ids}
-    for conn in connections:
-        if conn["from"] in adj and conn["to"] in adj:
-            adj[conn["from"]].append(conn["to"])
-            adj[conn["to"]].append(conn["from"])
+    Start from entrance (or non-stairs endpoint) so stairs end up last.
+    """
+    if not passage_ids:
+        return [n["id"] for n in nodes]
 
-    # Simple greedy chain: start from a room with fewest connections
+    node_type_map = {n["id"]: n.get("type") for n in nodes}
+
+    # Build passage-only adjacency
+    adj: dict[str, list[str]] = {pid: [] for pid in passage_ids}
+    for e in edges:
+        a, b = e[0], e[1]
+        if a in passage_ids and b in passage_ids:
+            adj[a].append(b)
+            adj[b].append(a)
+
+    # Pick start node: prefer entrance, then non-stairs endpoint
+    start = None
+    for n in nodes:
+        if n.get("type") == "entrance" and n["id"] in passage_ids:
+            start = n["id"]
+            break
+
+    if not start:
+        # Pick a degree-1 node that is NOT stairs
+        for pid in passage_ids:
+            if len(adj[pid]) <= 1 and node_type_map.get(pid) != "stairs":
+                start = pid
+                break
+        # If all degree-1 nodes are stairs, just pick any non-stairs
+        if not start:
+            for pid in passage_ids:
+                if node_type_map.get(pid) != "stairs":
+                    start = pid
+                    break
+        if not start:
+            start = next(iter(passage_ids))
+
+    # BFS to build chain
     visited = set()
-    result = []
-    start = min(room_ids, key=lambda r: len(adj[r]))
+    chain = []
     queue = [start]
     while queue:
-        rid = queue.pop(0)
-        if rid in visited:
+        nid = queue.pop(0)
+        if nid in visited:
             continue
-        visited.add(rid)
-        result.append(room_map[rid])
-        for neighbor in adj[rid]:
-            if neighbor not in visited:
-                queue.insert(0, neighbor)
+        visited.add(nid)
+        chain.append(nid)
+        for nb in adj[nid]:
+            if nb not in visited:
+                queue.append(nb)
 
-    # Add any remaining rooms
-    for rid in room_ids:
-        if rid not in visited:
-            result.append(room_map[rid])
-
-    return result
+    return chain
 
 
-def _draw_area(svg: Element, layout: dict):
-    area = layout["area"]
-    colors = COLORS.get(layout["area_type"], COLORS["indoor"])
+def _draw_area(svg, block, node_pos, highlight_room):
+    area = block["area"]
+    area_type = block["area_type"]
+    colors = COLORS.get(area_type, COLORS["indoor"])
 
-    attrs = {
-        "x": str(layout["x"]), "y": str(layout["y"]),
-        "width": str(layout["w"]), "height": str(layout["h"]),
-        "fill": "none", "stroke": colors["stroke"], "stroke-width": "2", "rx": "8",
-    }
-    if layout["area_type"] == "outdoor":
-        attrs["stroke-dasharray"] = "6,3"
-    SubElement(svg, "rect", attrs)
+    g = SubElement(svg, "g", {"role": "group", "aria-label": area.get("name", area["id"])})
 
-    SubElement(svg, "rect", {
-        "x": str(layout["x"]), "y": str(layout["y"]),
-        "width": str(layout["w"]), "height": str(AREA_HEADER),
+    # Background
+    SubElement(g, "rect", {
+        "x": str(block["x"]), "y": str(block["y"]),
+        "width": str(block["w"]), "height": str(block["h"]),
+        "fill": colors["bg"], "stroke": colors["stroke"],
+        "stroke-width": "2", "rx": "8",
+        **({"stroke-dasharray": "8,4"} if area_type == "outdoor" else {}),
+    })
+
+    # Header
+    SubElement(g, "rect", {
+        "x": str(block["x"]), "y": str(block["y"]),
+        "width": str(block["w"]), "height": str(AREA_HEADER),
         "fill": colors["header"], "rx": "8",
     })
-    SubElement(svg, "rect", {
-        "x": str(layout["x"]), "y": str(layout["y"] + AREA_HEADER - 8),
-        "width": str(layout["w"]), "height": "8", "fill": colors["header"],
+    SubElement(g, "rect", {
+        "x": str(block["x"]), "y": str(block["y"] + AREA_HEADER - 8),
+        "width": str(block["w"]), "height": "8", "fill": colors["header"],
     })
-
-    t = SubElement(svg, "text", {
-        "x": str(layout["x"] + layout["w"] // 2),
-        "y": str(layout["y"] + AREA_HEADER // 2 + 1),
+    icon = AREA_ICONS.get(area_type, "")
+    lbl = f"{icon} {area.get('name', area['id'])}" if icon else area.get("name", area["id"])
+    SubElement(g, "text", {
+        "x": str(block["x"] + block["w"] // 2),
+        "y": str(block["y"] + AREA_HEADER // 2 + 1),
         "text-anchor": "middle", "dominant-baseline": "central",
-        "fill": COLORS["text"], "font-size": str(FONT_SIZE),
+        "fill": COLORS["text"], "font-size": str(FONT_SIZE + 1),
         "font-weight": "bold", "font-family": "sans-serif",
-    })
-    t.text = area.get("name", area["id"])
+    }).text = lbl
+
+    node_map = block["node_map"]
+    backbone = block["backbone"]
+    branches = block["branches"]
+
+    # Draw backbone nodes first (so edges draw on top)
+    for nid in backbone:
+        node = node_map[nid]
+        pos = node_pos[nid]
+        _draw_node(g, node, pos, highlight_room == nid, area_type)
+
+    # Draw room nodes
+    for pid in backbone:
+        for rid in branches.get(pid, []):
+            node = node_map[rid]
+            pos = node_pos[rid]
+            _draw_node(g, node, pos, highlight_room == rid, area_type)
+
+    # Draw backbone edges (on top of nodes, between them)
+    for i in range(len(backbone) - 1):
+        p1 = node_pos[backbone[i]]
+        p2 = node_pos[backbone[i + 1]]
+        x1 = p1["x"] + p1["w"]
+        x2 = p2["x"]
+        cy = p1["cy"]
+        if x2 > x1:
+            SubElement(g, "line", {
+                "x1": str(x1), "y1": str(cy),
+                "x2": str(x2), "y2": str(p2["cy"]),
+                "stroke": COLORS["edge"], "stroke-width": "3",
+                "stroke-linecap": "round",
+            })
+
+    # Draw branch edges (passage → room, visible on top)
+    for pid in backbone:
+        pp = node_pos[pid]
+        for rid in branches.get(pid, []):
+            rp = node_pos[rid]
+            if rp["y"] < pp["y"]:
+                # Room is above
+                y1 = pp["y"]
+                y2 = rp["y"] + rp["h"]
+            else:
+                # Room is below
+                y1 = pp["y"] + pp["h"]
+                y2 = rp["y"]
+            SubElement(g, "line", {
+                "x1": str(pp["cx"]), "y1": str(y1),
+                "x2": str(rp["cx"]), "y2": str(y2),
+                "stroke": COLORS["branch_edge"], "stroke-width": "2",
+                "stroke-linecap": "round",
+            })
 
 
-def _draw_room(svg: Element, room: dict, x: int, y: int, area_type: str, highlighted: bool = False):
+def _draw_node(svg, node, pos, highlighted, area_type):
+    ntype = node.get("type", "room")
+    name = node.get("name", node["id"])
+    x, y, w, h = pos["x"], pos["y"], pos["w"], pos["h"]
+
+    rg = SubElement(svg, "g", {"role": "img", "aria-label": name})
+
     if highlighted:
-        fill, stroke, sw = "#3a2a1a", "#cc9944", "2.5"
+        SubElement(rg, "rect", {
+            "x": str(x - 3), "y": str(y - 3),
+            "width": str(w + 6), "height": str(h + 6),
+            "fill": COLORS["highlight_glow"], "rx": "6",
+            "filter": "url(#glow)",
+        })
+
+    if ntype == "passage":
+        fill = COLORS["passage"]
+        stroke = COLORS["passage_stroke"]
+    elif ntype == "entrance":
+        fill = COLORS["entrance"]
+        stroke = COLORS["entrance_stroke"]
+    elif ntype == "stairs":
+        fill = COLORS["stairs_fill"]
+        stroke = COLORS["stairs_stroke"]
     elif area_type == "outdoor":
-        fill, stroke, sw = COLORS["room_outdoor"]["fill"], COLORS["room_outdoor"]["stroke"], "1.5"
+        fill = COLORS["room_outdoor"]
+        stroke = COLORS["room_outdoor_stroke"]
     else:
-        fill, stroke, sw = COLORS["room"]["fill"], COLORS["room"]["stroke"], "1.5"
+        fill = COLORS["room"]
+        stroke = COLORS["room_stroke"]
 
-    SubElement(svg, "rect", {
-        "x": str(x), "y": str(y), "width": str(ROOM_W), "height": str(ROOM_H),
-        "fill": fill, "stroke": stroke, "stroke-width": sw, "rx": "4",
+    if highlighted:
+        fill = COLORS["highlight_fill"]
+        stroke = COLORS["highlight_stroke"]
+
+    SubElement(rg, "rect", {
+        "x": str(x), "y": str(y),
+        "width": str(w), "height": str(h),
+        "fill": fill, "stroke": stroke,
+        "stroke-width": "2", "rx": "4",
     })
-    t = SubElement(svg, "text", {
-        "x": str(x + ROOM_W // 2), "y": str(y + ROOM_H // 2 + 1),
+
+    # Stairs decoration
+    if ntype == "stairs" and not highlighted:
+        for s in range(1, 4):
+            sy = y + s * h // 4
+            SubElement(rg, "line", {
+                "x1": str(x + 6), "y1": str(sy),
+                "x2": str(x + w - 6), "y2": str(sy),
+                "stroke": COLORS["stairs_step"], "stroke-width": "1",
+            })
+
+    text_color = COLORS["text"] if ntype == "room" else COLORS["text_passage"]
+    if highlighted:
+        text_color = COLORS["text"]
+    SubElement(rg, "text", {
+        "x": str(x + w // 2), "y": str(y + h // 2 + 1),
         "text-anchor": "middle", "dominant-baseline": "central",
-        "fill": COLORS["text"], "font-size": str(FONT_SIZE),
+        "fill": text_color, "font-size": str(FONT_SIZE if ntype == "room" else FONT_SIZE - 1),
         "font-weight": "bold", "font-family": "sans-serif",
-    })
-    t.text = room.get("name", room["id"])
+    }).text = name
 
 
-def _draw_intra_connection(svg: Element, conn: dict, fp: dict, tp: dict):
-    """Draw connection between rooms in the same area, using left-side bracket."""
-    conn_type = conn.get("type", "door")
-    color = CONNECTION_COLORS.get(conn_type, COLORS["door"])
+def _draw_floor_connection(svg, p1, p2):
+    """Draw a vertical dashed line connecting stairs between floors."""
+    x1, y1 = p1["cx"], p1["y"] + p1["h"]
+    x2, y2 = p2["cx"], p2["y"]
+    if y1 > y2:
+        x1, y1, x2, y2 = x2, p2["y"] + p2["h"], x1, p1["y"]
 
-    # Route along the left side of the rooms
-    x_line = fp["x"] - 8
-    y1 = fp["cy"]
-    y2 = tp["cy"]
-
-    # Horizontal ticks from room edge to line
+    mx = (x1 + x2) // 2
     SubElement(svg, "line", {
-        "x1": str(fp["x"]), "y1": str(y1),
-        "x2": str(x_line), "y2": str(y1),
-        "stroke": color, "stroke-width": "1.5",
-    })
-    SubElement(svg, "line", {
-        "x1": str(tp["x"]), "y1": str(y2),
-        "x2": str(x_line), "y2": str(y2),
-        "stroke": color, "stroke-width": "1.5",
-    })
-    # Vertical line
-    dash = {}
-    if conn_type == "window":
-        dash = {"stroke-dasharray": "3,3"}
-    elif conn_type == "hidden_passage":
-        dash = {"stroke-dasharray": "2,4"}
-
-    SubElement(svg, "line", {
-        "x1": str(x_line), "y1": str(y1),
-        "x2": str(x_line), "y2": str(y2),
-        "stroke": color, "stroke-width": "1.5", **dash,
+        "x1": str(x1), "y1": str(y1),
+        "x2": str(x2), "y2": str(y2),
+        "stroke": COLORS["floor_conn"], "stroke-width": "2",
+        "stroke-dasharray": "6,4",
     })
 
-    # Small icon at midpoint
-    my = (y1 + y2) // 2
-    icon = CONN_ICONS.get(conn_type, "")
-    if icon:
+
+def _add_glow_filter(defs):
+    filt = SubElement(defs, "filter", {"id": "glow", "x": "-30%", "y": "-30%", "width": "160%", "height": "160%"})
+    SubElement(filt, "feGaussianBlur", {"in": "SourceGraphic", "stdDeviation": "4", "result": "blur"})
+    merge = SubElement(filt, "feMerge")
+    SubElement(merge, "feMergeNode", {"in": "blur"})
+    SubElement(merge, "feMergeNode", {"in": "SourceGraphic"})
+
+
+def _draw_legend(svg, x, y, total_w):
+    SubElement(svg, "line", {
+        "x1": str(x), "y1": str(y - 4),
+        "x2": str(total_w - x), "y2": str(y - 4),
+        "stroke": "#333344", "stroke-width": "1",
+    })
+    cx = x + 8
+    items = [
+        (COLORS["room"], COLORS["room_stroke"], "部屋"),
+        (COLORS["passage"], COLORS["passage_stroke"], "廊下"),
+        (COLORS["entrance"], COLORS["entrance_stroke"], "玄関"),
+        (COLORS["stairs_fill"], COLORS["stairs_stroke"], "階段"),
+    ]
+    for fill, stroke, label in items:
         SubElement(svg, "rect", {
-            "x": str(x_line - 7), "y": str(my - 6),
-            "width": "14", "height": "12",
-            "fill": COLORS["background"], "rx": "2",
+            "x": str(cx), "y": str(y + 2), "width": "14", "height": "10",
+            "fill": fill, "stroke": stroke, "stroke-width": "1", "rx": "2",
         })
-        it = SubElement(svg, "text", {
-            "x": str(x_line), "y": str(my + 1),
-            "text-anchor": "middle", "dominant-baseline": "central",
-            "fill": color, "font-size": "8", "font-family": "sans-serif",
-        })
-        it.text = icon
-
-
-def _draw_inter_connection(svg: Element, conn: dict, fp: dict, tp: dict, route_y: int):
-    """Draw connection between rooms in different areas, routed below."""
-    conn_type = conn.get("type", "door")
-    color = CONNECTION_COLORS.get(conn_type, COLORS["door"])
-
-    # Start from bottom of from-room, end at bottom of to-room
-    fx = fp["cx"]
-    fy = fp["y"] + ROOM_H
-    tx = tp["cx"]
-    ty = tp["y"] + ROOM_H
-
-    dash = ""
-    if conn_type in ("stairs", "hidden_passage"):
-        dash = "6,4"
-    elif conn_type == "window":
-        dash = "3,3"
-
-    # Path: down from room → horizontal at route_y → up to room
-    path_d = f"M {fx} {fy} L {fx} {route_y} L {tx} {route_y} L {tx} {ty}"
-    attrs = {
-        "d": path_d, "fill": "none",
-        "stroke": color, "stroke-width": "1.5", "stroke-linecap": "round",
-    }
-    if dash:
-        attrs["stroke-dasharray"] = dash
-    SubElement(svg, "path", attrs)
-
-    # Icon at midpoint of horizontal segment
-    mx = (fx + tx) // 2
-    icon = CONN_ICONS.get(conn_type, "")
-    if icon:
-        SubElement(svg, "rect", {
-            "x": str(mx - 8), "y": str(route_y - 7),
-            "width": "16", "height": "14",
-            "fill": COLORS["background"], "rx": "2",
-        })
-        it = SubElement(svg, "text", {
-            "x": str(mx), "y": str(route_y + 1),
-            "text-anchor": "middle", "dominant-baseline": "central",
-            "fill": color, "font-size": "9", "font-family": "sans-serif",
-        })
-        it.text = icon
+        SubElement(svg, "text", {
+            "x": str(cx + 20), "y": str(y + 8),
+            "dominant-baseline": "central",
+            "fill": COLORS["text_dim"], "font-size": str(LEGEND_FONT_SIZE), "font-family": "sans-serif",
+        }).text = label
+        cx += 56
 
 
 def _render_flat_map(map_data: dict, highlight_room: str | None = None) -> str:
     locations = map_data.get("locations", [])
     if not locations:
         return _empty_svg()
-    hierarchical = {
-        "areas": [{"id": "main", "name": "マップ", "area_type": "indoor", "rooms": locations}],
-        "connections": map_data.get("connections", []),
-    }
-    return _render_hierarchical_map(hierarchical, highlight_room)
+    nodes = [{"id": loc["id"], "name": loc.get("name", loc["id"]), "type": "room", "features": loc.get("features", [])} for loc in locations]
+    edges = [[c["from"], c["to"]] for c in map_data.get("connections", [])]
+    return _render_map({
+        "areas": [{"id": "main", "name": "マップ", "area_type": "indoor", "nodes": nodes, "edges": edges}],
+    }, highlight_room)
 
 
 def _empty_svg() -> str:
@@ -350,9 +533,8 @@ def _empty_svg() -> str:
         "viewBox": "0 0 200 100", "width": "200", "height": "100",
     })
     SubElement(svg, "rect", {"width": "200", "height": "100", "fill": COLORS["background"]})
-    t = SubElement(svg, "text", {
+    SubElement(svg, "text", {
         "x": "100", "y": "55", "text-anchor": "middle",
         "fill": COLORS["text"], "font-size": "14",
-    })
-    t.text = "マップなし"
+    }).text = "マップなし"
     return tostring(svg, encoding="unicode")
