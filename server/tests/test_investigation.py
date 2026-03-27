@@ -7,7 +7,7 @@ from sqlalchemy import select
 from madaminu.llm.client import LLMUsage
 from madaminu.models import Evidence, EvidenceSource, Game, GameStatus, Phase, PhaseType, Player
 from madaminu.models.player import ConnectionStatus
-from madaminu.services.scenario_engine import MAX_INVESTIGATIONS_PER_PHASE, investigate_location
+from madaminu.services.scenario_engine import investigate_location
 
 MOCK_INVESTIGATION_RESULT = {
     "title": "血のついた手紙",
@@ -75,11 +75,10 @@ async def test_investigate_location_success(session_factory):
 
     async with session_factory() as db:
         with patch("madaminu.services.scenario_engine.llm_client.generate_json", mock_generate):
-            evidence, usage = await investigate_location(db, game_id, player_id, "study")
+            discovery, usage = await investigate_location(db, game_id, player_id, "study")
 
-    assert evidence is not None
-    assert evidence.title == "血のついた手紙"
-    assert evidence.source == EvidenceSource.investigation
+    assert discovery is not None
+    assert discovery["title"] == "血のついた手紙"
     assert usage.model == "gpt-5.4-nano"
 
 
@@ -93,28 +92,19 @@ async def test_investigate_invalid_location(session_factory):
     assert usage is None
 
 
-async def test_investigate_max_limit(session_factory):
+async def test_investigate_multiple_features(session_factory):
     game_id, phase_id, player_id = await _create_investigation_game(session_factory)
 
-    async with session_factory() as db:
-        for i in range(MAX_INVESTIGATIONS_PER_PHASE):
-            ev = Evidence(
-                id=str(uuid.uuid4()),
-                game_id=game_id,
-                player_id=player_id,
-                phase_id=phase_id,
-                title=f"Evidence {i}",
-                content=f"Content {i}",
-                source=EvidenceSource.investigation,
-            )
-            db.add(ev)
-        await db.commit()
+    mock_response = json.dumps(MOCK_INVESTIGATION_RESULT, ensure_ascii=False)
+    mock_generate = AsyncMock(return_value=(mock_response, MOCK_USAGE))
 
     async with session_factory() as db:
-        evidence, usage = await investigate_location(db, game_id, player_id, "study")
+        with patch("madaminu.services.scenario_engine.llm_client.generate_json", mock_generate):
+            d1, _ = await investigate_location(db, game_id, player_id, "study", "本棚")
+            d2, _ = await investigate_location(db, game_id, player_id, "study", "机")
 
-    assert evidence is None
-    assert usage is None
+    assert d1 is not None
+    assert d2 is not None
 
 
 async def test_investigate_wrong_phase_type(session_factory):
@@ -157,21 +147,23 @@ async def test_investigate_wrong_phase_type(session_factory):
     assert evidence is None
 
 
-async def test_investigate_saves_evidence_to_db(session_factory):
+async def test_keep_evidence_saves_to_db(session_factory):
+    from madaminu.services.scenario_engine import keep_evidence
+
     game_id, phase_id, player_id = await _create_investigation_game(session_factory)
 
-    mock_response = json.dumps(MOCK_INVESTIGATION_RESULT, ensure_ascii=False)
-    mock_generate = AsyncMock(return_value=(mock_response, MOCK_USAGE))
+    discovery = {"id": str(uuid.uuid4()), "title": "血のついた手紙", "content": "手紙の内容"}
 
     async with session_factory() as db:
-        with patch("madaminu.services.scenario_engine.llm_client.generate_json", mock_generate):
-            await investigate_location(db, game_id, player_id, "garden")
+        evidence = await keep_evidence(db, game_id, player_id, discovery)
+
+    assert evidence.title == "血のついた手紙"
+    assert evidence.source == EvidenceSource.investigation
 
     async with session_factory() as db:
         result = await db.execute(select(Evidence).where(Evidence.game_id == game_id, Evidence.player_id == player_id))
         evidences = result.scalars().all()
         assert len(evidences) == 1
-        assert evidences[0].source == EvidenceSource.investigation
 
 
 async def test_investigate_uses_haiku_model(session_factory):

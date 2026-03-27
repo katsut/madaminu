@@ -120,6 +120,10 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 await _handle_investigate(db, room_code, player_id, data, websocket)
             elif msg_type == "investigate.select":
                 await _handle_investigate_select(db, room_code, player_id, data, websocket)
+            elif msg_type == "investigate.keep":
+                await _handle_investigate_keep(db, room_code, player_id, data, websocket)
+            elif msg_type == "investigate.tamper":
+                await _handle_investigate_tamper(db, room_code, player_id, data, websocket)
             elif msg_type == "room_message.send":
                 await _handle_room_message(db, room_code, player_id, data, websocket)
             elif msg_type == "vote.submit":
@@ -236,18 +240,34 @@ async def _handle_investigate_select(db: AsyncSession, room_code: str, player_id
             phase = phase_result.scalar_one_or_none()
             if phase and phase.phase_type == PhaseType.investigation:
                 try:
-                    evidence, usage = await investigate_location(db, game.id, player_id, location_id, feature)
-                    if evidence:
+                    discovery, usage = await investigate_location(db, game.id, player_id, location_id, feature)
+                    if discovery:
+                        pm.add_discovery(room_code, player_id, discovery)
+                        is_alone = _is_alone_at_location(pm, room_code, player_id, location_id)
                         await manager.send_to_player(
                             room_code,
                             player_id,
                             WSMessage(
-                                type="investigate.result",
-                                data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
+                                type="investigate.discovery",
+                                data={
+                                    "id": discovery["id"],
+                                    "title": discovery["title"],
+                                    "content": discovery["content"],
+                                    "can_tamper": is_alone,
+                                },
                             ),
                         )
                 except Exception:
                     logger.exception("Immediate investigation failed for %s", player_id)
+
+
+def _is_alone_at_location(pm, room_code: str, player_id: str, location_id: str) -> bool:
+    selections = pm.get_investigation_selections(room_code)
+    others = [
+        pid for pid, sel in selections.items()
+        if sel.get("location_id") == location_id and pid != player_id
+    ]
+    return len(others) == 0
 
 
 async def _broadcast_colocated_players(db: AsyncSession, room_code: str, location_id: str, pm):
@@ -311,6 +331,72 @@ async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, 
         WSMessage(
             type="investigate.result",
             data={"title": evidence.title, "content": evidence.content, "location_id": location_id},
+        ),
+    )
+
+
+async def _handle_investigate_keep(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    from madaminu.services.scenario_engine import keep_evidence
+
+    pm = _get_phase_manager(websocket)
+    if pm is None:
+        return
+
+    discovery_id = data.get("data", {}).get("discovery_id", "")
+    discoveries = pm.get_discoveries(room_code, player_id)
+    discovery = next((d for d in discoveries if d["id"] == discovery_id), None)
+    if discovery is None:
+        return
+
+    result = await db.execute(select(Game).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        return
+
+    evidence = await keep_evidence(db, game.id, player_id, discovery)
+    await manager.send_to_player(
+        room_code,
+        player_id,
+        WSMessage(
+            type="investigate.kept",
+            data={"id": evidence.id, "title": evidence.title, "content": evidence.content},
+        ),
+    )
+
+
+async def _handle_investigate_tamper(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+    from madaminu.services.scenario_engine import tamper_evidence
+
+    pm = _get_phase_manager(websocket)
+    if pm is None:
+        return
+
+    discovery_id = data.get("data", {}).get("discovery_id", "")
+    discoveries = pm.get_discoveries(room_code, player_id)
+    discovery = next((d for d in discoveries if d["id"] == discovery_id), None)
+    if discovery is None:
+        return
+
+    selections = pm.get_investigation_selections(room_code)
+    sel = selections.get(player_id, {})
+    location_id = sel.get("location_id")
+    if not location_id or not _is_alone_at_location(pm, room_code, player_id, location_id):
+        await websocket.send_json(WSMessage(type="error", data={"message": "同室に他のプレイヤーがいます"}).model_dump())
+        return
+
+    result = await db.execute(select(Game).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        return
+
+    tampered = await tamper_evidence(db, game.id, player_id, discovery)
+    pm.replace_discovery(room_code, player_id, discovery_id, tampered)
+    await manager.send_to_player(
+        room_code,
+        player_id,
+        WSMessage(
+            type="investigate.tampered",
+            data={"id": tampered["id"], "title": tampered["title"], "content": tampered["content"]},
         ),
     )
 

@@ -23,7 +23,7 @@ from madaminu.models import (
 
 logger = logging.getLogger(__name__)
 
-MAX_INVESTIGATIONS_PER_PHASE = 1
+MAX_DISCOVERIES_PER_PHASE = 5
 
 ROLE_MAP = {
     "criminal": PlayerRole.criminal,
@@ -213,20 +213,6 @@ async def investigate_location(
     if location is None:
         return None, None
 
-    count_result = await db.execute(
-        select(func.count())
-        .select_from(Evidence)
-        .where(
-            Evidence.game_id == game_id,
-            Evidence.player_id == player_id,
-            Evidence.phase_id == phase.id,
-            Evidence.source == EvidenceSource.investigation,
-        )
-    )
-    investigation_count = count_result.scalar_one()
-    if investigation_count >= MAX_INVESTIGATIONS_PER_PHASE:
-        return None, None
-
     player = next((p for p in game.players if p.id == player_id), None)
     if player is None:
         return None, None
@@ -265,20 +251,67 @@ async def investigate_location(
     if hint:
         content += f"\n\n💡 {hint}"
 
-    evidence = Evidence(
-        id=str(uuid.uuid4()),
-        game_id=game_id,
-        player_id=player_id,
-        phase_id=phase.id,
-        title=result.get("title", "調査結果"),
-        content=content,
-        source=EvidenceSource.investigation,
-    )
-    db.add(evidence)
     game.total_llm_cost_usd += usage.estimated_cost_usd
     await db.commit()
 
-    return evidence, usage
+    return {
+        "id": str(uuid.uuid4()),
+        "title": result.get("title", "調査結果"),
+        "content": content,
+        "location_name": location.get("name", location_id),
+    }, usage
+
+
+async def keep_evidence(
+    db: AsyncSession, game_id: str, player_id: str, discovery: dict,
+) -> Evidence:
+    result = await db.execute(select(Game).where(Game.id == game_id))
+    game = result.scalar_one()
+
+    evidence = Evidence(
+        id=discovery["id"],
+        game_id=game_id,
+        player_id=player_id,
+        phase_id=game.current_phase_id or "",
+        title=discovery["title"],
+        content=discovery["content"],
+        source=EvidenceSource.investigation,
+    )
+    db.add(evidence)
+    await db.commit()
+    return evidence
+
+
+async def tamper_evidence(
+    db: AsyncSession, game_id: str, player_id: str, discovery: dict,
+) -> dict:
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
+    game = result.scalar_one()
+
+    player = next((p for p in game.players if p.id == player_id), None)
+    if player is None:
+        return discovery
+
+    system_prompt = load_template("scenario_system")
+    user_prompt = render_template(
+        "tamper_evidence",
+        original_title=discovery["title"],
+        original_content=discovery["content"],
+        player_name=player.character_name or player.display_name,
+        location_name=discovery.get("location_name", ""),
+    )
+
+    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
+    result_data = _parse_scenario_json(raw_response)
+
+    game.total_llm_cost_usd += usage.estimated_cost_usd
+    await db.commit()
+
+    return {
+        "id": discovery["id"],
+        "title": result_data.get("title", discovery["title"]),
+        "content": result_data.get("content", discovery["content"]),
+    }
 
 
 async def generate_ending(db: AsyncSession, game_id: str) -> tuple[GameEnding, LLMUsage]:
