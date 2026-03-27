@@ -214,9 +214,11 @@ def _handle_investigate_select(room_code: str, player_id: str, data: dict, webso
     pm = _get_phase_manager(websocket)
     if pm is None:
         return
-    location_id = data.get("data", {}).get("location_id", "")
-    pm.set_investigation_selection(room_code, player_id, location_id if location_id else None)
-    logger.info("Player %s selected investigation location: %s", player_id, location_id or "(none)")
+    payload = data.get("data", {})
+    location_id = payload.get("location_id", "")
+    feature = payload.get("feature")
+    pm.set_investigation_selection(room_code, player_id, location_id if location_id else None, feature)
+    logger.info("Player %s selected: location=%s feature=%s", player_id, location_id or "(none)", feature or "(none)")
 
 
 async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
