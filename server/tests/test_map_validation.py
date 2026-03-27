@@ -13,6 +13,7 @@ VALID_SCENARIO = {
                     {"id": "entrance", "name": "玄関", "features": ["鏡"]},
                     {"id": "living", "name": "リビング", "features": ["暖炉"]},
                     {"id": "kitchen", "name": "台所", "features": ["包丁"]},
+                    {"id": "dining", "name": "食堂", "features": ["テーブル"]},
                 ],
             },
             {
@@ -20,18 +21,34 @@ VALID_SCENARIO = {
                 "rooms": [
                     {"id": "hallway", "name": "廊下", "features": ["窓"]},
                     {"id": "bedroom", "name": "寝室", "features": ["ベッド"]},
+                    {"id": "study", "name": "書斎", "features": ["金庫"]},
+                    {"id": "guest", "name": "客室", "features": ["鏡台"]},
+                ],
+            },
+            {
+                "id": "outside", "name": "屋外", "area_type": "outdoor",
+                "rooms": [
+                    {"id": "garden", "name": "庭園", "features": ["噴水"]},
+                    {"id": "shed", "name": "物置", "features": ["工具"]},
+                    {"id": "greenhouse", "name": "温室", "features": ["植物"]},
                 ],
             },
         ],
         "connections": [
             {"from": "entrance", "to": "living", "type": "door"},
             {"from": "living", "to": "kitchen", "type": "door"},
+            {"from": "kitchen", "to": "dining", "type": "door"},
             {"from": "entrance", "to": "hallway", "type": "stairs"},
             {"from": "hallway", "to": "bedroom", "type": "door"},
+            {"from": "hallway", "to": "study", "type": "door"},
+            {"from": "hallway", "to": "guest", "type": "door"},
+            {"from": "entrance", "to": "garden", "type": "door"},
+            {"from": "garden", "to": "shed", "type": "door"},
+            {"from": "garden", "to": "greenhouse", "type": "door"},
         ],
     },
     "phases": [
-        {"phase_type": "investigation", "investigation_locations": ["living", "kitchen", "bedroom"]},
+        {"phase_type": "investigation", "investigation_locations": ["living", "kitchen", "bedroom", "garden"]},
         {"phase_type": "discussion"},
         {"phase_type": "voting"},
     ],
