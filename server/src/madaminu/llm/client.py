@@ -46,6 +46,7 @@ class LLMClient:
     ) -> tuple[str, LLMUsage]:
         start = time.monotonic()
 
+        logger.info("LLM request: model=%s, max_tokens=%d, system_len=%d, user_len=%d", model, max_tokens, len(system_prompt), len(user_prompt))
         response = await self._client.chat.completions.create(
             model=model,
             max_completion_tokens=max_tokens,
@@ -57,10 +58,21 @@ class LLMClient:
 
         duration_ms = int((time.monotonic() - start) * 1000)
 
-        text = response.choices[0].message.content or ""
-        finish_reason = response.choices[0].finish_reason
+        choice = response.choices[0] if response.choices else None
+        if choice is None:
+            logger.error("LLM returned no choices")
+            return "", LLMUsage(model=model, input_tokens=0, output_tokens=0, duration_ms=int((time.monotonic() - start) * 1000))
+
+        text = choice.message.content or ""
+        finish_reason = choice.finish_reason
+        refusal = getattr(choice.message, "refusal", None)
+
+        if refusal:
+            logger.error("LLM refused request: %s", refusal)
         if finish_reason == "length":
             logger.warning("LLM response truncated (max_tokens reached)")
+        if not text:
+            logger.error("LLM returned empty content. finish_reason=%s, refusal=%s", finish_reason, refusal)
         logger.info("LLM finish_reason=%s, response_length=%d", finish_reason, len(text))
         usage = LLMUsage(
             model=model,
