@@ -6,7 +6,7 @@ struct IntroView: View {
     @State private var currentPage = 0
     @State private var selectedPlayer: PlayerInfo?
 
-    private let pageCount = 8
+    private let pageCount = 9
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,8 +20,9 @@ struct IntroView: View {
                 case 3: myPublicInfoPage
                 case 4: mySecretPage
                 case 5: myObjectivePage
-                case 6: allCharactersPage
-                case 7: readyPage
+                case 6: myEvidencePage
+                case 7: allCharactersPage
+                case 8: readyPage
                 default: EmptyView()
                 }
             }
@@ -362,7 +363,47 @@ struct IntroView: View {
         }
     }
 
-    // MARK: - Page 7: All Characters
+    // MARK: - Page 7: My Evidence
+
+    private var myEvidencePage: some View {
+        VStack(spacing: Spacing.lg) {
+            Spacer()
+
+            Text("あなたの手がかり")
+                .font(.mdLargeTitle)
+                .foregroundStyle(Color.mdInfo)
+
+            Text("事件発生時にあなたが持っている情報です")
+                .font(.mdCaption)
+                .foregroundStyle(Color.mdTextMuted)
+
+            if store.notebook.evidences.isEmpty {
+                ProgressView()
+                    .tint(Color.mdPrimary)
+                Text("手がかりを準備中...")
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdTextMuted)
+            } else {
+                ForEach(store.notebook.evidences) { evidence in
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Text(evidence.title)
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdPrimary)
+                            Text(evidence.content)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                }
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Page 8: All Characters
 
     private var allCharactersPage: some View {
         VStack(spacing: 0) {

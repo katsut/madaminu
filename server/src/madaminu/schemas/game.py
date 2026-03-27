@@ -62,11 +62,24 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
         "map_url": f"/api/v1/images/game/{game.room_code}/map" if game.scenario_skeleton and "map" in game.scenario_skeleton else None,
     }
 
+    from madaminu.models import Evidence
+
     current_player = next((p for p in game.players if p.id == player_id), None)
     if current_player:
         state["my_secret_info"] = current_player.secret_info
         state["my_objective"] = current_player.objective
         state["my_role"] = current_player.role
+
+    ev_result = await db.execute(
+        select(Evidence)
+        .where(Evidence.game_id == game.id, Evidence.player_id == player_id)
+        .order_by(Evidence.revealed_at)
+    )
+    my_evidences = ev_result.scalars().all()
+    state["my_evidences"] = [
+        {"evidence_id": e.id, "title": e.title, "content": e.content, "source": e.source}
+        for e in my_evidences
+    ]
 
     if game.current_phase_id:
         phase_info = await _get_current_phase_dict(db, game.current_phase_id)

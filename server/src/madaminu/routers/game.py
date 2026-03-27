@@ -174,28 +174,7 @@ async def _generate_scenario_background(
                 room_code, WSMessage(type="progress", data={"step": "scenario", "status": "done"})
             )
 
-        # Step 2: Generate initial evidence/alibis
-        try:
-            from madaminu.services.scenario_engine import generate_initial_evidence
-
-            async with session_factory() as db:
-                distributed, ev_usage = await generate_initial_evidence(db, game_id)
-                logger.info("Initial evidence generated: %d items", len(distributed))
-
-            if ws_manager:
-                for item in distributed:
-                    await ws_manager.send_to_player(
-                        room_code,
-                        item["player_id"],
-                        WSMessage(
-                            type="evidence.received",
-                            data={"evidence_id": item["evidence_id"], "title": item["title"], "content": item["content"]},
-                        ),
-                    )
-        except Exception:
-            logger.exception("Initial evidence generation failed for %s", room_code)
-
-        # Step 3: Start first phase
+        # Step 2: Start first phase
         if phase_manager:
             await phase_manager.start_first_phase(game_id, room_code)
 
