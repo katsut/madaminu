@@ -21,7 +21,9 @@ struct WSMessageAdapter {
             }
         case "game.ready":
             store.game.allReady = true
-            store.screen = .intro
+            if store.game.scenarioSetting.sceneImageUrl != nil {
+                store.screen = .intro
+            }
         case "phase.started":
             applyPhaseStarted(data, store: store)
         case "phase.timer":
@@ -137,7 +139,7 @@ struct WSMessageAdapter {
         }
 
         if status == "playing" || status == "voting" {
-            if store.screen == .generating || store.screen == .lobby {
+            if (store.screen == .generating || store.screen == .lobby) && store.game.allReady && store.game.scenarioSetting.sceneImageUrl != nil {
                 store.screen = .intro
             } else if store.screen == .home {
                 // Rejoin mid-game: skip intro, go directly to playing
