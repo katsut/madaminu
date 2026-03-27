@@ -102,8 +102,10 @@ struct WSMessageAdapter {
             if let countStr = data["count"], let count = Int(countStr) {
                 store.game.introReadyCount = count
             }
-        case "intro.all_ready":
-            store.screen = .playing
+        case "intro.start_game":
+            if store.screen == .intro {
+                store.screen = .playing
+            }
         case "game.ending":
             applyEnding(data, store: store)
         case "error":
