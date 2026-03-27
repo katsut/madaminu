@@ -244,9 +244,37 @@ struct IntroView: View {
                                 .font(.mdCaption)
                                 .foregroundStyle(Color.mdTextMuted)
                         }
+                        if let publicInfo = me.publicInfo, !publicInfo.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text("この集まりでの立場")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdPrimary)
+                                Text(publicInfo)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, Spacing.lg)
+
+                // Other players' public info
+                ForEach(store.room.players.filter { $0.id != store.room.playerId }) { player in
+                    if let publicInfo = player.publicInfo, !publicInfo.isEmpty {
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                Text(player.characterName ?? player.displayName)
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                Text(publicInfo)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                            }
+                        }
+                        .padding(.horizontal, Spacing.lg)
+                    }
+                }
             }
 
             Spacer()
@@ -575,6 +603,10 @@ struct PlayerDetailSheet: View {
 
                     if let background = player.characterBackground {
                         detailCard("経歴", icon: "book", text: background)
+                    }
+
+                    if let publicInfo = player.publicInfo, !publicInfo.isEmpty {
+                        detailCard("この集まりでの立場", icon: "person.2", text: publicInfo)
                     }
                 }
                 .padding(Spacing.lg)
