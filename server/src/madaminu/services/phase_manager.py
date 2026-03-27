@@ -77,7 +77,7 @@ class PhaseManager:
             if not phases:
                 raise ValueError("No phases found for game")
 
-            first_phase = phases[0]
+            first_phase = next((p for p in phases if p.duration_sec > 0), phases[0])
             first_phase.started_at = datetime.utcnow()
             first_phase.deadline_at = datetime.utcnow() + timedelta(seconds=first_phase.duration_sec)
 
@@ -403,7 +403,8 @@ class PhaseManager:
         else:
             total_turns = max(1, (total_phases - 1) // 3)
 
-        turn_number = phase.phase_order // 3 + 1
+        adjusted_order = max(0, phase.phase_order - 2)  # skip initial + opening
+        turn_number = adjusted_order // 3 + 1
 
         await manager.broadcast(
             room_code,

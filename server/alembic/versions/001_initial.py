@@ -75,7 +75,7 @@ def upgrade() -> None:
         "phases",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("game_id", sa.String(), nullable=False),
-        sa.Column("phase_type", sa.Enum("planning", "investigation", "discussion", "voting", name="phasetype"), nullable=False),
+        sa.Column("phase_type", sa.Enum("initial", "opening", "planning", "investigation", "discussion", "voting", name="phasetype"), nullable=False),
         sa.Column("phase_order", sa.Integer(), nullable=False),
         sa.Column("duration_sec", sa.Integer(), nullable=False),
         sa.Column("scenario_update", sa.JSON(), nullable=True),

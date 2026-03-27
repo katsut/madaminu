@@ -107,10 +107,10 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
 
     await db.flush()
 
-    first_phase_result = await db.execute(
-        select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order).limit(1)
+    initial_phase_result = await db.execute(
+        select(Phase).where(Phase.game_id == game.id, Phase.phase_type == PhaseType.initial).limit(1)
     )
-    first_phase = first_phase_result.scalar_one()
+    initial_phase = initial_phase_result.scalar_one()
 
     for sp in scenario["players"]:
         player = name_to_player.get(sp["character_name"])
@@ -123,7 +123,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
                 id=str(uuid.uuid4()),
                 game_id=game.id,
                 player_id=player.id,
-                phase_id=first_phase.id,
+                phase_id=initial_phase.id,
                 title=initial_ev.get("title", "証拠"),
                 content=initial_ev.get("content", ""),
                 source=EvidenceSource.gm_push,
@@ -135,7 +135,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
                 id=str(uuid.uuid4()),
                 game_id=game.id,
                 player_id=player.id,
-                phase_id=first_phase.id,
+                phase_id=initial_phase.id,
                 title=initial_alibi.get("title", "アリバイ"),
                 content=initial_alibi.get("content", ""),
                 source=EvidenceSource.gm_push,
@@ -503,6 +503,24 @@ PHASE_DURATIONS = {
 def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
     turn_count = game.turn_count or 3
     phase_order = 0
+
+    initial_phase = Phase(
+        game_id=game.id,
+        phase_type=PhaseType.initial,
+        phase_order=phase_order,
+        duration_sec=0,
+    )
+    db.add(initial_phase)
+    phase_order += 1
+
+    opening_phase = Phase(
+        game_id=game.id,
+        phase_type=PhaseType.opening,
+        phase_order=phase_order,
+        duration_sec=0,
+    )
+    db.add(opening_phase)
+    phase_order += 1
 
     for _turn in range(turn_count):
         for phase_type in (PhaseType.planning, PhaseType.investigation, PhaseType.discussion):

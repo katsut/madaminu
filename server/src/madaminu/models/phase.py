@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 
 class PhaseType(enum.StrEnum):
+    initial = "initial"
+    opening = "opening"
     planning = "planning"
     investigation = "investigation"
     discussion = "discussion"

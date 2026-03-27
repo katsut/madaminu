@@ -88,7 +88,7 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
                 select(func.count()).select_from(Phase).where(Phase.game_id == game.id)
             )
             phase_info["total_phases"] = total_result.scalar_one()
-            phase_info["turn_number"] = phase_info["phase_order"] // 3 + 1
+            phase_info["turn_number"] = max(1, (phase_info["phase_order"] - 2) // 3 + 1)
             phase_info["total_turns"] = game.turn_count or 3
             state["current_phase"] = phase_info
 
