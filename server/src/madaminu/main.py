@@ -71,7 +71,7 @@ async def _cleanup_old_rooms():
         logger.exception("Room cleanup failed")
 
 
-DEPLOY_VERSION = "2026-03-27T04"
+DEPLOY_VERSION = "2026-03-27T05"
 
 
 @app.get("/health")
