@@ -312,6 +312,16 @@ struct CharacterCreationView: View {
                 .foregroundStyle(Color.mdTextSecondary)
 
             MDCard {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(Color.mdInfo)
+                    Text("作成後、AIによるプロフィールの調整が入る場合があります")
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdTextMuted)
+                }
+            }
+
+            MDCard {
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     confirmRow("名前", value: characterName)
                     Divider()
