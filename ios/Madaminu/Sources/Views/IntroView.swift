@@ -414,6 +414,14 @@ struct IntroView: View {
 
     // MARK: - Page 8: Ready
 
+    private var humanPlayers: [PlayerInfo] {
+        store.room.players.filter { !$0.isAI }
+    }
+
+    private var allIntroReady: Bool {
+        humanPlayers.count > 0 && store.game.introReadyCount >= humanPlayers.count
+    }
+
     private var readyPage: some View {
         VStack(spacing: Spacing.lg) {
             Spacer()
@@ -422,29 +430,42 @@ struct IntroView: View {
                 .font(.system(size: 80))
                 .foregroundStyle(store.game.introReady ? Color.mdSuccess : Color.mdPrimary)
 
-            Text(store.game.introReady ? "準備完了！" : "準備はいいですか？")
+            Text("準備はいいですか？")
                 .font(.mdLargeTitle)
                 .foregroundStyle(Color.mdPrimary)
 
-            Text("全員の情報を確認しましたか？\n全員が準備完了すると調査計画フェーズが始まります。")
+            Text("全員の情報を確認しましたか？\n全員が準備完了するとゲームを開始できます。")
                 .font(.mdBody)
                 .foregroundStyle(Color.mdTextSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.lg)
 
-            Text("\(store.game.introReadyCount)/\(store.room.players.filter { !$0.isAI }.count) 人が準備完了")
+            Text("\(store.game.introReadyCount)/\(humanPlayers.count) 人が準備完了")
                 .font(.mdHeadline)
                 .foregroundStyle(Color.mdTextMuted)
 
             Spacer()
 
-            if !store.game.introReady {
-                MDButton("準備完了") {
-                    store.dispatch(.introReady)
+            HStack(spacing: Spacing.sm) {
+                if !store.game.introReady {
+                    MDButton("準備完了") {
+                        store.dispatch(.introReady)
+                    }
+                } else {
+                    MDButton("準備取消", style: .secondary) {
+                        store.dispatch(.introUnready)
+                    }
                 }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.bottom, Spacing.md)
+
+                if store.room.isHost {
+                    MDButton("ゲーム開始", style: allIntroReady ? .primary : .ghost) {
+                        store.dispatch(.dismissIntro)
+                    }
+                    .disabled(!allIntroReady)
+                }
             }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.bottom, Spacing.md)
         }
     }
 

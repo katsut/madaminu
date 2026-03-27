@@ -9,6 +9,7 @@ enum AppAction {
     case startGame
     case dismissIntro
     case introReady
+    case introUnready
     case requestSpeech
     case releaseSpeech
     case investigate(locationId: String)
