@@ -35,6 +35,10 @@ COLORS = {
     "stairs_fill": "#2a2240",
     "stairs_stroke": "#9977bb",
     "stairs_step": "#7755aa",
+    "crime_scene": "#3a1515",
+    "crime_scene_stroke": "#cc3333",
+    "meeting": "#1a2a1a",
+    "meeting_stroke": "#44aa66",
     "edge": "#444466",
     "branch_edge": "#555577",
     "text": "#e0e0e8",
@@ -61,7 +65,7 @@ def _node_size(node: dict) -> tuple[int, int]:
     """Return (width, height) in pixels based on node size and type."""
     ntype = node.get("type", "room")
     if ntype in ("passage", "entrance", "stairs"):
-        return CELL, CELL
+        return PASSAGE_W, PASSAGE_H
     size = node.get("size", 1)
     if size >= 4:
         return CELL * 2, CELL * 2
@@ -77,10 +81,21 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
     if not areas:
         return _empty_svg()
 
+    # Normalize: support both "nodes"/"edges" and "rooms"/"connections" formats
+    for area in areas:
+        if "nodes" not in area and "rooms" in area:
+            area["nodes"] = area["rooms"]
+        if "edges" not in area and "connections" not in area:
+            area["edges"] = []
+
+    connections = map_data.get("connections", [])
+
     # Build node lookup
     all_nodes: dict[str, dict] = {}
     for area in areas:
         for node in area.get("nodes", []):
+            if "type" not in node:
+                node["type"] = node.get("room_type", "room")
             all_nodes[node["id"]] = node
 
     # Layout each area
@@ -91,12 +106,18 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
 
     for area in areas:
         nodes = area.get("nodes", [])
+        area_conns = area.get("connections", [])
         edges = area.get("edges", [])
+        if not edges and area_conns:
+            edges = [[c.get("from", ""), c.get("to", "")] for c in area_conns]
+        if not edges and connections:
+            node_ids = {n["id"] for n in nodes}
+            edges = [[c.get("from", ""), c.get("to", "")] for c in connections if c.get("from") in node_ids and c.get("to") in node_ids]
         area_type = area.get("area_type", "indoor")
 
         # Find backbone: chain of passage/entrance/stairs nodes
         passage_ids = {n["id"] for n in nodes if n.get("type") in ("passage", "entrance", "stairs")}
-        room_ids = {n["id"] for n in nodes if n.get("type") == "room"}
+        room_ids = {n["id"] for n in nodes if n.get("type") in ("room", "crime_scene", "meeting")}
         node_map = {n["id"]: n for n in nodes}
 
         # Build adjacency
@@ -427,12 +448,22 @@ def _draw_node(svg, node, pos, highlighted, area_type):
     elif ntype == "stairs":
         fill = COLORS["stairs_fill"]
         stroke = COLORS["stairs_stroke"]
+    elif ntype == "crime_scene":
+        fill = COLORS["crime_scene"]
+        stroke = COLORS["crime_scene_stroke"]
+    elif ntype == "meeting":
+        fill = COLORS["meeting"]
+        stroke = COLORS["meeting_stroke"]
     elif area_type == "outdoor":
         fill = COLORS["room_outdoor"]
         stroke = COLORS["room_outdoor_stroke"]
     else:
         fill = COLORS["room"]
         stroke = COLORS["room_stroke"]
+
+    sw = "2"
+    if ntype in ("crime_scene", "meeting"):
+        sw = "3"
 
     if highlighted:
         fill = COLORS["highlight_fill"]
@@ -442,8 +473,22 @@ def _draw_node(svg, node, pos, highlighted, area_type):
         "x": str(x), "y": str(y),
         "width": str(w), "height": str(h),
         "fill": fill, "stroke": stroke,
-        "stroke-width": "2", "rx": "4",
+        "stroke-width": sw, "rx": "4",
     })
+
+    # Crime scene marker
+    if ntype == "crime_scene" and not highlighted:
+        SubElement(rg, "text", {
+            "x": str(x + 6), "y": str(y + 10),
+            "fill": COLORS["crime_scene_stroke"], "font-size": "10",
+        }).text = "☠"
+
+    # Meeting room marker
+    if ntype == "meeting" and not highlighted:
+        SubElement(rg, "text", {
+            "x": str(x + 6), "y": str(y + 10),
+            "fill": COLORS["meeting_stroke"], "font-size": "10",
+        }).text = "👥"
 
     # Stairs decoration
     if ntype == "stairs" and not highlighted:
@@ -502,6 +547,8 @@ def _draw_legend(svg, x, y, total_w):
         (COLORS["passage"], COLORS["passage_stroke"], "廊下"),
         (COLORS["entrance"], COLORS["entrance_stroke"], "玄関"),
         (COLORS["stairs_fill"], COLORS["stairs_stroke"], "階段"),
+        (COLORS["crime_scene"], COLORS["crime_scene_stroke"], "☠現場"),
+        (COLORS["meeting"], COLORS["meeting_stroke"], "👥集合"),
     ]
     for fill, stroke, label in items:
         SubElement(svg, "rect", {
