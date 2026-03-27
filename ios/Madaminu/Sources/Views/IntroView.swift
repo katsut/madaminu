@@ -76,7 +76,7 @@ struct IntroView: View {
                     .padding(.top, Spacing.xl)
 
                 if let urlString = store.game.scenarioSetting.sceneImageUrl,
-                   let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=512") {
                     AsyncImage(url: url) { image in
                         image.resizable().aspectRatio(contentMode: .fill)
                     } placeholder: {
@@ -118,7 +118,7 @@ struct IntroView: View {
                     .padding(.top, Spacing.xl)
 
                 if let urlString = store.game.scenarioSetting.victimImageUrl,
-                   let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=200") {
                     ZStack {
                         AsyncImage(url: url) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
@@ -183,7 +183,7 @@ struct IntroView: View {
 
                 if let me {
                     if let urlString = me.portraitUrl,
-                       let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                       let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=200") {
                         AsyncImage(url: url) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {
@@ -447,7 +447,7 @@ struct IntroView: View {
     @ViewBuilder
     private func playerAvatar(_ player: PlayerInfo) -> some View {
         if let urlString = player.portraitUrl,
-           let url = URL(string: APIClient.defaultBaseURL + urlString) {
+           let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
             AsyncImage(url: url) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
@@ -551,7 +551,7 @@ struct PlayerDetailSheet: View {
                     }
 
                     if let urlString = player.portraitUrl,
-                       let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                       let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=200") {
                         AsyncImage(url: url) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {

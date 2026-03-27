@@ -161,7 +161,7 @@ struct NotebookView: View {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
                             HStack(spacing: Spacing.sm) {
                                 if let urlString = player.portraitUrl,
-                                   let url = URL(string: APIClient.defaultBaseURL + urlString) {
+                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
                                     AsyncImage(url: url) { image in
                                         image.resizable().aspectRatio(contentMode: .fill)
                                     } placeholder: {
