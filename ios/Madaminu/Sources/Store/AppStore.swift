@@ -187,6 +187,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             room.sessionToken = response.sessionToken
             room.isHost = true
             screen = .lobby
+            connectWebSocket()
             await performRefreshRoom()
         } catch {
             errorMessage = "ルーム作成に失敗しました"
@@ -211,6 +212,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             room.sessionToken = response.sessionToken
             room.isHost = false
             screen = .lobby
+            connectWebSocket()
             await performRefreshRoom()
         } catch {
             errorMessage = "ルームに参加できませんでした"
@@ -273,7 +275,6 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             if info.status == "generating" || info.status == "playing" || info.status == "voting" {
                 if screen == .lobby {
                     screen = .generating
-                    connectWebSocket()
                 }
             }
         } catch {
@@ -336,11 +337,9 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         do {
             try await api.startGame(roomCode: room.roomCode, sessionToken: token)
             screen = .generating
-            connectWebSocket()
         } catch let apiError as APIError {
             if case .requestFailed(let code, _) = apiError, code == 400 {
                 screen = .generating
-                connectWebSocket()
             } else {
                 errorMessage = "ゲーム開始に失敗しました"
             }
