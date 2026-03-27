@@ -141,16 +141,17 @@ struct GamePlayView: View {
                 .fill(store.game.isConnected ? Color.mdSuccess : Color.mdAccent)
                 .frame(width: 8, height: 8)
 
-            if store.room.isHost, store.screen != .ended {
-                Menu {
+            Menu {
+                Button("ホームに戻る", role: .destructive) { store.dispatch(.leaveRoom) }
+                if store.room.isHost, store.screen != .ended {
                     Button("フェーズを進める") { store.dispatch(.advancePhase) }
                     Button("時間を延長") { store.dispatch(.extendPhase) }
                     Button("デバッグ情報") { showDebug = true }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.mdTitle2)
-                        .foregroundStyle(Color.mdTextSecondary)
                 }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.mdTitle2)
+                    .foregroundStyle(Color.mdTextSecondary)
             }
         }
         .padding(.horizontal, Spacing.lg)
