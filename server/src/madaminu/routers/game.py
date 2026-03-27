@@ -227,10 +227,20 @@ async def _generate_scenario_background(
             await ws_manager.broadcast(room_code, WSMessage(type="game.ready", data={"room_code": room_code}))
     except Exception:
         logger.exception("Background scenario generation failed for game %s", game_id)
+        try:
+            async with session_factory() as db:
+                result = await db.execute(select(Game).where(Game.id == game_id))
+                game = result.scalar_one_or_none()
+                if game and game.status == GameStatus.generating:
+                    game.status = GameStatus.waiting
+                    await db.commit()
+                    logger.info("Reset game %s to waiting after generation failure", room_code)
+        except Exception:
+            logger.exception("Failed to reset game status for %s", game_id)
         if ws_manager:
             await ws_manager.broadcast(
                 room_code,
-                WSMessage(type="error", data={"message": "Scenario generation failed"}),
+                WSMessage(type="game.generation_failed", data={"room_code": room_code}),
             )
 
 
@@ -292,7 +302,7 @@ async def start_game(
         if pm:
             await pm.start_first_phase(game.id, room_code)
 
-        await db.refresh(game, ["players"])
+        await db.refresh(game)
         for player in game.players:
             state = await build_game_state(db, game, player.id)
             await ws_manager.send_to_player(room_code, player.id, WSMessage(type="game.state", data=state))

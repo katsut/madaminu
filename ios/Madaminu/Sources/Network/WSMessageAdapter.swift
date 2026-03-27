@@ -21,8 +21,8 @@ struct WSMessageAdapter {
             }
         case "game.ready":
             store.game.allReady = true
-            if store.game.scenarioSetting.sceneImageUrl != nil {
-                store.screen = .intro
+            if store.screen == .generating {
+                store.screen = store.game.scenarioSetting.sceneImageUrl != nil ? .intro : .playing
             }
         case "phase.started":
             applyPhaseStarted(data, store: store)
@@ -130,15 +130,15 @@ struct WSMessageAdapter {
             if store.screen == .intro {
                 store.screen = .playing
             }
+        case "game.generation_failed":
+            store.setError("シナリオ生成に失敗しました。もう一度お試しください。", level: .transient)
+            store.game.reset()
+            store.screen = .lobby
         case "game.ending":
             applyEnding(data, store: store)
         case "error":
             if let msg = data["message"] {
-                if msg.contains("Scenario") || msg.contains("generation") || msg.contains("failed") {
-                    store.setError(msg, level: .fatal)
-                } else {
-                    store.setError(msg, level: .transient)
-                }
+                store.setError(msg, level: .transient)
             }
         default:
             break

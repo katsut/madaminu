@@ -353,9 +353,11 @@ final class AppStore: ObservableObject, @unchecked Sendable {
                 screen = .generating
             } else {
                 errorMessage = "ゲーム開始に失敗しました"
+                screen = .lobby
             }
         } catch {
             errorMessage = "ゲーム開始に失敗しました"
+            screen = .lobby
         }
 
         room.progressMessage = nil
