@@ -26,7 +26,8 @@ class PhaseManager:
         self._timers: dict[str, asyncio.Task] = {}
         self._investigation_selections: dict[str, dict[str, dict]] = {}
         self._discoveries: dict[str, dict[str, list[dict]]] = {}
-        self._intro_ready: dict[str, set[str]] = {}  # room_code -> set of player_ids
+        self._intro_ready: dict[str, set[str]] = {}
+        self._paused: dict[str, int] = {}  # game_id -> remaining_sec when paused
 
     def set_investigation_selection(self, room_code: str, player_id: str, location_id: str | None, feature: str | None = None):
         if room_code not in self._investigation_selections:
@@ -132,12 +133,19 @@ class PhaseManager:
         if current_phase.phase_type != PhaseType.planning:
             await self._run_phase_adjustment(game_id, room_code, current_phase.id)
 
+        if next_phase.phase_type == PhaseType.investigation:
+            await self._generate_room_discoveries(game_id, room_code)
+            async with self._session_factory() as db:
+                phase_result = await db.execute(select(Phase).where(Phase.id == next_phase.id))
+                next_phase = phase_result.scalar_one()
+                next_phase.started_at = datetime.utcnow()
+                next_phase.deadline_at = datetime.utcnow() + timedelta(seconds=next_phase.duration_sec)
+                await db.commit()
+
         await self._broadcast_phase_started(room_code, next_phase)
         self._start_timer(game_id, room_code, next_phase)
 
-        if next_phase.phase_type == PhaseType.investigation:
-            asyncio.create_task(self._generate_room_discoveries(game_id, room_code))
-        else:
+        if next_phase.phase_type != PhaseType.investigation:
             asyncio.create_task(self._schedule_ai_speeches(game_id, room_code, next_phase))
 
         return next_phase
@@ -166,6 +174,51 @@ class PhaseManager:
             ),
         )
         return phase
+
+    async def pause_phase(self, game_id: str, room_code: str):
+        from madaminu.ws.handler import manager
+
+        self._cancel_timer(game_id)
+
+        async with self._session_factory() as db:
+            game_result = await db.execute(select(Game).where(Game.id == game_id))
+            game = game_result.scalar_one()
+            phase_result = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
+            phase = phase_result.scalar_one()
+
+            elapsed = (datetime.utcnow() - phase.started_at).total_seconds() if phase.started_at else 0
+            remaining = max(0, phase.duration_sec - int(elapsed))
+            self._paused[game_id] = remaining
+
+        await manager.broadcast(
+            room_code,
+            WSMessage(type="phase.paused", data={"remaining_sec": remaining}),
+        )
+
+    async def resume_phase(self, game_id: str, room_code: str):
+        from madaminu.ws.handler import manager
+
+        remaining = self._paused.pop(game_id, None)
+        if remaining is None:
+            return
+
+        async with self._session_factory() as db:
+            game_result = await db.execute(select(Game).where(Game.id == game_id))
+            game = game_result.scalar_one()
+            phase_result = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
+            phase = phase_result.scalar_one()
+
+            phase.started_at = datetime.utcnow()
+            phase.duration_sec = remaining
+            phase.deadline_at = datetime.utcnow() + timedelta(seconds=remaining)
+            await db.commit()
+
+        self._start_timer(game_id, room_code, phase)
+
+        await manager.broadcast(
+            room_code,
+            WSMessage(type="phase.resumed", data={"remaining_sec": remaining}),
+        )
 
     def cleanup_game(self, game_id: str):
         self._cancel_timer(game_id)

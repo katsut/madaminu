@@ -22,6 +22,8 @@ enum AppAction {
     case vote(suspectId: String)
     case advancePhase
     case extendPhase
+    case pausePhase
+    case resumePhase
     case fetchRooms
     case fetchMyRooms
     case deleteRoom(roomCode: String)
