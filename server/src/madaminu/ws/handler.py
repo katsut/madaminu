@@ -119,7 +119,7 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
             elif msg_type == "investigate":
                 await _handle_investigate(db, room_code, player_id, data, websocket)
             elif msg_type == "investigate.select":
-                _handle_investigate_select(room_code, player_id, data, websocket)
+                await _handle_investigate_select(db, room_code, player_id, data, websocket)
             elif msg_type == "room_message.send":
                 await _handle_room_message(db, room_code, player_id, data, websocket)
             elif msg_type == "vote.submit":
@@ -212,7 +212,7 @@ async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str,
         await pm.extend_phase(game.id, room_code)
 
 
-def _handle_investigate_select(room_code: str, player_id: str, data: dict, websocket: WebSocket):
+async def _handle_investigate_select(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
     pm = _get_phase_manager(websocket)
     if pm is None:
         return
@@ -221,6 +221,38 @@ def _handle_investigate_select(room_code: str, player_id: str, data: dict, webso
     feature = payload.get("feature")
     pm.set_investigation_selection(room_code, player_id, location_id if location_id else None, feature)
     logger.info("Player %s selected: location=%s feature=%s", player_id, location_id or "(none)", feature or "(none)")
+
+    if location_id:
+        await _broadcast_colocated_players(db, room_code, location_id, pm)
+
+
+async def _broadcast_colocated_players(db: AsyncSession, room_code: str, location_id: str, pm):
+    selections = pm.get_investigation_selections(room_code)
+    colocated_ids = [
+        pid for pid, sel in selections.items()
+        if sel.get("location_id") == location_id
+    ]
+    if len(colocated_ids) < 2:
+        return
+
+    result = await db.execute(select(Player).where(Player.id.in_(colocated_ids)))
+    players = result.scalars().all()
+    player_list = [
+        {
+            "player_id": p.id,
+            "character_name": p.character_name or p.display_name,
+            "portrait_url": f"/api/v1/images/player/{p.id}" if p.portrait_image else None,
+        }
+        for p in players
+    ]
+
+    for pid in colocated_ids:
+        others = [p for p in player_list if p["player_id"] != pid]
+        await manager.send_to_player(
+            room_code,
+            pid,
+            WSMessage(type="location.colocated", data={"players": others}),
+        )
 
 
 async def _handle_investigate(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
