@@ -37,15 +37,15 @@ CONNECTION_COLORS = {
 }
 
 
-def render_map_svg(map_data: dict) -> str:
+def render_map_svg(map_data: dict, highlight_room: str | None = None) -> str:
     """Render map data to SVG string. Supports both flat and hierarchical format."""
     areas = map_data.get("areas")
     if areas is None:
-        return _render_flat_map(map_data)
-    return _render_hierarchical_map(map_data)
+        return _render_flat_map(map_data, highlight_room)
+    return _render_hierarchical_map(map_data, highlight_room)
 
 
-def _render_hierarchical_map(map_data: dict) -> str:
+def _render_hierarchical_map(map_data: dict, highlight_room: str | None = None) -> str:
     areas = map_data.get("areas", [])
     connections = map_data.get("connections", [])
 
@@ -111,7 +111,7 @@ def _render_hierarchical_map(map_data: dict) -> str:
         area_type = area.get("area_type", "indoor")
         for room in area.get("rooms", []):
             pos = room_positions[room["id"]]
-            _draw_room(svg, room, pos["x"], pos["y"], area_type)
+            _draw_room(svg, room, pos["x"], pos["y"], area_type, highlighted=room["id"] == highlight_room)
 
     # Draw connections
     for conn in connections:
@@ -175,15 +175,26 @@ def _draw_area(svg: Element, layout: dict):
     text.text = area.get("name", area["id"])
 
 
-def _draw_room(svg: Element, room: dict, x: int, y: int, area_type: str):
-    room_colors = COLORS["room_outdoor"] if area_type == "outdoor" else COLORS["room"]
+def _draw_room(svg: Element, room: dict, x: int, y: int, area_type: str, highlighted: bool = False):
+    if highlighted:
+        fill = "#3a2a1a"
+        stroke = "#cc9944"
+        stroke_width = "2.5"
+    elif area_type == "outdoor":
+        fill = COLORS["room_outdoor"]["fill"]
+        stroke = COLORS["room_outdoor"]["stroke"]
+        stroke_width = "1.5"
+    else:
+        fill = COLORS["room"]["fill"]
+        stroke = COLORS["room"]["stroke"]
+        stroke_width = "1.5"
 
     SubElement(svg, "rect", {
         "x": str(x), "y": str(y),
         "width": str(ROOM_W), "height": str(ROOM_H),
-        "fill": room_colors["fill"],
-        "stroke": room_colors["stroke"],
-        "stroke-width": "1.5",
+        "fill": fill,
+        "stroke": stroke,
+        "stroke-width": stroke_width,
         "rx": "4",
     })
 
@@ -279,7 +290,7 @@ def _draw_connection(svg: Element, conn: dict, from_pos: dict, to_pos: dict):
         lt.text = label
 
 
-def _render_flat_map(map_data: dict) -> str:
+def _render_flat_map(map_data: dict, highlight_room: str | None = None) -> str:
     """Fallback renderer for old flat location format."""
     locations = map_data.get("locations", [])
     if not locations:
@@ -290,7 +301,7 @@ def _render_flat_map(map_data: dict) -> str:
         "areas": [{"id": "main", "name": "マップ", "area_type": "indoor", "rooms": locations}],
         "connections": map_data.get("connections", []),
     }
-    return _render_hierarchical_map(hierarchical)
+    return _render_hierarchical_map(hierarchical, highlight_room)
 
 
 def _empty_svg() -> str:

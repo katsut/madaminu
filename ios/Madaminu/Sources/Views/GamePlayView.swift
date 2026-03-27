@@ -290,8 +290,8 @@ struct SpeechButton: View {
 
 struct InvestigationPhaseView: View {
     @ObservedObject var store: AppStore
-    @State private var showMap = false
     @State private var selectedLocationId: String?
+    @State private var mapSvg: String?
 
     var body: some View {
         ScrollView {
@@ -309,10 +309,11 @@ struct InvestigationPhaseView: View {
                     TranscriptView(store: store)
                 }
 
-                if store.game.scenarioSetting.mapUrl != nil {
-                    MDButton("マップを見る", style: .ghost) {
-                        showMap = true
-                    }
+                // Embedded map
+                if mapSvg != nil {
+                    SVGWebView(svgContent: mapSvg!)
+                        .frame(height: 250)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
 
                 if let locations = store.game.currentPhase?.investigationLocations {
@@ -333,28 +334,34 @@ struct InvestigationPhaseView: View {
                                     store.dispatch(.selectInvestigation(locationId: location.id))
                                 }
                             }
+                            Task { await loadMap() }
                         } label: {
-                            MDCard {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                        Text(location.name)
-                                            .font(.mdHeadline)
-                                            .foregroundStyle(Color.mdTextPrimary)
-                                        Text(location.description)
+                            HStack {
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text(location.name)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    Text(location.description)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(isSelected ? Color.mdTextPrimary : Color.mdTextSecondary)
+                                    if let features = location.features, !features.isEmpty {
+                                        Text(features.joined(separator: "・"))
                                             .font(.mdCaption)
-                                            .foregroundStyle(Color.mdTextSecondary)
-                                        if let features = location.features, !features.isEmpty {
-                                            Text(features.joined(separator: "・"))
-                                                .font(.mdCaption)
-                                                .foregroundStyle(Color.mdTextMuted)
-                                        }
+                                            .foregroundStyle(Color.mdTextMuted)
                                     }
-                                    Spacer()
-                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                        .font(.mdTitle2)
-                                        .foregroundStyle(isSelected ? Color.mdSuccess : Color.mdTextMuted)
                                 }
+                                Spacer()
+                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(isSelected ? Color.mdSuccess : Color.mdTextMuted)
                             }
+                            .padding(Spacing.md)
+                            .background(isSelected ? Color.mdPrimary.opacity(0.15) : Color.mdSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: CornerRadius.md)
+                                    .stroke(isSelected ? Color.mdPrimary : Color.mdSurface, lineWidth: isSelected ? 2 : 0)
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -362,8 +369,21 @@ struct InvestigationPhaseView: View {
             }
             .padding(Spacing.lg)
         }
-        .sheet(isPresented: $showMap) {
-            MapSheetView(store: store)
+        .task { await loadMap() }
+    }
+
+    @MainActor private func loadMap() async {
+        guard let mapPath = store.game.scenarioSetting.mapUrl else { return }
+        var urlString = APIClient.defaultBaseURL + mapPath
+        if let locId = selectedLocationId {
+            urlString += "?highlight=\(locId)"
+        }
+        guard let url = URL(string: urlString) else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            mapSvg = String(data: data, encoding: .utf8)
+        } catch {
+            // ignore
         }
     }
 

@@ -86,7 +86,11 @@ async def get_victim_image(
 
 
 @router.get("/game/{room_code}/map")
-async def get_map_svg(room_code: str, db: AsyncSession = Depends(get_db)):
+async def get_map_svg(
+    room_code: str,
+    highlight: str = Query(default="", description="Room ID to highlight"),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Game).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
@@ -94,5 +98,5 @@ async def get_map_svg(room_code: str, db: AsyncSession = Depends(get_db)):
     if not game.scenario_skeleton or "map" not in game.scenario_skeleton:
         raise HTTPException(status_code=404, detail="Map not yet generated") from None
 
-    svg = render_map_svg(game.scenario_skeleton["map"])
-    return Response(content=svg, media_type="image/svg+xml", headers=CACHE_HEADERS)
+    svg = render_map_svg(game.scenario_skeleton["map"], highlight_room=highlight or None)
+    return Response(content=svg, media_type="image/svg+xml")
