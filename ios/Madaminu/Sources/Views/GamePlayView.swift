@@ -310,10 +310,19 @@ struct InvestigationPhaseView: View {
                 }
 
                 // Embedded map
-                if mapSvg != nil {
-                    SVGWebView(svgContent: mapSvg!)
-                        .frame(height: 250)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                if let svg = mapSvg {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        SVGWebView(svgContent: svg)
+                            .frame(width: 500, height: 220)
+                            .id(selectedLocationId ?? "none")
+                    }
+                    .frame(height: 220)
+                    .background(Color(red: 0.067, green: 0.067, blue: 0.094))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mdSurface, lineWidth: 1)
+                    )
                 }
 
                 if let locations = store.game.currentPhase?.investigationLocations {

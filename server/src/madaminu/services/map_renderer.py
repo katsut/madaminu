@@ -2,8 +2,8 @@
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-ROOM_W = 120
-ROOM_H = 50
+ROOM_W = 110
+ROOM_H = 36
 ROOM_GAP = 12
 AREA_PAD = 16
 AREA_GAP = 24
@@ -198,30 +198,18 @@ def _draw_room(svg: Element, room: dict, x: int, y: int, area_type: str, highlig
         "rx": "4",
     })
 
-    # Room name
+    # Room name (vertically centered)
     name_text = SubElement(svg, "text", {
         "x": str(x + ROOM_W // 2),
-        "y": str(y + 18),
+        "y": str(y + ROOM_H // 2 + 1),
         "text-anchor": "middle",
+        "dominant-baseline": "central",
         "fill": COLORS["text"],
         "font-size": str(FONT_SIZE),
         "font-weight": "bold",
         "font-family": "sans-serif",
     })
     name_text.text = room.get("name", room["id"])
-
-    # Features
-    features = room.get("features", [])
-    if features:
-        ft = SubElement(svg, "text", {
-            "x": str(x + ROOM_W // 2),
-            "y": str(y + 34),
-            "text-anchor": "middle",
-            "fill": COLORS["text_dim"],
-            "font-size": str(FEATURE_FONT),
-            "font-family": "sans-serif",
-        })
-        ft.text = "・".join(features[:3])
 
 
 def _draw_connection(svg: Element, conn: dict, from_pos: dict, to_pos: dict):
