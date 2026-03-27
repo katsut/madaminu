@@ -69,7 +69,7 @@ Create a complete scenario with the following structure (respond in JSON):
     {
       "character_name": "キャラクター名",
       "role": "criminal|witness|related|innocent",
-      "public_info": "他のプレイヤーに公開される情報（この集まりに来た理由、表向きの立場や目的など。2〜3文）",
+      "public_info": "他のプレイヤー全員に公開される情報。プロフィールや経歴とは別の、この事件・集まりに関する情報。3〜5文。",
       "secret_info": "このキャラクターの秘密（他のプレイヤーには見えない）",
       "objective": "このキャラクターの個人目的",
       "gm_notes": "GMがこの秘密を使ってシナリオを展開するためのメモ"
@@ -136,7 +136,14 @@ Include these enhanced profiles in the player data output (as part of gm_notes).
 - Each player should have at least one ally and one adversary among the other players
 - The criminal's objective should include hiding their crime while achieving a personal goal
 - Non-criminal players should have objectives that may conflict with finding the truth
-- public_info should give other players a reason to interact with this character (why they're here, their stated purpose)
+- public_info is NOT a repeat of the character profile. It is situation-specific information that all players can see:
+  - Why this character came to this gathering / event
+  - Who they arrived with or who invited them
+  - Their publicly known relationship to the victim or other characters
+  - What they were seen doing before the incident
+  - Their stated reason for being here
+  - Example: "被害者の古い友人として招待された。田中健二と一緒に来館し、到着時にロビーで他の客と談笑していた。夕食前に被害者と二人で書斎に入るのが目撃されている。"
+  - Each public_info should mention at least one other character by name
 
 ## Constraints
 
