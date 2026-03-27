@@ -83,6 +83,15 @@ actor APIClient {
         )
     }
 
+    func toggleReady(roomCode: String, sessionToken: String) async throws {
+        let body: [String: String] = [:]
+        let _: [String: Bool] = try await post(
+            "/api/v1/rooms/\(roomCode)/ready",
+            body: body,
+            headers: ["X-Session-Token": sessionToken]
+        )
+    }
+
     func listMyRooms() async throws -> [MyRoomItem] {
         return try await get("/api/v1/rooms/mine/list")
     }

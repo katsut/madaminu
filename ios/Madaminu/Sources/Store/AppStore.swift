@@ -37,6 +37,8 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             screen = .lobby
         case .createCharacter(let name, let gender, let age, let occupation, let appearance, let personality, let background):
             Task { @MainActor in await performCreateCharacter(name: name, gender: gender, age: age, occupation: occupation, appearance: appearance, personality: personality, background: background) }
+        case .toggleReady:
+            Task { @MainActor in await performToggleReady() }
         case .startGame:
             Task { @MainActor in await performStartGame() }
         case .dismissIntro:
@@ -189,6 +191,16 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         }
 
         isLoading = false
+    }
+
+    @MainActor private func performToggleReady() async {
+        guard let token = room.sessionToken else { return }
+        do {
+            try await api.toggleReady(roomCode: room.roomCode, sessionToken: token)
+            await performRefreshRoom()
+        } catch {
+            errorMessage = "準備状態の変更に失敗しました"
+        }
     }
 
     @MainActor private func performFetchRooms() async {
