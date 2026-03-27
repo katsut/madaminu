@@ -142,6 +142,11 @@ async def delete_room(room_code: str, x_device_id: str = Header(...), db: AsyncS
     if host is None or host.device_id != x_device_id:
         raise HTTPException(status_code=403, detail="Only the host can delete this room") from None
 
+    # Clear self-referencing FKs before cascade delete
+    game.host_player_id = None
+    game.current_phase_id = None
+    await db.flush()
+
     await db.delete(game)
     await db.commit()
     return {"status": "deleted"}
