@@ -50,6 +50,7 @@ actor APIClient {
         request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(sessionToken, forHTTPHeaderField: "X-Session-Token")
+        request.setValue(DeviceIdentifier.deviceId, forHTTPHeaderField: "X-Device-Id")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         try validateResponse(response, data: data)
@@ -82,6 +83,21 @@ actor APIClient {
         )
     }
 
+    func listMyRooms() async throws -> [MyRoomItem] {
+        return try await get("/api/v1/rooms/mine/list")
+    }
+
+    func deleteRoom(roomCode: String) async throws {
+        guard let url = URL(string: baseURL + "/api/v1/rooms/\(roomCode)") else {
+            throw APIError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue(DeviceIdentifier.deviceId, forHTTPHeaderField: "X-Device-Id")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response, data: data)
+    }
+
     func getDebugInfo(roomCode: String, sessionToken: String) async throws -> DebugInfoResponse {
         return try await get("/api/v1/rooms/\(roomCode)/debug", headers: ["X-Session-Token": sessionToken])
     }
@@ -92,6 +108,7 @@ actor APIClient {
         }
 
         var request = URLRequest(url: url)
+        request.setValue(DeviceIdentifier.deviceId, forHTTPHeaderField: "X-Device-Id")
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
@@ -113,6 +130,7 @@ actor APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(DeviceIdentifier.deviceId, forHTTPHeaderField: "X-Device-Id")
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }

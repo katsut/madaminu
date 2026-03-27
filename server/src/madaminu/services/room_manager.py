@@ -18,7 +18,7 @@ def _generate_room_code() -> str:
     return "".join(random.choices(chars, k=ROOM_CODE_LENGTH))
 
 
-async def create_room(db: AsyncSession, display_name: str, password: str | None = None) -> tuple[Game, Player]:
+async def create_room(db: AsyncSession, display_name: str, password: str | None = None, device_id: str | None = None) -> tuple[Game, Player]:
     for _ in range(10):
         code = _generate_room_code()
         existing = await db.execute(select(Game).where(Game.room_code == code))
@@ -39,6 +39,7 @@ async def create_room(db: AsyncSession, display_name: str, password: str | None 
     player = Player(
         id=str(uuid.uuid4()),
         game_id=game.id,
+        device_id=device_id,
         session_token=str(uuid.uuid4()),
         display_name=display_name,
         is_host=True,
@@ -56,7 +57,7 @@ async def create_room(db: AsyncSession, display_name: str, password: str | None 
 
 
 async def join_room(
-    db: AsyncSession, room_code: str, display_name: str, password: str | None = None
+    db: AsyncSession, room_code: str, display_name: str, password: str | None = None, device_id: str | None = None
 ) -> tuple[Game, Player]:
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
@@ -75,6 +76,7 @@ async def join_room(
     player = Player(
         id=str(uuid.uuid4()),
         game_id=game.id,
+        device_id=device_id,
         session_token=str(uuid.uuid4()),
         display_name=display_name,
         is_host=False,

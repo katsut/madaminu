@@ -58,6 +58,16 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             ws.send(type: "phase.extend")
         case .fetchRooms:
             Task { @MainActor in await performFetchRooms() }
+        case .fetchMyRooms:
+            Task { @MainActor in await performFetchMyRooms() }
+        case .deleteRoom(let roomCode):
+            Task { @MainActor in await performDeleteRoom(roomCode: roomCode) }
+        case .rejoinRoom(let sessionToken, let playerId, let roomCode):
+            room.sessionToken = sessionToken
+            room.playerId = playerId
+            room.roomCode = roomCode
+            screen = .lobby
+            Task { @MainActor in await performRefreshRoom() }
         case .refreshRoom:
             Task { @MainActor in await performRefreshRoom() }
         }
@@ -186,6 +196,23 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             room.availableRooms = try await api.listRooms()
         } catch {
             room.availableRooms = []
+        }
+    }
+
+    @MainActor private func performFetchMyRooms() async {
+        do {
+            room.myRooms = try await api.listMyRooms()
+        } catch {
+            room.myRooms = []
+        }
+    }
+
+    @MainActor private func performDeleteRoom(roomCode: String) async {
+        do {
+            try await api.deleteRoom(roomCode: roomCode)
+            room.myRooms.removeAll { $0.roomCode == roomCode }
+        } catch {
+            errorMessage = "ルームの削除に失敗しました"
         }
     }
 

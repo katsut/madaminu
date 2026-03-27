@@ -101,6 +101,29 @@ struct CharacterResponse: Codable, Sendable {
     }
 }
 
+struct MyRoomItem: Codable, Identifiable, Sendable {
+    var id: String { roomCode }
+    let roomCode: String
+    let status: String
+    let isHost: Bool
+    let displayName: String
+    let characterName: String?
+    let sessionToken: String
+    let playerId: String
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case roomCode = "room_code"
+        case status
+        case isHost = "is_host"
+        case displayName = "display_name"
+        case characterName = "character_name"
+        case sessionToken = "session_token"
+        case playerId = "player_id"
+        case createdAt = "created_at"
+    }
+}
+
 struct RoomListItem: Codable, Identifiable, Sendable {
     var id: String { roomCode }
     let roomCode: String

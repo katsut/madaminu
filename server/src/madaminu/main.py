@@ -1,15 +1,21 @@
+import asyncio
 import contextlib
+import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 from fastapi import Depends, FastAPI, WebSocket
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from madaminu.config import settings
 from madaminu.db import get_db
 from madaminu.db.database import async_session, engine
-from madaminu.models import Base
+from madaminu.models import Base, Game, GameStatus
 from madaminu.events import EventBus, ImagesReady, ScenarioReady
+
+logger = logging.getLogger(__name__)
 from madaminu.routers.characters import router as characters_router
 from madaminu.routers.game import router as game_router
 from madaminu.routers.images import router as images_router
@@ -32,6 +38,8 @@ async def lifespan(app: FastAPI):
         event_bus.on(ScenarioReady, lambda e: None)
         event_bus.on(ImagesReady, lambda e: None)
 
+        asyncio.create_task(_cleanup_old_rooms())
+
     yield
 
     if not settings.testing:
@@ -43,6 +51,24 @@ app.include_router(rooms_router)
 app.include_router(characters_router)
 app.include_router(game_router)
 app.include_router(images_router)
+
+
+async def _cleanup_old_rooms():
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    try:
+        async with async_session() as db:
+            result = await db.execute(
+                select(Game)
+                .where(Game.created_at < cutoff, Game.status.in_([GameStatus.ended, GameStatus.waiting]))
+            )
+            old_games = result.scalars().all()
+            for game in old_games:
+                await db.delete(game)
+            if old_games:
+                await db.commit()
+                logger.info("Cleaned up %d old rooms", len(old_games))
+    except Exception:
+        logger.exception("Room cleanup failed")
 
 
 @app.get("/health")
