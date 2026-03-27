@@ -97,13 +97,27 @@ class SpeechManager:
             ),
         )
 
-    async def broadcast_speech_released(self, room_code: str, player_id: str):
+    async def broadcast_speech_released(self, room_code: str, player_id: str, transcript: str = ""):
         from madaminu.ws.handler import manager
+
+        character_name = ""
+        if transcript:
+            async with self._session_factory() as db:
+                from madaminu.models import Player
+
+                result = await db.execute(select(Player).where(Player.id == player_id))
+                player = result.scalar_one_or_none()
+                if player:
+                    character_name = player.character_name or player.display_name
 
         await manager.broadcast(
             room_code,
             WSMessage(
                 type="speech.released",
-                data=SpeechReleasedData(player_id=player_id).model_dump(),
+                data={
+                    "player_id": player_id,
+                    "character_name": character_name,
+                    "transcript": transcript,
+                },
             ),
         )

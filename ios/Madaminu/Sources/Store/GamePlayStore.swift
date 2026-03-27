@@ -22,6 +22,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var keptDiscoveryId: String?
     @Published var revealedEvidences: [RevealedEvidence] = []
     @Published var hasRevealedEvidence = false
+    @Published var speechHistory: [SpeechEntry] = []
     @Published var introReady = false
     @Published var introReadyCount = 0
 
@@ -53,6 +54,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         keptDiscoveryId = nil
         revealedEvidences = []
         hasRevealedEvidence = false
+        speechHistory = []
         introReady = false
         introReadyCount = 0
         aiPlayersReady = false
