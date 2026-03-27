@@ -24,7 +24,8 @@ class PhaseManager:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self._session_factory = session_factory
         self._timers: dict[str, asyncio.Task] = {}
-        self._investigation_selections: dict[str, dict[str, dict]] = {}  # room_code -> {player_id: {location_id, feature}}
+        self._investigation_selections: dict[str, dict[str, dict]] = {}
+        self._discoveries: dict[str, dict[str, list[dict]]] = {}  # room_code -> {player_id: [discovery]}
 
     def set_investigation_selection(self, room_code: str, player_id: str, location_id: str | None, feature: str | None = None):
         if room_code not in self._investigation_selections:
@@ -36,6 +37,26 @@ class PhaseManager:
 
     def clear_investigation_selections(self, room_code: str):
         self._investigation_selections.pop(room_code, None)
+
+    def add_discovery(self, room_code: str, player_id: str, discovery: dict):
+        if room_code not in self._discoveries:
+            self._discoveries[room_code] = {}
+        if player_id not in self._discoveries[room_code]:
+            self._discoveries[room_code][player_id] = []
+        self._discoveries[room_code][player_id].append(discovery)
+
+    def get_discoveries(self, room_code: str, player_id: str) -> list[dict]:
+        return list(self._discoveries.get(room_code, {}).get(player_id, []))
+
+    def replace_discovery(self, room_code: str, player_id: str, discovery_id: str, new_discovery: dict):
+        discoveries = self._discoveries.get(room_code, {}).get(player_id, [])
+        for i, d in enumerate(discoveries):
+            if d["id"] == discovery_id:
+                discoveries[i] = new_discovery
+                break
+
+    def clear_discoveries(self, room_code: str):
+        self._discoveries.pop(room_code, None)
 
     async def start_first_phase(self, game_id: str, room_code: str) -> Phase:
         async with self._session_factory() as db:
@@ -94,7 +115,7 @@ class PhaseManager:
         await self._broadcast_phase_ended(room_code, current_phase, next_phase)
 
         if current_phase.phase_type == PhaseType.investigation:
-            await self._execute_investigation_selections(game_id, room_code)
+            self.clear_discoveries(room_code)
 
         await self._run_phase_adjustment(game_id, room_code, current_phase.id)
 
