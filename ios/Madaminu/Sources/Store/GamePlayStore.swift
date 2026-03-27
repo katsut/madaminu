@@ -13,6 +13,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var currentTranscript = ""
     @Published var isConnected = false
     @Published var showPhaseTransition = false
+    @Published var isPaused = false
     @Published var localRemainingSec: Int = 0
     @Published var selectedLocationId: String?
     @Published var selectedFeature: String?
@@ -45,6 +46,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         currentTranscript = ""
         isConnected = false
         showPhaseTransition = false
+        isPaused = false
         localRemainingSec = 0
         selectedLocationId = nil
         selectedFeature = nil

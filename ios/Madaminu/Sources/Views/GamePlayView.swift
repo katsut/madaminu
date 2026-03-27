@@ -75,7 +75,7 @@ struct GamePlayView: View {
     private func startLocalTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             DispatchQueue.main.async {
-                if store.game.localRemainingSec > 0 {
+                if store.game.localRemainingSec > 0 && !store.game.isPaused {
                     store.game.localRemainingSec -= 1
                 }
             }
@@ -144,6 +144,11 @@ struct GamePlayView: View {
             Menu {
                 Button("ホームに戻る", role: .destructive) { store.dispatch(.leaveRoom) }
                 if store.room.isHost, store.screen != .ended {
+                    if store.game.isPaused {
+                        Button("再開") { store.dispatch(.resumePhase) }
+                    } else {
+                        Button("一時停止") { store.dispatch(.pausePhase) }
+                    }
                     Button("フェーズを進める") { store.dispatch(.advancePhase) }
                     Button("時間を延長") { store.dispatch(.extendPhase) }
                     Button("デバッグ情報") { showDebug = true }

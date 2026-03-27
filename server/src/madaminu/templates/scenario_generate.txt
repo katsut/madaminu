@@ -186,6 +186,7 @@ Each player receives exactly 1 evidence card and 1 alibi card at the start:
   - **partner** フィールドに相手のキャラクター名を記載
   - **アリバイの整合性**: AのアリバイでpartnerがBなら、Bのアリバイでもpartnerが必ずAで、同じ内容であること
   - 犯人のアリバイは偽り（実際は犯行時間に不在だった）
+- **重複禁止**: initial_evidence と initial_alibi の内容は public_info と重複しないこと。public_info は公開情報、evidence/alibi は非公開の個人情報
 
 ## Constraints
 

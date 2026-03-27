@@ -82,6 +82,10 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             ws.send(type: "phase.advance")
         case .extendPhase:
             ws.send(type: "phase.extend")
+        case .pausePhase:
+            ws.send(type: "phase.pause")
+        case .resumePhase:
+            ws.send(type: "phase.resume")
         case .fetchRooms:
             Task { @MainActor in await performFetchRooms() }
         case .fetchMyRooms:

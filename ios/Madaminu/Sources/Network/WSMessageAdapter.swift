@@ -28,6 +28,13 @@ struct WSMessageAdapter {
             applyPhaseStarted(data, store: store)
         case "phase.timer":
             applyPhaseTimer(data, store: store)
+        case "phase.paused":
+            store.game.isPaused = true
+        case "phase.resumed":
+            store.game.isPaused = false
+            if let remainingStr = data["remaining_sec"], let remaining = Int(remainingStr) {
+                store.game.localRemainingSec = remaining
+            }
         case "phase.ended":
             store.game.currentPhase = nil
         case "speech.granted":

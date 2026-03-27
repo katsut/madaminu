@@ -116,7 +116,7 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 await _handle_intro_unready(room_code, player_id, websocket)
             elif msg_type == "intro.start_game":
                 await manager.broadcast(room_code, WSMessage(type="intro.start_game", data={}))
-            elif msg_type in ("phase.advance", "phase.extend"):
+            elif msg_type in ("phase.advance", "phase.extend", "phase.pause", "phase.resume"):
                 await _handle_host_command(db, room_code, player_id, msg_type, websocket)
             elif msg_type == "speech.request":
                 await _handle_speech_request(room_code, player_id, websocket)
@@ -275,6 +275,10 @@ async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str,
         await pm.advance_phase(game.id, room_code)
     elif msg_type == "phase.extend":
         await pm.extend_phase(game.id, room_code)
+    elif msg_type == "phase.pause":
+        await pm.pause_phase(game.id, room_code)
+    elif msg_type == "phase.resume":
+        await pm.resume_phase(game.id, room_code)
 
 
 async def _handle_investigate_select(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
