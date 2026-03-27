@@ -503,19 +503,50 @@ struct InvestigationPhaseView: View {
                     }
                 }
 
-                if let evidence = store.game.latestEvidence {
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            HStack {
-                                Image(systemName: "doc.text.magnifyingglass")
-                                    .foregroundStyle(Color.mdSuccess)
-                                Text(evidence.title)
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdPrimary)
+                if !store.game.discoveries.isEmpty {
+                    Text("発見物")
+                        .font(.mdHeadline)
+                        .foregroundStyle(Color.mdTextSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    ForEach(store.game.discoveries) { discovery in
+                        let isKept = store.game.keptDiscoveryId == discovery.id
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.sm) {
+                                HStack {
+                                    Image(systemName: discovery.isTampered ? "arrow.triangle.2.circlepath" : "doc.text.magnifyingglass")
+                                        .foregroundStyle(discovery.isTampered ? Color.mdWarning : Color.mdSuccess)
+                                    Text(discovery.title)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    Spacer()
+                                    if isKept {
+                                        Text("持ち帰り")
+                                            .font(.mdCaption2)
+                                            .foregroundStyle(Color.mdSuccess)
+                                            .padding(.horizontal, Spacing.xs)
+                                            .padding(.vertical, Spacing.xxs)
+                                            .background(Color.mdSuccess.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                    }
+                                }
+                                Text(discovery.content)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+
+                                if store.game.keptDiscoveryId == nil && !discovery.isTampered {
+                                    HStack(spacing: Spacing.sm) {
+                                        MDButton("持ち帰る", style: .primary) {
+                                            store.dispatch(.keepEvidence(discoveryId: discovery.id))
+                                        }
+                                        if discovery.canTamper {
+                                            MDButton("すり替える", style: .danger) {
+                                                store.dispatch(.tamperEvidence(discoveryId: discovery.id))
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                            Text(evidence.content)
-                                .font(.mdBody)
-                                .foregroundStyle(Color.mdTextPrimary)
                         }
                     }
                 }

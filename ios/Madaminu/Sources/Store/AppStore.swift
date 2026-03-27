@@ -61,6 +61,10 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             if let locationId = game.selectedLocationId {
                 ws.send(type: "investigate.select", data: ["location_id": locationId, "feature": feature])
             }
+        case .keepEvidence(let discoveryId):
+            ws.send(type: "investigate.keep", data: ["discovery_id": discoveryId])
+        case .tamperEvidence(let discoveryId):
+            ws.send(type: "investigate.tamper", data: ["discovery_id": discoveryId])
         case .sendRoomMessage(let text):
             ws.send(type: "room_message.send", data: ["text": text])
         case .vote(let suspectId):
