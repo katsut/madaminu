@@ -76,7 +76,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     from madaminu.services.map_builder import build_map_structure, generate_route_text
 
     raw_map = scenario.get("map", {})
-    complete_map = build_map_structure(raw_map)
+    complete_map = build_map_structure(raw_map, victim=scenario.get("victim"))
     route_text = generate_route_text(complete_map)
 
     game.scenario_skeleton = {

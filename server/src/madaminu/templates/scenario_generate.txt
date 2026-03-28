@@ -16,7 +16,8 @@ Create a complete scenario with the following structure (respond in JSON):
   },
   "victim": {
     "name": "被害者の名前",
-    "description": "被害者の説明"
+    "description": "被害者の説明",
+    "crime_scene_room_id": "殺害が行われた部屋のroom_id（mapのroomsのidと一致させる）"
   },
   "map": {
     "areas": [
@@ -64,7 +65,7 @@ Create a complete scenario with the following structure (respond in JSON):
   - size 1: features 3個（例: 机の引き出し、本棚、窓際）
   - size 2: features 6個（例: 暖炉、ソファ、書類棚、デスク、窓、絵画）
   - size 3: features 9個
-- **is_crime_scene**: 犯行現場なら true。**必ず1つだけ設定すること（設定忘れ厳禁）**
+- **is_crime_scene**: 不要（victim.crime_scene_room_id から自動設定される）
 
 ### Guidelines
 - 3〜5エリア、全体で調査可能な部屋を最低8個以上
