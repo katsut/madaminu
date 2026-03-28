@@ -121,18 +121,45 @@ async def fill_ai_players(db: AsyncSession, game_id: str, target_count: int = 4)
     return ai_players
 
 
+PHASE_SPEECH_INSTRUCTIONS = {
+    "opening": (
+        "今は自己紹介タイムです。"
+        "自分のキャラクターを紹介してください。名前、この集まりに来た理由、"
+        "他のキャラクターとの関係などを話してください。"
+        "推理や事件の話はまだしないでください。"
+    ),
+    "discussion": (
+        "今は議論フェーズです。"
+        "推理や質問、意見を述べてください。"
+        "他のプレイヤーの発言に反応することも大切です。"
+        "証拠に基づいた主張を心がけてください。"
+    ),
+    "voting": (
+        "今は投票フェーズです。"
+        "誰が犯人だと思うか、最後の主張をしてください。"
+        "これまでの議論を踏まえた発言をしてください。"
+    ),
+}
+
+
 async def generate_ai_speech(
     db: AsyncSession,
     game_id: str,
     player_id: str,
     phase_id: str,
 ) -> tuple[str, LLMUsage]:
+    from madaminu.models import Phase
+
     game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
     game = game_result.scalar_one()
 
     player = next((p for p in game.players if p.id == player_id), None)
     if player is None:
         return "", LLMUsage(model=LIGHT_MODEL, input_tokens=0, output_tokens=0, duration_ms=0)
+
+    phase_result = await db.execute(select(Phase).where(Phase.id == phase_id))
+    phase = phase_result.scalar_one_or_none()
+    phase_type = phase.phase_type if phase else "discussion"
 
     logs_result = await db.execute(
         select(SpeechLog)
@@ -142,12 +169,18 @@ async def generate_ai_speech(
     recent_logs = logs_result.scalars().all()
 
     id_to_name = {p.id: p.character_name or p.display_name for p in game.players}
-    conversation = "\n".join(f"[{id_to_name.get(log.player_id, '?')}]: {log.transcript}" for log in recent_logs[-10:])
+    conversation = "\n".join(
+        f"[{id_to_name.get(log.player_id, '?')}]: {log.transcript}"
+        for log in recent_logs[-10:]
+    )
 
+    phase_instruction = PHASE_SPEECH_INSTRUCTIONS.get(
+        phase_type, PHASE_SPEECH_INSTRUCTIONS["discussion"],
+    )
     system_prompt = (
         "あなたはマーダーミステリーゲームのAIプレイヤーです。"
         "キャラクターになりきって、自然な日本語で1〜3文の短い発言をしてください。"
-        "推理や質問、意見を述べてください。他のプレイヤーの発言に反応することも大切です。"
+        f"{phase_instruction}"
     )
 
     user_prompt = (
