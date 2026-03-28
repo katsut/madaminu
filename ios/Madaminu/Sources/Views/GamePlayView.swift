@@ -76,9 +76,23 @@ struct GamePlayView: View {
                 EmptyView()
             }
         }
-        .fullScreenCover(isPresented: $showNotebook) {
-            NotebookView(store: store, isPresented: $showNotebook)
+        .overlay {
+            if showNotebook {
+                ZStack(alignment: .bottom) {
+                    NotebookView(store: store, isPresented: $showNotebook)
+
+                    if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
+                        HStack(spacing: Spacing.md) {
+                            SpeechButton(store: store)
+                        }
+                        .padding(Spacing.md)
+                        .background(Color.mdBackgroundSecondary)
+                    }
+                }
+                .transition(.move(edge: .bottom))
+            }
         }
+        .animation(.easeInOut(duration: 0.25), value: showNotebook)
         .sheet(isPresented: $showDebug) {
             DebugInfoView(store: store)
         }
