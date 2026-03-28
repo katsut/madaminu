@@ -36,6 +36,14 @@ struct WSMessageAdapter {
                 store.game.localRemainingSec = remaining
             }
         case "phase.ended":
+            let endedType = data["phase_type"] ?? store.game.currentPhase?.phaseType ?? ""
+            if endedType == "discussion" {
+                store.notebook.addDiscussionLog(
+                    turnNumber: store.game.currentPhase?.turnNumber ?? 1,
+                    speeches: store.game.speechHistory,
+                    reveals: store.game.revealedEvidences
+                )
+            }
             if let nextType = data["next_phase_type"], !nextType.isEmpty {
                 store.game.showPhaseTransition = true
                 store.game.nextPhaseType = nextType

@@ -7,7 +7,7 @@ struct NotebookView: View {
     @State private var selectedTab = 0
 
     private var tabs: [String] {
-        var t = ["自分", "登場人物", "証拠", "メモ"]
+        var t = ["自分", "登場人物", "証拠", "議論", "メモ"]
         if store.game.scenarioSetting.mapUrl != nil {
             t.insert("マップ", at: 2)
         }
@@ -73,10 +73,12 @@ struct NotebookView: View {
             if hasMap {
                 mapPage.tag(2)
                 evidencePage.tag(3)
-                notesPage.tag(4)
+                discussionLogPage.tag(4)
+                notesPage.tag(5)
             } else {
                 evidencePage.tag(2)
-                notesPage.tag(3)
+                discussionLogPage.tag(3)
+                notesPage.tag(4)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -270,7 +272,78 @@ struct NotebookView: View {
         }
     }
 
-    // MARK: - Tab 4: Notes
+    // MARK: - Tab: Discussion Log
+
+    private var discussionLogPage: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                HStack {
+                    Label("議論の記録", systemImage: "text.bubble")
+                        .font(.mdHeadline)
+                        .foregroundStyle(Color.mdInfo)
+                    Spacer()
+                    Text("\(store.notebook.discussionLogs.count)ターン")
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdTextMuted)
+                }
+
+                if store.notebook.discussionLogs.isEmpty {
+                    MDCard {
+                        Text("まだ議論の記録はありません")
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextMuted)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                } else {
+                    ForEach(store.notebook.discussionLogs) { log in
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Text("ターン \(log.turnNumber)")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdPrimary)
+
+                            if !log.reveals.isEmpty {
+                                ForEach(log.reveals) { revealed in
+                                    HStack(alignment: .top, spacing: Spacing.sm) {
+                                        PlayerAvatarView(playerId: revealed.playerId, players: store.room.players, size: 24)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("\(revealed.playerName)が証拠を提出")
+                                                .font(.mdCaption)
+                                                .foregroundStyle(Color.mdWarning)
+                                            Text(revealed.title)
+                                                .font(.mdCallout)
+                                                .foregroundStyle(Color.mdTextPrimary)
+                                        }
+                                    }
+                                }
+                            }
+
+                            if !log.speeches.isEmpty {
+                                ForEach(log.speeches) { entry in
+                                    HStack(alignment: .top, spacing: Spacing.sm) {
+                                        PlayerAvatarView(playerId: entry.playerId, players: store.room.players, size: 24)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(entry.characterName)
+                                                .font(.mdCaption)
+                                                .foregroundStyle(Color.mdPrimary)
+                                            Text(entry.transcript)
+                                                .font(.mdCaption)
+                                                .foregroundStyle(Color.mdTextSecondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(Spacing.md)
+                        .background(Color.mdSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    }
+                }
+            }
+            .padding(Spacing.lg)
+        }
+    }
+
+    // MARK: - Tab: Notes
 
     private var notesPage: some View {
         VStack(spacing: Spacing.md) {
