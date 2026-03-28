@@ -1245,10 +1245,24 @@ struct SVGWebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
+        loadSVG(webView, svg: svgContent)
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
+        if context.coordinator.lastSVG != svgContent {
+            context.coordinator.lastSVG = svgContent
+            loadSVG(webView, svg: svgContent)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    class Coordinator {
+        var lastSVG: String = ""
+    }
+
+    private func loadSVG(_ webView: WKWebView, svg: String) {
         let html = """
         <!DOCTYPE html>
         <html>
@@ -1260,7 +1274,7 @@ struct SVGWebView: UIViewRepresentable {
         </style>
         </head>
         <body>
-        \(svgContent)
+        \(svg)
         </body>
         </html>
         """
