@@ -52,10 +52,11 @@ struct WSMessageAdapter {
             if type == "speech.released" {
                 store.game.currentSpeakerId = nil
             }
+            let playerId = data["player_id"]
             let characterName = data["character_name"] ?? ""
             let transcript = data["transcript"] ?? ""
             if !transcript.isEmpty {
-                store.game.speechHistory.append(SpeechEntry(characterName: characterName, transcript: transcript))
+                store.game.speechHistory.append(SpeechEntry(playerId: playerId, characterName: characterName, transcript: transcript))
             }
         case "investigate.discoveries":
             print("[WSMessageAdapter] discoveries raw keys: \(data.keys.sorted())")
@@ -129,7 +130,7 @@ struct WSMessageAdapter {
             let title = data["title"] ?? ""
             let content = data["content"] ?? ""
             store.game.revealedEvidences.insert(
-                RevealedEvidence(playerName: playerName, title: title, content: content),
+                RevealedEvidence(playerId: playerId, playerName: playerName, title: title, content: content),
                 at: 0
             )
             if playerId != store.room.playerId {

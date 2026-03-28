@@ -454,6 +454,10 @@ struct InvestigationPhaseView: View {
                     )
                 }
 
+                if !store.game.colocatedPlayers.isEmpty {
+                    ColocatedPlayersView(store: store)
+                }
+
                 if store.game.discoveries.isEmpty {
                     ProgressView()
                         .tint(Color.mdPrimary)
@@ -510,7 +514,6 @@ struct InvestigationPhaseView: View {
                 }
 
                 if !store.game.colocatedPlayers.isEmpty {
-                    ColocatedPlayersView(store: store)
                     RoomChatView(store: store)
                 }
             }
@@ -646,11 +649,15 @@ struct DiscussionPhaseView: View {
                 ForEach(store.game.revealedEvidences) { revealed in
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
-                            HStack {
+                            HStack(spacing: Spacing.sm) {
+                                PlayerAvatarView(playerId: revealed.playerId, players: store.room.players, size: 32)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(revealed.playerName) が証拠を公開")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdWarning)
+                                }
+                                Spacer()
                                 Image(systemName: "eye.fill")
-                                    .foregroundStyle(Color.mdWarning)
-                                Text("\(revealed.playerName) が証拠を公開しました")
-                                    .font(.mdCaption)
                                     .foregroundStyle(Color.mdWarning)
                             }
                             Text(revealed.title)
@@ -684,14 +691,16 @@ struct SpeechHistoryView: View {
                     .foregroundStyle(Color.mdTextMuted)
 
                 ForEach(store.game.speechHistory) { entry in
-                    HStack(alignment: .top, spacing: Spacing.xs) {
-                        Text(entry.characterName)
-                            .font(.mdCaption)
-                            .foregroundStyle(Color.mdPrimary)
-                            .frame(width: 70, alignment: .leading)
-                        Text(entry.transcript)
-                            .font(.mdCaption)
-                            .foregroundStyle(Color.mdTextSecondary)
+                    HStack(alignment: .top, spacing: Spacing.sm) {
+                        PlayerAvatarView(playerId: entry.playerId, players: store.room.players, size: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.characterName)
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdPrimary)
+                            Text(entry.transcript)
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextSecondary)
+                        }
                     }
                 }
             }
@@ -706,6 +715,13 @@ struct EvidenceRevealSheet: View {
     @ObservedObject var store: AppStore
     @Binding var isPresented: Bool
 
+    private var revealableEvidences: [EvidenceItem] {
+        let revealedIds = Set(store.game.revealedEvidences.map { $0.title })
+        return store.notebook.evidences.filter { evidence in
+            !revealedIds.contains(evidence.title)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -716,7 +732,14 @@ struct EvidenceRevealSheet: View {
                             .font(.mdBody)
                             .foregroundStyle(Color.mdTextSecondary)
 
-                        ForEach(store.notebook.evidences) { evidence in
+                        if revealableEvidences.isEmpty {
+                            Text("公開できる証拠がありません")
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextMuted)
+                                .padding(Spacing.xl)
+                        }
+
+                        ForEach(revealableEvidences) { evidence in
                             MDCard {
                                 VStack(alignment: .leading, spacing: Spacing.sm) {
                                     Text(evidence.title)
@@ -1170,6 +1193,44 @@ struct GMGuideCard: View {
                         .foregroundStyle(Color.mdTextSecondary)
                 }
             }
+        }
+    }
+}
+
+struct PlayerAvatarView: View {
+    let playerId: String?
+    let players: [PlayerInfo]
+    var size: CGFloat = 32
+
+    private var portraitUrl: URL? {
+        guard let pid = playerId,
+              let player = players.first(where: { $0.id == pid }),
+              let urlPath = player.portraitUrl else { return nil }
+        return URL(string: APIClient.defaultBaseURL + urlPath + "?size=\(Int(size * 2))")
+    }
+
+    private var initial: String {
+        guard let pid = playerId,
+              let player = players.first(where: { $0.id == pid }),
+              let name = player.characterName else { return "?" }
+        return String(name.prefix(1))
+    }
+
+    var body: some View {
+        if let url = portraitUrl {
+            AsyncImage(url: url) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Circle().fill(Color.mdSurface)
+                    .overlay(Text(initial).font(.system(size: size * 0.4)).foregroundStyle(Color.mdTextMuted))
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+        } else {
+            Circle()
+                .fill(Color.mdSurface)
+                .frame(width: size, height: size)
+                .overlay(Text(initial).font(.system(size: size * 0.4)).foregroundStyle(Color.mdTextMuted))
         }
     }
 }
