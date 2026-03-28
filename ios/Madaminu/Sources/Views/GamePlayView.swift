@@ -217,7 +217,10 @@ struct GamePlayView: View {
                                             .font(.mdCallout)
                                             .foregroundStyle(Color.mdTextSecondary)
                                         if name == ending.arrestedName {
-                                            Image(systemName: "lock.fill")
+                                            Image(systemName: "lock.circle.fill")
+                                                .foregroundStyle(Color.mdAccent)
+                                            Text("監禁")
+                                                .font(.mdCaption2)
                                                 .foregroundStyle(Color.mdAccent)
                                         }
                                     }
