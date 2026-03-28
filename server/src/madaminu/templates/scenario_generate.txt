@@ -20,12 +20,9 @@ Create a complete scenario with the following structure (respond in JSON):
   },
   "map": {
     "areas": [
-      {"id": "area_id", "name": "エリア名", "area_type": "indoor|outdoor|semi_outdoor", "rooms": [
-        {"id": "room_id", "name": "部屋名", "room_type": "room|corridor|entrance|stairs", "size": 1, "row": 0, "col": 0, "features": ["特徴1", "特徴2", "特徴3"]}
+      {"id": "area_id", "name": "エリア名", "area_type": "indoor|outdoor|semi_outdoor", "floor_order": 0, "rooms": [
+        {"id": "room_id", "name": "部屋名", "size": 1, "features": ["特徴1", "特徴2", "特徴3"], "is_crime_scene": false}
       ]}
-    ],
-    "connections": [
-      {"from": "room_id_1", "to": "room_id_2", "type": "door|stairs|window|corridor|hidden_passage"}
     ]
   },
   "relationships": [
@@ -52,92 +49,29 @@ Create a complete scenario with the following structure (respond in JSON):
 
 ## Map Structure
 
-The map is a **floor plan** rendered as an SVG. You design the layout by placing rooms on a grid.
+部屋の一覧のみ出力してください。廊下・階段・玄関・接続グラフはサーバーが自動生成します。
 
 ### Areas
-- Each area is a floor or zone: a floor of a building, outdoor area, separate building, etc.
-- area_type: "indoor" (建物内), "outdoor" (屋外), or "semi_outdoor" (テラス等)
-- Each area has 3-8 rooms (including corridors, stairs, entrances)
-- Examples:
-  - 洋館: 本館1階, 本館2階, 中庭, 離れ
-  - リゾートホテル: ロビー階, 客室階, プールサイド
-  - 豪華客船: デッキ, 客室エリア, 機関室, レストラン階
-  - 学校: 校舎1階, 校舎2階, 校庭, 体育館
+- 各エリアは建物のフロアやゾーン（1階、2階、中庭、離れ etc.）
+- area_type: "indoor"（建物内）, "outdoor"（屋外）, "semi_outdoor"（テラス等）
+- floor_order: フロア順番（0=1階, 1=2階, ...）。屋外は独立した番号
+- 例: 洋館なら「本館1階(0)」「本館2階(1)」「中庭(2)」「離れ(3)」
 
-### Rooms and room_type
-Each room has: id, name, room_type, row, col, features.
-
-**room_type** determines how it appears on the floor plan:
-- `"room"` — 普通の部屋 (寝室, 台所, 書斎, etc.)
-- `"corridor"` — 廊下。横長に表示される。部屋はドアで廊下につながる
-- `"entrance"` — 玄関/出入口。屋内と屋外を結ぶ。特別なアイコン付き
-- `"stairs"` — 階段室。別フロア(エリア)への接続点。段々模様で表示
-
-**size** — 部屋の広さ。1=小部屋, 2=中部屋, 3=大部屋。広い部屋ほど調査ポイント(features)を多くする:
-- size 1: features 3個（小部屋: クローゼット、物置、トイレなど）
-- size 2: features 6個（中部屋: 書斎、寝室、キッチンなど）
-- size 3: features 9個（大部屋: リビング、ホール、庭園など）
-- 廊下・階段・入口: features 1-2個
-廊下・階段・玄関には size 不要。
-
-**row, col** — グリッド座標 (0始まり)。実際の間取りに合わせて配置する。
-
-#### Indoor area layout example (洋館1階):
-```
-row 0: [玄関ホール]  [廊下(横長)]  [階段]
-row 1: [リビング]    [ダイニング]  [台所]
-row 2: [書斎]
-```
-- 廊下は row 0, col 1 に配置。部屋は廊下の下(row 1)に並ぶ
-- 玄関は廊下の左端(row 0, col 0)、階段は右端(row 0, col 2)
-- 部屋と廊下は "door" で接続、廊下同士は "corridor" で接続
-
-#### Outdoor area layout example (庭園):
-```
-row 0: [前庭]  [温室]  [東屋]
-```
-- 屋外は廊下不要。場所を横一列 or 自由に配置
-- 場所同士は "corridor"(小道) で接続
-
-### CRITICAL layout rules
-1. **廊下を必ず含めること (indoor areas)**。実際の建物には廊下がある。部屋は全て廊下にドアで接続する。廊下セルが足りない場合は複数の廊下セル（同じ名前でOK）を隣接配置して1本の長い廊下を表現する
-2. **玄関を含めること**。屋内エリアから屋外エリアへの出口。玄関を経由しないと外に出られない
-3. **階段を含めること**。1階→2階など別フロアへの移動は階段室を経由する
-4. **階段はバックボーンの末尾に配置**。入口→廊下→…→階段の順。1階と2階で階段の位置（順番）を揃えること
-5. **階段は廊下からのみ接続**。階段と部屋を直接つなげない。必ず廊下→階段の形にする
-6. **部屋は廊下からのみ接続**。部屋同士を直接つなげない（hidden_passageを除く）。必ず廊下→部屋の形にする
-7. **1つの廊下ノードに接続する部屋は最大2つ**。3つ以上の部屋を1つの廊下に繋げない。部屋が多い場合は廊下ノードを追加する
-8. **隣接するセルの部屋のみ接続可能**。row/colが上下左右に隣接するセル同士だけconnectionを張れる
-9. **接続の名前は双方向で一致させる**。A→Bの接続を定義したら、B→Aは定義しない（1つのconnectionで双方向）
-10. **間取りはリアルに**。洋館なら洋館の、客船なら客船の間取りを想像して配置する
-
-### Connections (edges)
-- Each connection links two **grid-adjacent** rooms
-- type: "door" (部屋↔廊下), "corridor" (廊下同士, 屋外の小道), "stairs" (階段↔別エリアの階段), "window", "hidden_passage"
-- A connection can only exist between rooms whose (row,col) differ by exactly 1 in one axis
-- Exception: "stairs" type connects rooms in DIFFERENT areas (same position rule does not apply)
-- Exception: "hidden_passage" may connect non-adjacent rooms
-
-### Route constraints (important for alibis and mystery logic)
-- Think about how people move through the building
-- "廊下からしか裏庭に出られない" → the corridor is a bottleneck
-- "階段からしか2階に上がれない" → the staircase is the only link between floors
-- Corridors and entrances are hub rooms with many connections
-- Dead-end rooms (storage, secret room) have only one connection
-- This topology creates natural alibis
-
-### IMPORTANT: Generate an original map
-- DO NOT copy the examples. Design a unique floor plan that fits your scenario's setting.
-- Every scenario should produce a different map layout.
+### Rooms
+- 調査対象の部屋のみ出力する。廊下・階段・玄関は出力しない
+- **size**: 1=小部屋, 2=中部屋, 3=大部屋
+- **features**: 部屋内の調査ポイント。size×3個を出力する
+  - size 1: features 3個（例: 机の引き出し、本棚、窓際）
+  - size 2: features 6個（例: 暖炉、ソファ、書類棚、デスク、窓、絵画）
+  - size 3: features 9個
+- **is_crime_scene**: 犯行現場なら true（1マップに1つ）
 
 ### Guidelines
-- Generate 3-5 areas with a total of 15-20 rooms
-- このうち調査可能な部屋（room_type="room"）は最低8個以上。廊下・階段・入口だけの階はNG
-- 各エリアに最低2つの調査可能な部屋（room_type="room"）を含める
-- 例: 本館1階なら「リビング」「書斎」「キッチン」「ダイニング」+ 廊下・玄関
-- Include at least one lockable or restricted room
-- The crime scene should have at least 2 connections
-- Room IDs from the map are used for investigation locations during gameplay
+- 3〜5エリア、全体で調査可能な部屋を最低8個以上
+- 各エリアに最低2つの部屋を含める
+- 部屋名は舞台設定に合ったリアルな名前にする
+- 少なくとも1つの施錠可能・立入制限のある部屋を含める
+- 部屋のIDは英数字のスネークケース（例: study, master_bedroom, courtyard）
 
 ## Character Profile Enhancement
 

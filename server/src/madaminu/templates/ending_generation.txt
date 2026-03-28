@@ -3,6 +3,9 @@
 ### シナリオ骨格
 $scenario_skeleton
 
+### マップの動線構造
+$route_text
+
 ### GM内部状態
 $gm_internal_state
 

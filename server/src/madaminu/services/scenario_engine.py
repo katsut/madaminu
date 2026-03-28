@@ -73,10 +73,17 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     scenario = _parse_scenario_json(raw_response)
     logger.info("Scenario keys: %s", list(scenario.keys()))
 
+    from madaminu.services.map_builder import build_map_structure, generate_route_text
+
+    raw_map = scenario.get("map", {})
+    complete_map = build_map_structure(raw_map)
+    route_text = generate_route_text(complete_map)
+
     game.scenario_skeleton = {
         "setting": scenario["setting"],
         "victim": scenario["victim"],
-        "map": scenario.get("map"),
+        "map": complete_map,
+        "route_text": route_text,
         "relationships": scenario["relationships"],
     }
     game.gm_internal_state = {
@@ -96,18 +103,12 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         player.objective = sp["objective"]
         player.role = ROLE_MAP.get(sp["role"], PlayerRole.innocent)
 
-    map_data = scenario.get("map", {})
     map_locations = {}
     skip_types = {"corridor", "entrance", "stairs"}
-    if "areas" in map_data:
-        for area in map_data["areas"]:
-            for room in area.get("rooms", []):
-                if room.get("room_type") not in skip_types and room.get("features"):
-                    map_locations[room["id"]] = room
-    elif "locations" in map_data:
-        for loc in map_data["locations"]:
-            if loc.get("room_type") not in skip_types and loc.get("features"):
-                map_locations[loc["id"]] = loc
+    for area in complete_map.get("areas", []):
+        for room in area.get("rooms", []):
+            if room.get("room_type") not in skip_types and room.get("features"):
+                map_locations[room["id"]] = room
 
     all_locations = _resolve_investigation_locations(list(map_locations.keys()), map_locations)
     _create_cycle_phases(db, game, all_locations)
@@ -328,9 +329,11 @@ async def investigate_location(
     location_features = location.get("features", [])
 
     system_prompt = load_template("scenario_system")
+    route_text = (game.scenario_skeleton or {}).get("route_text", "")
     user_prompt = render_template(
         "investigation",
         scenario_skeleton=json.dumps(game.scenario_skeleton or {}, ensure_ascii=False, indent=2),
+        route_text=route_text,
         gm_internal_state=json.dumps(game.gm_internal_state or {}, ensure_ascii=False, indent=2),
         player_id=player_id,
         player_name=player.character_name or player.display_name,
@@ -434,6 +437,7 @@ async def generate_ending(db: AsyncSession, game_id: str) -> tuple[GameEnding, L
     user_prompt = render_template(
         "ending_generation",
         scenario_skeleton=json.dumps(game.scenario_skeleton or {}, ensure_ascii=False, indent=2),
+        route_text=(game.scenario_skeleton or {}).get("route_text", ""),
         gm_internal_state=json.dumps(game.gm_internal_state or {}, ensure_ascii=False, indent=2),
         players_info=players_info,
         vote_results=vote_results,
