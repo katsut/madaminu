@@ -545,8 +545,6 @@ async def _handle_room_message(db: AsyncSession, room_code: str, player_id: str,
 async def _handle_vote(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
     import uuid
 
-    from madaminu.services.scenario_engine import generate_ending
-
     suspect_id = data.get("data", {}).get("suspect_player_id", "")
     if not suspect_id:
         await websocket.send_json(WSMessage(type="error", data={"message": "Missing suspect_player_id"}).model_dump())
@@ -592,24 +590,6 @@ async def _handle_vote(db: AsyncSession, room_code: str, player_id: str, data: d
         WSMessage(type="vote.results", data={"votes": vote_summary}),
     )
 
-    try:
-        ending, usage = await generate_ending(db, game.id)
-        logger.info("Ending generated: %s", usage)
-
-        await manager.broadcast(
-            room_code,
-            WSMessage(
-                type="game.ending",
-                data={
-                    "ending_text": ending.ending_text,
-                    "true_criminal_id": ending.true_criminal_id,
-                    "objective_results": ending.objective_results,
-                },
-            ),
-        )
-    except Exception:
-        logger.exception("Ending generation failed for game %s", game.id)
-        await manager.broadcast(
-            room_code,
-            WSMessage(type="error", data={"message": "Ending generation failed"}),
-        )
+    pm = _get_phase_manager(websocket)
+    if pm:
+        await pm._generate_and_broadcast_ending(game.id, room_code)

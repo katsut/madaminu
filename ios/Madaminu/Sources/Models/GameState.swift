@@ -46,17 +46,66 @@ struct EndingData: Codable, Sendable {
     let endingText: String
     let trueCriminalId: String
     let objectiveResults: [String: ObjectiveResult]?
+    let voteDetails: [VoteDetail]?
+    let voteCounts: [String: Int]?
+    let arrestedName: String?
+    let rankings: [PlayerRanking]?
+    let characterReveals: [CharacterReveal]?
 
     enum CodingKeys: String, CodingKey {
         case endingText = "ending_text"
         case trueCriminalId = "true_criminal_id"
         case objectiveResults = "objective_results"
+        case voteDetails = "vote_details"
+        case voteCounts = "vote_counts"
+        case arrestedName = "arrested_name"
+        case rankings
+        case characterReveals = "character_reveals"
     }
 }
 
 struct ObjectiveResult: Codable, Sendable {
     let achieved: Bool
     let description: String
+}
+
+struct VoteDetail: Codable, Sendable {
+    let voter: String
+    let suspect: String
+}
+
+struct PlayerRanking: Codable, Identifiable, Sendable {
+    var id: String { playerId }
+    let playerId: String
+    let characterName: String
+    let speechCount: Int
+    let evidenceCount: Int
+    let score: Int
+
+    enum CodingKeys: String, CodingKey {
+        case playerId = "player_id"
+        case characterName = "character_name"
+        case speechCount = "speech_count"
+        case evidenceCount = "evidence_count"
+        case score
+    }
+}
+
+struct CharacterReveal: Codable, Identifiable, Sendable {
+    var id: String { playerId }
+    let playerId: String
+    let characterName: String
+    let role: String?
+    let secretInfo: String?
+    let objective: String?
+
+    enum CodingKeys: String, CodingKey {
+        case playerId = "player_id"
+        case characterName = "character_name"
+        case role
+        case secretInfo = "secret_info"
+        case objective
+    }
 }
 
 struct DiscoveryItem: Identifiable, Sendable {

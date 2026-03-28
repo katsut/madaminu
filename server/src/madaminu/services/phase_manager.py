@@ -543,6 +543,7 @@ class PhaseManager:
         )
 
     async def _generate_and_broadcast_ending(self, game_id: str, room_code: str):
+        from madaminu.models import Evidence, SpeechLog, Vote
         from madaminu.services.scenario_engine import generate_ending
         from madaminu.ws.handler import manager
 
@@ -550,6 +551,69 @@ class PhaseManager:
             async with self._session_factory() as db:
                 ending, usage = await generate_ending(db, game_id)
                 logger.info("Ending generated for %s: %s", room_code, usage)
+
+                # Build vote results
+                game_result = await db.execute(
+                    select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+                )
+                game = game_result.scalar_one()
+                id_to_name = {p.id: p.character_name or p.display_name for p in game.players}
+
+                votes_result = await db.execute(select(Vote).where(Vote.game_id == game_id))
+                votes = votes_result.scalars().all()
+                vote_details = [
+                    {
+                        "voter": id_to_name.get(v.voter_player_id, "?"),
+                        "suspect": id_to_name.get(v.suspect_player_id, "?"),
+                    }
+                    for v in votes
+                ]
+                vote_counts: dict[str, int] = {}
+                for v in votes:
+                    name = id_to_name.get(v.suspect_player_id, "?")
+                    vote_counts[name] = vote_counts.get(name, 0) + 1
+                arrested_name = max(vote_counts, key=vote_counts.get) if vote_counts else None
+
+                # Build scores: speech=1pt, evidence_reveal tracked per player
+                logs_result = await db.execute(select(SpeechLog).where(SpeechLog.game_id == game_id))
+                all_logs = logs_result.scalars().all()
+                speech_counts: dict[str, int] = {}
+                for log in all_logs:
+                    speech_counts[log.player_id] = speech_counts.get(log.player_id, 0) + 1
+
+                # Evidence reveals: count evidences with source="investigation" per player
+                ev_result = await db.execute(
+                    select(Evidence).where(Evidence.game_id == game_id, Evidence.source == "investigation")
+                )
+                all_evidence = ev_result.scalars().all()
+                evidence_counts: dict[str, int] = {}
+                for ev in all_evidence:
+                    evidence_counts[ev.player_id] = evidence_counts.get(ev.player_id, 0) + 1
+
+                rankings = []
+                for p in game.players:
+                    speeches = speech_counts.get(p.id, 0)
+                    evidences = evidence_counts.get(p.id, 0)
+                    score = speeches * 1 + evidences * 3
+                    rankings.append({
+                        "player_id": p.id,
+                        "character_name": p.character_name or p.display_name,
+                        "speech_count": speeches,
+                        "evidence_count": evidences,
+                        "score": score,
+                    })
+                rankings.sort(key=lambda x: -x["score"])
+
+                # Character reveals
+                reveals = []
+                for p in game.players:
+                    reveals.append({
+                        "player_id": p.id,
+                        "character_name": p.character_name or p.display_name,
+                        "role": p.role,
+                        "secret_info": p.secret_info,
+                        "objective": p.objective,
+                    })
 
             await manager.broadcast(
                 room_code,
@@ -559,6 +623,11 @@ class PhaseManager:
                         "ending_text": ending.ending_text,
                         "true_criminal_id": ending.true_criminal_id,
                         "objective_results": ending.objective_results,
+                        "vote_details": vote_details,
+                        "vote_counts": vote_counts,
+                        "arrested_name": arrested_name,
+                        "rankings": rankings,
+                        "character_reveals": reveals,
                     },
                 ),
             )
