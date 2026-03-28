@@ -352,10 +352,15 @@ struct GamePlayView: View {
                         }
                     }
 
-                    // Home button
-                    MDButton("ホームに戻る") {
-                        store.game.reset()
-                        store.screen = .home
+                    // Bottom buttons
+                    HStack(spacing: Spacing.md) {
+                        MDButton("もう一度見る", style: .secondary) {
+                            endingRevealPhase = 0
+                        }
+                        MDButton("ホームに戻る") {
+                            store.game.reset()
+                            store.screen = .home
+                        }
                     }
                 } else {
                     ProgressView("エンディングを生成中...")
