@@ -48,24 +48,33 @@ struct WSMessageAdapter {
             store.setError("他のプレイヤーが発言中です", level: .transient)
         case "speech.active":
             store.game.currentSpeakerId = data["player_id"]
-        case "speech.released":
-            store.game.currentSpeakerId = nil
+        case "speech.released", "speech.ai":
+            if type == "speech.released" {
+                store.game.currentSpeakerId = nil
+            }
             let characterName = data["character_name"] ?? ""
             let transcript = data["transcript"] ?? ""
             if !transcript.isEmpty {
                 store.game.speechHistory.append(SpeechEntry(characterName: characterName, transcript: transcript))
             }
         case "investigate.discoveries":
+            print("[WSMessageAdapter] discoveries raw keys: \(data.keys.sorted())")
+            print("[WSMessageAdapter] discoveries value: \(data["discoveries"]?.prefix(200) ?? "nil")")
             if let discJSON = data["discoveries"],
                let discData = discJSON.data(using: .utf8),
                let discArray = try? JSONSerialization.jsonObject(with: discData) as? [[String: Any]] {
+                print("[WSMessageAdapter] parsed \(discArray.count) discoveries")
                 store.game.discoveries = discArray.compactMap { d in
                     guard let id = d["id"] as? String,
                           let title = d["title"] as? String,
-                          let content = d["content"] as? String else { return nil }
+                          let content = d["content"] as? String else {
+                        print("[WSMessageAdapter] discovery parse failed: \(d.keys)")
+                        return nil
+                    }
                     let canTamper = d["can_tamper"] as? Bool ?? false
                     return DiscoveryItem(id: id, title: title, content: content, canTamper: canTamper)
                 }
+                print("[WSMessageAdapter] final discoveries count: \(store.game.discoveries.count)")
             }
         case "investigate.discovery":
             let id = data["id"] ?? UUID().uuidString
