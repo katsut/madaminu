@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from madaminu.models import Game, SpeechLog
-from madaminu.ws.messages import SpeechActiveData, SpeechReleasedData, WSMessage
+from madaminu.ws.messages import SpeechActiveData, WSMessage
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +24,19 @@ class SpeechManager:
 
     async def request_speech(self, room_code: str, player_id: str) -> bool:
         lock = self._get_lock(room_code)
-        if lock.locked():
-            return False
 
-        acquired = lock.locked()
-        if not acquired:
-            await lock.acquire()
-            self._speakers[room_code] = player_id
+        current = self._speakers.get(room_code)
+        if current == player_id:
             return True
-        return False
+
+        if current and lock.locked():
+            self._speakers[room_code] = None
+            lock.release()
+            await self.broadcast_speech_released(room_code, current)
+
+        await lock.acquire()
+        self._speakers[room_code] = player_id
+        return True
 
     async def release_speech(
         self,
