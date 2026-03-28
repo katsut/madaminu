@@ -198,26 +198,39 @@ struct GamePlayView: View {
     private var endingView: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
-                if let error = store.errorMessage {
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Color.mdBackground)
-                        Text(error)
-                            .font(.mdCaption)
-                            .foregroundStyle(Color.mdBackground)
-                        Spacer()
-                    }
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.sm)
-                    .background(Color.mdAccent)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                }
-
                 if let ending = store.game.ending {
+                    // 1. Vote Results
+                    if let counts = ending.voteCounts, !counts.isEmpty {
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.sm) {
+                                Label("投票結果", systemImage: "hand.raised.fill")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdAccent)
+
+                                ForEach(counts.sorted(by: { $0.value > $1.value }), id: \.key) { name, count in
+                                    HStack {
+                                        Text(name)
+                                            .font(.mdHeadline)
+                                            .foregroundStyle(name == ending.arrestedName ? Color.mdAccent : Color.mdTextPrimary)
+                                        Spacer()
+                                        Text("\(count) 票")
+                                            .font(.mdCallout)
+                                            .foregroundStyle(Color.mdTextSecondary)
+                                        if name == ending.arrestedName {
+                                            Image(systemName: "lock.fill")
+                                                .foregroundStyle(Color.mdAccent)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Epilogue
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.md) {
-                            Text("真相")
-                                .font(.mdTitle)
+                            Label("エピローグ", systemImage: "book.fill")
+                                .font(.mdTitle2)
                                 .foregroundStyle(Color.mdPrimary)
 
                             Text(ending.endingText)
@@ -226,16 +239,53 @@ struct GamePlayView: View {
                         }
                     }
 
-                    if let results = ending.objectiveResults {
+                    // 3. Rankings
+                    if let rankings = ending.rankings, !rankings.isEmpty {
                         MDCard {
                             VStack(alignment: .leading, spacing: Spacing.sm) {
-                                Text("個人目的の達成状況")
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdPrimary)
+                                Label("最終スコア", systemImage: "trophy.fill")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdWarning)
+
+                                ForEach(Array(rankings.enumerated()), id: \.element.id) { index, rank in
+                                    HStack(spacing: Spacing.sm) {
+                                        Text(rankEmoji(index))
+                                            .font(.system(size: 24))
+                                            .frame(width: 32)
+                                        PlayerAvatarView(playerId: rank.playerId, players: store.room.players, size: 36)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(rank.characterName)
+                                                .font(.mdHeadline)
+                                                .foregroundStyle(Color.mdTextPrimary)
+                                            Text("発言 \(rank.speechCount)回 / 証拠 \(rank.evidenceCount)件")
+                                                .font(.mdCaption2)
+                                                .foregroundStyle(Color.mdTextMuted)
+                                        }
+                                        Spacer()
+                                        Text("\(rank.score) pt")
+                                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                            .foregroundStyle(index == 0 ? Color.mdWarning : Color.mdTextPrimary)
+                                    }
+                                    if index < rankings.count - 1 {
+                                        Divider()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 4. Objective Results
+                    if let results = ending.objectiveResults, !results.isEmpty {
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.sm) {
+                                Label("個人目的の達成状況", systemImage: "target")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdInfo)
 
                                 ForEach(Array(results.keys.sorted()), id: \.self) { playerId in
                                     if let result = results[playerId] {
-                                        HStack(alignment: .top) {
+                                        HStack(alignment: .top, spacing: Spacing.sm) {
+                                            PlayerAvatarView(playerId: playerId, players: store.room.players, size: 28)
                                             Image(systemName: result.achieved ? "checkmark.circle.fill" : "xmark.circle.fill")
                                                 .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
                                             VStack(alignment: .leading) {
@@ -252,9 +302,85 @@ struct GamePlayView: View {
                             }
                         }
                     }
+
+                    // 5. Character Reveals
+                    if let reveals = ending.characterReveals, !reveals.isEmpty {
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.md) {
+                                Label("ネタバラシ", systemImage: "theatermasks.fill")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdPrimary)
+
+                                ForEach(reveals) { reveal in
+                                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                                        HStack(spacing: Spacing.sm) {
+                                            PlayerAvatarView(playerId: reveal.playerId, players: store.room.players, size: 32)
+                                            Text(reveal.characterName)
+                                                .font(.mdHeadline)
+                                                .foregroundStyle(Color.mdTextPrimary)
+                                            if let role = reveal.role {
+                                                Text(roleLabel(role))
+                                                    .font(.mdCaption2)
+                                                    .padding(.horizontal, Spacing.xs)
+                                                    .padding(.vertical, 2)
+                                                    .background(roleColor(role).opacity(0.15))
+                                                    .foregroundStyle(roleColor(role))
+                                                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                            }
+                                        }
+                                        if let secret = reveal.secretInfo {
+                                            Text(secret)
+                                                .font(.mdCaption)
+                                                .foregroundStyle(Color.mdTextSecondary)
+                                        }
+                                    }
+                                    .padding(.vertical, Spacing.xs)
+                                }
+                            }
+                        }
+                    }
+
+                    // Home button
+                    MDButton("ホームに戻る") {
+                        store.game.reset()
+                        store.screen = .home
+                    }
+                } else {
+                    ProgressView("エンディングを生成中...")
+                        .tint(Color.mdPrimary)
+                        .padding(Spacing.xl)
                 }
             }
             .padding(Spacing.lg)
+        }
+    }
+
+    private func rankEmoji(_ index: Int) -> String {
+        switch index {
+        case 0: "🥇"
+        case 1: "🥈"
+        case 2: "🥉"
+        default: "\(index + 1)."
+        }
+    }
+
+    private func roleLabel(_ role: String) -> String {
+        switch role {
+        case "criminal": "犯人"
+        case "witness": "目撃者"
+        case "related": "関係者"
+        case "innocent": "一般人"
+        default: role
+        }
+    }
+
+    private func roleColor(_ role: String) -> Color {
+        switch role {
+        case "criminal": .mdAccent
+        case "witness": .mdWarning
+        case "related": .mdInfo
+        case "innocent": .mdSuccess
+        default: .mdTextMuted
         }
     }
 
