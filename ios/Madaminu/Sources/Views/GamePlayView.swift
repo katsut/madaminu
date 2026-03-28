@@ -820,12 +820,13 @@ struct VotingPhaseView: View {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
                     title: "投票フェーズ",
-                    message: "調査と議論の結果をもとに、犯人だと思う人物を選んで投票してください。全員の投票が揃うと結果が発表されます。"
+                    message: "調査と議論の結果をもとに、犯人だと思う人物を選んで投票してください。話し合いながら投票できます。"
                 )
 
                 ForEach(store.room.players) { player in
                     MDCard {
-                        HStack {
+                        HStack(spacing: Spacing.sm) {
+                            PlayerAvatarView(playerId: player.id, players: store.room.players, size: 36)
                             VStack(alignment: .leading) {
                                 Text(player.characterName ?? player.displayName)
                                     .font(.mdHeadline)
@@ -849,6 +850,26 @@ struct VotingPhaseView: View {
                         store.dispatch(.vote(suspectId: suspect))
                     }
                 }
+
+                if let speaker = store.game.currentSpeakerId {
+                    let name = store.room.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
+                    MDCard {
+                        HStack {
+                            Image(systemName: "mic.fill")
+                                .foregroundStyle(Color.mdAccent)
+                            Text("\(name) が発言中")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdTextPrimary)
+                            Spacer()
+                        }
+                    }
+                }
+
+                if store.game.isSpeaking {
+                    TranscriptView(store: store)
+                }
+
+                SpeechHistoryView(store: store)
             }
             .padding(Spacing.lg)
         }
