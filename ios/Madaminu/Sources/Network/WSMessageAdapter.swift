@@ -257,6 +257,9 @@ struct WSMessageAdapter {
         store.game.hasRevealedEvidence = false
         store.game.colocatedPlayers = []
         store.game.roomMessages = []
+        if store.screen == .generating || store.screen == .lobby {
+            store.screen = .playing
+        }
         store.game.showPhaseTransition = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             store.game.showPhaseTransition = false

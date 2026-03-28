@@ -325,43 +325,15 @@ final class AppStore: ObservableObject, @unchecked Sendable {
     @MainActor private func performStartGame() async {
         guard let token = room.sessionToken else { return }
 
-        isLoading = true
+        screen = .generating
         errorMessage = nil
-        room.progressMessage = "AIプレイヤーを準備中..."
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-            if self?.isLoading == true { self?.room.progressMessage = "シナリオを生成中..." }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
-            if self?.isLoading == true { self?.room.progressMessage = "キャラクターを生成中..." }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
-            if self?.isLoading == true { self?.room.progressMessage = "イラストを生成中..." }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self] in
-            if self?.isLoading == true { self?.room.progressMessage = "物語を組み立てています..." }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 40) { [weak self] in
-            if self?.isLoading == true { self?.room.progressMessage = "もう少しお待ちください..." }
-        }
 
         do {
             try await api.startGame(roomCode: room.roomCode, sessionToken: token)
-            screen = .generating
-        } catch let apiError as APIError {
-            if case .requestFailed(let code, _) = apiError, code == 400 {
-                screen = .generating
-            } else {
-                errorMessage = "ゲーム開始に失敗しました"
-                screen = .lobby
-            }
         } catch {
             errorMessage = "ゲーム開始に失敗しました"
             screen = .lobby
         }
-
-        room.progressMessage = nil
-        isLoading = false
     }
 
     private func performLeaveRoom() {

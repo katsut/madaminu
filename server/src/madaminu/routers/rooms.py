@@ -113,10 +113,12 @@ async def list_my_rooms(x_device_id: str = Header(...), db: AsyncSession = Depen
     players = result.scalars().all()
 
     rooms = []
+    seen_game_ids: set[str] = set()
     for p in players:
         g = p.game
-        if g is None:
+        if g is None or g.id in seen_game_ids:
             continue
+        seen_game_ids.add(g.id)
         rooms.append({
             "room_code": g.room_code,
             "status": g.status,
