@@ -9,9 +9,9 @@
 ```
 iOS (Host)              Server                    iOS (All Players)
     │                      │                          │
+    │  screen=generating   │                          │
     │  POST /start         │                          │
     │─────────────────────→│                          │
-    │  screen=generating   │                          │
     │                      │  WS: game.generating     │
     │                      │─────────────────────────→│
     │                      │                          │  screen=generating
@@ -54,6 +54,11 @@ Server                    iOS (All Players)
   │                         │  エラーメッセージ表示
 ```
 
+**ポイント**:
+- iOS はAPIを呼ぶ前に screen=generating に遷移（即座にフィードバック）
+- AIプレイヤーはLLMで動的生成（シナリオ設定に合ったキャラクター）
+- 生成失敗時は game.status を waiting に戻し、ロビーに復帰
+
 ## 2. イントロシーケンス
 
 ```
@@ -72,9 +77,55 @@ iOS (Player)            Server                    iOS (All Players)
     │                      │                          │  screen=playing
 ```
 
-## 3. フェーズサイクルシーケンス
+イントロ画面の構成（9ページ）:
+1. オープニング（舞台説明）
+2. 被害者紹介
+3. 自分のプロフィール
+4. 公開情報（この集まりでの立場）
+5. 秘密情報
+6. 個人目的（※他のプレイヤーにバレてはいけない）
+7. 初期証拠・アリバイ
+8. 全キャラクター一覧
+9. 準備完了（ロビー形式、全員 ready でホストが開始）
+
+## 3. 自己紹介フェーズ（opening）
+
+```
+Server (PhaseManager)              iOS (All Players)
+    │                                  │
+    │  ===== Opening Phase (300s) ==== │
+    │  WS: phase.started               │
+    │  {type: opening}                 │
+    │─────────────────────────────────→│
+    │                                  │  自己紹介画面
+    │  WS: speech.request              │  発言ボタンで自己紹介
+    │←─────────────────────────────────│
+    │  WS: speech.granted              │
+    │─────────────────────────────────→│
+    │                                  │
+    │  WS: speech.ai                   │
+    │─────────────────────────────────→│  AI も一人称で自己紹介
+    │                                  │
+    │  [時間切れ or advance]           │
+    │  WS: phase.ended                 │
+    │─────────────────────────────────→│  フェーズ遷移UI表示
+```
+
+**ポイント**:
+- AI発言は「私は〇〇です」と一人称視点で自己紹介（推理禁止）
+- 発言ボタンは画面下部に常時表示
+- 手帳を開いたままでも発言可能
+
+## 4. フェーズサイクルシーケンス
 
 1ターン = planning → investigation → discussion
+
+### フェーズ遷移UI
+
+全フェーズ遷移で `phase.ended` 受信時に即座にオーバーレイ表示:
+- 次フェーズ名・ターン数・ガイド・制限時間
+- LLM処理中はスピナー表示
+- `phase.started` 受信後3秒で自動消去
 
 ```
 Server (PhaseManager)              iOS (All Players)
@@ -83,8 +134,8 @@ Server (PhaseManager)              iOS (All Players)
     │  WS: phase.started               │
     │  {type: planning, turn: 1/3}     │
     │─────────────────────────────────→│
-    │                                  │  マップ表示
-    │  WS: phase.timer (10秒毎)        │  場所選択
+    │                                  │  マップ表示 + 場所選択
+    │  WS: phase.timer (10秒毎)        │
     │─────────────────────────────────→│
     │                                  │
     │  WS: investigate.select          │
@@ -93,8 +144,9 @@ Server (PhaseManager)              iOS (All Players)
     │─────────────────────────────────→│  同室者表示
     │                                  │
     │  [時間切れ or advance]           │
+    │  未選択者にランダム場所割当      │
     │  WS: phase.ended                 │
-    │─────────────────────────────────→│
+    │─────────────────────────────────→│  遷移UI表示（スピナー）
     │                                  │
     │  ===== Investigation Phase ===== │
     │  _generate_room_discoveries()    │
@@ -121,7 +173,7 @@ Server (PhaseManager)              iOS (All Players)
     │                                  │
     │  [時間切れ]                       │
     │  WS: phase.ended                 │
-    │─────────────────────────────────→│
+    │─────────────────────────────────→│  遷移UI表示
     │                                  │
     │  ===== Discussion Phase =====    │
     │  adjust_phase() → LLM           │
@@ -132,27 +184,28 @@ Server (PhaseManager)              iOS (All Players)
     │─────────────────────────────────→│
     │                                  │
     │  WS: speech.request              │
-    │←─────────────────────────────────│  発言権要求
+    │←─────────────────────────────────│  発言権要求(割り込み可)
     │  WS: speech.granted              │
     │─────────────────────────────────→│  録音開始
     │  WS: speech.release              │
     │←─────────────────────────────────│  発言終了+文字起こし
-    │  WS: speech.active / released    │
-    │─────────────────────────────────→│  発言履歴に追加
+    │  WS: speech.released             │
+    │─────────────────────────────────→│  発言履歴に追加(アバター付き)
     │                                  │
     │  WS: evidence.reveal             │
-    │←─────────────────────────────────│  証拠公開
+    │←─────────────────────────────────│  証拠公開(提出済みは除外)
     │  WS: evidence.revealed           │
-    │─────────────────────────────────→│  全員に公開
+    │─────────────────────────────────→│  全員に公開(アバター付き)
     │                                  │
     │  [時間切れ]                       │
+    │  議論記録を手帳に自動保存        │
     │  WS: phase.ended                 │
     │─────────────────────────────────→│
     │                                  │
     │  ── ターン2, 3 も同様 ──         │
 ```
 
-## 4. 投票・エンディングシーケンス
+## 5. 投票・エンディングシーケンス
 
 ```
 Server (PhaseManager)              iOS (All Players)
@@ -160,7 +213,10 @@ Server (PhaseManager)              iOS (All Players)
     │  ===== Voting Phase =====        │
     │  WS: phase.started               │
     │  {type: voting}                  │
-    │─────────────────────────────────→│
+    │─────────────────────────────────→│  投票画面(アバター付き)
+    │                                  │  + 発言ボタン
+    │  WS: speech.request              │
+    │←─────────────────────────────────│  最後の主張
     │                                  │
     │  WS: vote.submit                 │
     │←─────────────────────────────────│  犯人投票
@@ -168,18 +224,51 @@ Server (PhaseManager)              iOS (All Players)
     │─────────────────────────────────→│  投票済み表示
     │                                  │
     │  [全員投票完了]                   │
+    │  ※タイマーでは自動進行しない     │
     │  WS: vote.results                │
     │─────────────────────────────────→│
     │                                  │
+    │  WS: phase.ended                 │
+    │─────────────────────────────────→│  「結果発表」遷移UI
+    │                                  │
     │  generate_ending() → LLM         │
+    │  + スコア計算 + 投票集計          │
     │                                  │
     │  WS: game.ending                 │
     │  {ending_text, true_criminal_id, │
-    │   objective_results}             │
+    │   objective_results, rankings,   │
+    │   vote_details, vote_counts,     │
+    │   arrested_name,                 │
+    │   character_reveals}             │
     │─────────────────────────────────→│  screen=ended
 ```
 
-## 5. ホスト操作
+### エンディング画面の構成
+
+#### シーン1: ドラマチックリビール（黒背景、4秒）
+```
+[アバター]
+〇〇は・・・・
+```
+
+#### シーン2: 判定（5秒）
+```
+[アバター]
+犯人でした / 冤罪でした
+真犯人を見事に見抜きました / 無実の人が監禁されてしまいました...
+```
+
+#### エンディング画面（スクロール）
+1. **投票結果** — 誰に何票。最多票に「監禁」マーク
+2. **エピローグ** — LLM生成。監禁→真相解明→結末
+   - 犯人当て: 告白・動機・トリック
+   - 冤罪: 後味の悪い結末。真犯人の冷笑、残された者の後悔
+3. **最終スコア** — ランキング(🥇🥈🥉)。発言×1pt + 証拠×3pt
+4. **個人目的の達成状況** — アバター + ○/× + 説明
+5. **ネタバラシ** — 全キャラの役割・秘密を公開
+6. **「もう一度見る」/ 「ホームに戻る」** ボタン
+
+## 6. ホスト操作
 
 | 操作 | WS メッセージ | 効果 |
 |------|-------------|------|
@@ -188,7 +277,7 @@ Server (PhaseManager)              iOS (All Players)
 | 一時停止 | `phase.pause` | タイマー停止 |
 | 再開 | `phase.resume` | タイマー再開 |
 
-## 6. ルーム再参加
+## 7. ルーム再参加
 
 ```
 iOS                     Server
@@ -197,7 +286,8 @@ iOS                     Server
   │──────────────────────→│
   │                       │  device_id で既存 Player 検索
   │                       │  → 存在: session_token 更新、既存 Player 返却
-  │                       │  → 不在: 新規 Player 作成
+  │                       │  → 不在 & waiting: 新規 Player 作成
+  │                       │  → 不在 & started: エラー
   │  200 OK               │
   │←──────────────────────│
   │                       │
@@ -207,7 +297,7 @@ iOS                     Server
   │                       │──→ screen 復帰
 ```
 
-## 7. WebSocket メッセージ一覧
+## 8. WebSocket メッセージ一覧
 
 ### サーバー → クライアント
 
@@ -215,13 +305,13 @@ iOS                     Server
 |------|------|------|
 | `game.generating` | `{room_code}` | シナリオ生成開始 |
 | `game.ready` | `{room_code}` | ゲーム準備完了 |
-| `game.generation_failed` | `{room_code}` | 生成失敗 |
-| `game.state` | (後述) | ゲーム全状態 |
-| `game.ending` | `{ending_text, true_criminal_id, objective_results}` | エンディング |
+| `game.generation_failed` | `{room_code}` | 生成失敗→ロビー復帰 |
+| `game.state` | (後述) | ゲーム全状態(プレイヤー個別) |
+| `game.ending` | `{ending_text, true_criminal_id, objective_results, rankings, vote_details, vote_counts, arrested_name, character_reveals}` | エンディング |
 | `progress` | `{step, status}` | 生成進捗 |
 | `phase.started` | `{phase_id, phase_type, duration_sec, turn_number, total_turns, investigation_locations}` | フェーズ開始 |
 | `phase.timer` | `{remaining_sec}` | タイマー (10秒毎) |
-| `phase.ended` | `{phase_type, next_phase_type}` | フェーズ終了 |
+| `phase.ended` | `{phase_type, next_phase_type}` | フェーズ終了→遷移UI |
 | `phase.paused` | `{remaining_sec}` | 一時停止 |
 | `phase.resumed` | `{remaining_sec}` | 再開 |
 | `phase.extended` | `{extra_sec, new_duration_sec}` | 延長 |
@@ -232,7 +322,8 @@ iOS                     Server
 | `speech.granted` | - | 発言権付与 |
 | `speech.denied` | - | 発言権拒否 |
 | `speech.active` | `{player_id}` | 発言中 |
-| `speech.released` | `{character_name, transcript}` | 発言終了 |
+| `speech.released` | `{player_id, character_name, transcript}` | 発言終了 |
+| `speech.ai` | `{player_id, character_name, transcript}` | AI発言 |
 | `evidence.revealed` | `{player_id, player_name, title, content}` | 証拠公開 |
 | `evidence.received` | `{title, content}` | 証拠受け取り |
 | `vote.cast` | `{voter_id}` | 投票済み |
@@ -253,7 +344,7 @@ iOS                     Server
 | `investigate.select` | `{location_id, feature?}` | 場所/feature 選択 |
 | `investigate.keep` | `{discovery_id}` | 発見を保持 |
 | `investigate.tamper` | `{discovery_id}` | 発見を改ざん |
-| `speech.request` | - | 発言権要求 |
+| `speech.request` | - | 発言権要求(割り込み可) |
 | `speech.release` | `{transcript}` | 発言終了 |
 | `evidence.reveal` | `{evidence_id}` | 証拠公開 |
 | `vote.submit` | `{suspect_player_id}` | 犯人投票 |
@@ -263,7 +354,7 @@ iOS                     Server
 | `phase.pause` | - | 一時停止 (ホスト) |
 | `phase.resume` | - | 再開 (ホスト) |
 
-## 8. game.state データ構造
+## 9. game.state データ構造
 
 各プレイヤーに個別送信される。自分の秘密情報のみ含む。
 
@@ -286,27 +377,38 @@ iOS                     Server
 }
 ```
 
-## 9. フェーズ時間設定
+## 10. フェーズ時間設定
 
 | フェーズ | デフォルト時間 | 説明 |
 |---------|-------------|------|
 | initial | 0秒 | 自動スキップ |
-| opening | 0秒 | 自動スキップ |
+| opening | 300秒 (5分) | 自己紹介 + 状況共有 |
 | planning | 180秒 (3分) | 場所選択 + 会話 |
 | investigation | 120秒 (2分) | 調査実行 |
 | discussion | 300秒 (5分) | 議論 + 証拠公開 |
-| voting | 180秒 (3分) | 犯人投票 |
+| voting | 180秒 (3分) | 犯人投票(自動進行しない) |
 
-1ターン合計: 10分。3ターン + 投票 = 約33分。
+1ターン合計: 10分。自己紹介(5分) + 3ターン(30分) + 投票(3分) = 約38分。
 
-## 10. LLM 呼び出しポイント
+## 11. LLM 呼び出しポイント
 
 | タイミング | 関数 | モデル | 用途 |
 |-----------|------|--------|------|
 | ゲーム開始 | `generate_scenario()` | gpt-5.4-mini | シナリオ全体生成 |
+| AI補充時 | `_generate_ai_character()` | gpt-5.4-nano | AIキャラ動的生成 |
 | investigation 開始 | `investigate_location()` | gpt-5.4-nano | 各 feature の発見生成 |
 | investigate.tamper | `tamper_evidence()` | gpt-5.4-nano | 証拠改ざん |
 | discussion 開始 | `adjust_phase()` | gpt-5.4-nano | 追加証拠配布 |
+| AI発言 | `generate_ai_speech()` | gpt-5.4-nano | フェーズ別AI発言 |
 | 全員投票後 | `generate_ending()` | gpt-5.4-mini | エンディング生成 |
 
 コスト上限: $2.00 / ゲーム
+JSON修復: `json-repair` ライブラリで壊れたLLM出力を自動修復
+
+## 12. エンディングテンプレート構成
+
+1. **監禁**: 最多票キャラが監禁される描写
+2. **真相解明**: 犯人当て→告白 / 冤罪→真犯人逃走（後味悪い結末）
+3. **各キャラのその後**: 事件後の運命
+
+ending_text は最低15文以上。
