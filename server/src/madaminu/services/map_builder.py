@@ -16,6 +16,21 @@ def build_map_structure(llm_map: dict) -> dict:
     all_connections: list[dict] = []
     indoor_areas_with_stairs: list[dict] = []
 
+    # Ensure at least one crime scene is set
+    has_crime_scene = any(
+        r.get("is_crime_scene")
+        for a in areas
+        for r in a.get("rooms", [])
+    )
+    if not has_crime_scene:
+        # Pick the first size>=2 room, or fallback to first room
+        all_rooms = [r for a in areas for r in a.get("rooms", [])]
+        candidate = next((r for r in all_rooms if r.get("size", 1) >= 2), None)
+        if candidate is None and all_rooms:
+            candidate = all_rooms[0]
+        if candidate:
+            candidate["is_crime_scene"] = True
+
     # Determine which areas need stairs (multiple indoor/semi_outdoor areas)
     indoor_areas = [a for a in areas if a.get("area_type", "indoor") != "outdoor"]
     needs_stairs = len(indoor_areas) > 1
