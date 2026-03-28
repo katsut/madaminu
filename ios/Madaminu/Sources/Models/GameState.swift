@@ -69,12 +69,14 @@ struct DiscoveryItem: Identifiable, Sendable {
 
 struct SpeechEntry: Identifiable, Sendable {
     let id = UUID()
+    let playerId: String?
     let characterName: String
     let transcript: String
 }
 
 struct RevealedEvidence: Identifiable, Sendable {
     let id = UUID()
+    let playerId: String?
     let playerName: String
     let title: String
     let content: String
