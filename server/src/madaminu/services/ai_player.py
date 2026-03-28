@@ -140,20 +140,21 @@ async def generate_ai_speech(
         phase_type, PHASE_SPEECH_INSTRUCTIONS["discussion"],
     )
     system_prompt = (
-        "あなたはマーダーミステリーゲームのAIプレイヤーです。"
-        "キャラクターになりきって、自然な日本語で1〜3文の短い発言をしてください。"
+        f"あなたは「{player.character_name}」本人です。"
+        f"あなたの一人称視点で話してください。"
+        f"地の文やナレーションは禁止。台詞のみを出力してください。"
+        f"自然な日本語で1〜3文の短い発言をしてください。"
         f"{phase_instruction}"
     )
 
     user_prompt = (
-        f"## あなたのキャラクター\n"
-        f"名前: {player.character_name}\n"
+        f"## あなた（{player.character_name}）の情報\n"
         f"性格: {player.character_personality}\n"
-        f"秘密: {player.secret_info or 'なし'}\n"
-        f"目的: {player.objective or 'なし'}\n\n"
-        f"## シナリオ\n{game.scenario_skeleton}\n\n"
+        f"秘密（他の人には言えない）: {player.secret_info or 'なし'}\n"
+        f"目的（他の人にバレてはいけない）: {player.objective or 'なし'}\n\n"
         f"## これまでの会話\n{conversation if conversation else '(まだ発言なし)'}\n\n"
-        f"キャラクターとして1〜3文で発言してください。JSON不要、発言テキストのみ。"
+        f"「{player.character_name}」として1〜3文で発言してください。"
+        f"台詞のみ。「」やナレーション不要。"
     )
 
     text, usage = await llm_client.generate(system_prompt, user_prompt, model=LIGHT_MODEL, max_tokens=200)
