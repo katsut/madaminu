@@ -114,7 +114,7 @@ struct CharacterResponse: Codable, Sendable {
 }
 
 struct MyRoomItem: Codable, Identifiable, Sendable {
-    var id: String { roomCode }
+    var id: String { playerId }
     let roomCode: String
     let status: String
     let isHost: Bool
