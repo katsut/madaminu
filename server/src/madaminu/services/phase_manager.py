@@ -415,7 +415,7 @@ class PhaseManager:
                 logger.exception("Investigation failed for player %s location %s", player_id, location_id)
 
     async def _schedule_ai_speeches(self, game_id: str, room_code: str, phase: Phase):
-        if phase.phase_type != PhaseType.discussion:
+        if phase.phase_type not in (PhaseType.discussion, PhaseType.opening):
             return
 
         try:
