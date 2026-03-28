@@ -184,7 +184,7 @@ struct GamePlayView: View {
                 showNotebook = true
             }
 
-            if ["planning", "discussion"].contains(store.game.currentPhase?.phaseType) {
+            if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
                 SpeechButton(store: store)
             }
         }
