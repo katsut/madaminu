@@ -116,6 +116,7 @@ class PhaseManager:
                 game.status = GameStatus.ended
                 await db.commit()
                 await self._broadcast_phase_ended(room_code, current_phase, None)
+                await self._generate_and_broadcast_ending(game.id, room_code)
                 return None
 
             next_phase = sorted_phases[current_idx + 1]
@@ -540,3 +541,30 @@ class PhaseManager:
                 ).model_dump(),
             ),
         )
+
+    async def _generate_and_broadcast_ending(self, game_id: str, room_code: str):
+        from madaminu.services.scenario_engine import generate_ending
+        from madaminu.ws.handler import manager
+
+        try:
+            async with self._session_factory() as db:
+                ending, usage = await generate_ending(db, game_id)
+                logger.info("Ending generated for %s: %s", room_code, usage)
+
+            await manager.broadcast(
+                room_code,
+                WSMessage(
+                    type="game.ending",
+                    data={
+                        "ending_text": ending.ending_text,
+                        "true_criminal_id": ending.true_criminal_id,
+                        "objective_results": ending.objective_results,
+                    },
+                ),
+            )
+        except Exception:
+            logger.exception("Ending generation failed for game %s", game_id)
+            await manager.broadcast(
+                room_code,
+                WSMessage(type="error", data={"message": "エンディング生成に失敗しました"}),
+            )
