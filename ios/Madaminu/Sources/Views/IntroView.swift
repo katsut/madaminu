@@ -357,9 +357,9 @@ struct IntroView: View {
                 .padding(.horizontal, Spacing.lg)
             }
 
-            Text("この目的の達成を目指しながらゲームを進めましょう")
+            Text("この目的は他のプレイヤーにバレてはいけません。\n達成を目指しながらゲームを進めましょう。")
                 .font(.mdCaption)
-                .foregroundStyle(Color.mdTextMuted)
+                .foregroundStyle(Color.mdAccent)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.lg)
 

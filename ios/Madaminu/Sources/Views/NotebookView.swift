@@ -131,6 +131,10 @@ struct NotebookView: View {
                             Text(objective)
                                 .font(.mdBody)
                                 .foregroundStyle(Color.mdTextPrimary)
+
+                            Text("※ 他のプレイヤーにバレてはいけません")
+                                .font(.mdCaption2)
+                                .foregroundStyle(Color.mdAccent)
                         }
                     }
                 }
