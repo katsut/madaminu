@@ -160,6 +160,7 @@ struct WSMessageAdapter {
             applyEnding(data, store: store)
         case "error":
             if let msg = data["message"] {
+                print("[WSMessageAdapter] Error: \(msg)")
                 store.setError(msg, level: .transient)
             }
         default:

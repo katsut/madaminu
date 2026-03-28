@@ -273,6 +273,15 @@ class PhaseManager:
             return
 
         logger.info("Phase timer expired for game %s, phase %s", game_id, phase_id)
+
+        # Don't auto-advance voting phase - wait for all votes
+        async with self._session_factory() as db:
+            phase_result = await db.execute(select(Phase).where(Phase.id == phase_id))
+            phase = phase_result.scalar_one_or_none()
+            if phase and phase.phase_type == PhaseType.voting:
+                logger.info("Voting phase timer expired but waiting for all votes")
+                return
+
         try:
             await self.advance_phase(game_id, room_code)
         except Exception:
@@ -415,7 +424,7 @@ class PhaseManager:
                 logger.exception("Investigation failed for player %s location %s", player_id, location_id)
 
     async def _schedule_ai_speeches(self, game_id: str, room_code: str, phase: Phase):
-        if phase.phase_type not in (PhaseType.discussion, PhaseType.opening):
+        if phase.phase_type not in (PhaseType.discussion, PhaseType.opening, PhaseType.voting):
             return
 
         try:
