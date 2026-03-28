@@ -7,6 +7,7 @@ struct GamePlayView: View {
     @State private var showNotebook = false
     @State private var showDebug = false
     @State private var timer: Timer?
+    @State private var endingRevealPhase: Int = 0  // 0=not started, 1=name, 2=verdict, 3=done
 
     var body: some View {
         ZStack {
@@ -62,7 +63,15 @@ struct GamePlayView: View {
                 }
                 .animation(.easeInOut(duration: 0.5), value: store.game.showPhaseTransition)
             case .ended:
-                endingView
+                if endingRevealPhase < 3, let ending = store.game.ending {
+                    EndingRevealView(
+                        ending: ending,
+                        players: store.room.players,
+                        phase: $endingRevealPhase
+                    )
+                } else {
+                    endingView
+                }
             default:
                 EmptyView()
             }
@@ -1396,6 +1405,82 @@ struct GMGuideCard: View {
                     Text(message)
                         .font(.mdCaption)
                         .foregroundStyle(Color.mdTextSecondary)
+                }
+            }
+        }
+    }
+}
+
+struct EndingRevealView: View {
+    let ending: EndingData
+    let players: [PlayerInfo]
+    @Binding var phase: Int
+    @State private var textOpacity: Double = 0
+
+    private var arrestedPlayer: PlayerInfo? {
+        guard let name = ending.arrestedName else { return nil }
+        return players.first(where: { $0.characterName == name })
+    }
+
+    private var isTrueCriminal: Bool {
+        guard let player = arrestedPlayer else { return false }
+        return player.id == ending.trueCriminalId
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: Spacing.xl) {
+                if phase == 0 || phase == 1 {
+                    // Scene 1: "〇〇は・・・・"
+                    VStack(spacing: Spacing.lg) {
+                        if let player = arrestedPlayer {
+                            PlayerAvatarView(playerId: player.id, players: players, size: 100)
+                        }
+                        Text("\(ending.arrestedName ?? "???") は・・・・")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(Color.mdTextPrimary)
+                    }
+                    .opacity(textOpacity)
+                } else if phase == 2 {
+                    // Scene 2: verdict
+                    VStack(spacing: Spacing.lg) {
+                        if let player = arrestedPlayer {
+                            PlayerAvatarView(playerId: player.id, players: players, size: 100)
+                        }
+                        Text(isTrueCriminal ? "犯人でした" : "冤罪でした")
+                            .font(.system(size: 40, weight: .black))
+                            .foregroundStyle(isTrueCriminal ? Color.mdAccent : Color.mdInfo)
+                        Text(isTrueCriminal ? "真犯人を見事に見抜きました" : "無実の人が監禁されてしまいました...")
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextSecondary)
+                    }
+                    .opacity(textOpacity)
+                }
+            }
+        }
+        .onAppear {
+            startReveal()
+        }
+    }
+
+    private func startReveal() {
+        phase = 1
+        withAnimation(.easeIn(duration: 1.5)) {
+            textOpacity = 1
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            withAnimation(.easeOut(duration: 0.5)) {
+                textOpacity = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                phase = 2
+                withAnimation(.easeIn(duration: 1.0)) {
+                    textOpacity = 1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    phase = 3
                 }
             }
         }
