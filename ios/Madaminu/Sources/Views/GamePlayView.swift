@@ -1184,6 +1184,7 @@ struct PhaseTransitionOverlay: View {
         case "investigation": "調査フェーズ"
         case "discussion": "議論フェーズ"
         case "voting": "投票フェーズ"
+        case "ending": "結果発表"
         default: type
         }
     }
@@ -1195,6 +1196,7 @@ struct PhaseTransitionOverlay: View {
         case "investigation": "選んだ場所で手がかりを探しましょう"
         case "discussion": "集めた情報をもとに推理を話し合いましょう"
         case "voting": "犯人だと思う人物に投票してください"
+        case "ending": "投票結果とエピローグを生成中です..."
         default: ""
         }
     }
@@ -1206,6 +1208,11 @@ struct PhaseTransitionOverlay: View {
                 "発言ボタンを押して自己紹介をする",
                 "他のキャラクターの話を聞いて関係性を把握する",
                 "手帳で自分の情報を確認する",
+            ]
+        case "ending":
+            return [
+                "AIがエピローグを生成中です",
+                "少々お待ちください...",
             ]
         case "planning":
             return [

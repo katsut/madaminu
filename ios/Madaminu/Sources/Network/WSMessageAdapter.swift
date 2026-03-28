@@ -44,9 +44,13 @@ struct WSMessageAdapter {
                     reveals: store.game.revealedEvidences
                 )
             }
-            if let nextType = data["next_phase_type"], !nextType.isEmpty {
+            let nextType = data["next_phase_type"] ?? ""
+            if !nextType.isEmpty {
                 store.game.showPhaseTransition = true
                 store.game.nextPhaseType = nextType
+            } else if endedType == "voting" {
+                store.game.showPhaseTransition = true
+                store.game.nextPhaseType = "ending"
             }
             store.game.currentPhase = nil
         case "speech.granted":
@@ -318,6 +322,7 @@ struct WSMessageAdapter {
             return
         }
         store.game.ending = endingData
+        store.game.showPhaseTransition = false
         store.screen = .ended
     }
 
