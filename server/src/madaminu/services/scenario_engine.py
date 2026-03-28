@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -303,6 +303,15 @@ async def investigate_location(
     locations = phase.investigation_locations or []
     location = next((loc for loc in locations if loc.get("id") == location_id), None)
     if location is None:
+        map_data = (game.scenario_skeleton or {}).get("map", {})
+        for area in map_data.get("areas", []):
+            for room in area.get("rooms", []):
+                if room.get("id") == location_id:
+                    location = room
+                    break
+            if location:
+                break
+    if location is None:
         return None, None
 
     player = next((p for p in game.players if p.id == player_id), None)
@@ -500,6 +509,7 @@ def _format_speech_logs(logs, id_to_name: dict[str, str]) -> str:
 
 
 PHASE_DURATIONS = {
+    PhaseType.opening: 300,
     PhaseType.planning: 180,
     PhaseType.investigation: 120,
     PhaseType.discussion: 300,
@@ -524,7 +534,7 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
         game_id=game.id,
         phase_type=PhaseType.opening,
         phase_order=phase_order,
-        duration_sec=0,
+        duration_sec=PHASE_DURATIONS[PhaseType.opening],
     )
     db.add(opening_phase)
     phase_order += 1

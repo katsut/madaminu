@@ -26,6 +26,8 @@ struct GamePlayView: View {
                         Group {
                             if let phase = store.game.currentPhase {
                                 switch phase.phaseType {
+                                case "opening":
+                                    OpeningPhaseView(store: store)
                                 case "planning":
                                     PlanningPhaseView(store: store)
                                 case "investigation":
@@ -258,6 +260,7 @@ struct GamePlayView: View {
 
     private func phaseColor(_ type: String) -> Color {
         switch type {
+        case "opening": .mdSuccess
         case "planning": .mdWarning
         case "investigation": .mdInfo
         case "discussion": .mdPrimary
@@ -268,6 +271,7 @@ struct GamePlayView: View {
 
     private func phaseDisplayName(_ type: String) -> String {
         switch type {
+        case "opening": "自己紹介"
         case "planning": "調査計画"
         case "investigation": "調査フェーズ"
         case "discussion": "議論フェーズ"
@@ -302,6 +306,42 @@ struct SpeechButton: View {
                 store.dispatch(.requestSpeech)
             }
             .disabled(store.game.currentSpeakerId != nil)
+        }
+    }
+}
+
+struct OpeningPhaseView: View {
+    @ObservedObject var store: AppStore
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                GMGuideCard(
+                    title: "自己紹介タイム",
+                    message: "発言ボタンを押して、自分のキャラクターを紹介してください。\nこの集まりでの立場や、他のキャラクターとの関係を共有しましょう。"
+                )
+
+                if let speaker = store.game.currentSpeakerId {
+                    let name = store.room.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
+                    MDCard {
+                        HStack {
+                            Image(systemName: "mic.fill")
+                                .foregroundStyle(Color.mdAccent)
+                            Text("\(name) が発言中")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdTextPrimary)
+                            Spacer()
+                        }
+                    }
+                }
+
+                if store.game.isSpeaking {
+                    TranscriptView(store: store)
+                }
+
+                SpeechHistoryView(store: store)
+            }
+            .padding(Spacing.lg)
         }
     }
 }
@@ -1118,6 +1158,7 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseTitle(_ type: String) -> String {
         switch type {
+        case "opening": "自己紹介"
         case "planning": "調査計画"
         case "investigation": "調査フェーズ"
         case "discussion": "議論フェーズ"
@@ -1128,6 +1169,7 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseSubtitle(_ type: String) -> String {
         switch type {
+        case "opening": "まずはお互いを知りましょう。自己紹介と状況の共有をしてください"
         case "planning": "みんなで相談して、次に調べる場所を決めましょう"
         case "investigation": "選んだ場所で手がかりを探しましょう"
         case "discussion": "集めた情報をもとに推理を話し合いましょう"
@@ -1138,6 +1180,12 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseGuide(_ type: String) -> [String] {
         switch type {
+        case "opening":
+            return [
+                "発言ボタンを押して自己紹介をする",
+                "他のキャラクターの話を聞いて関係性を把握する",
+                "手帳で自分の情報を確認する",
+            ]
         case "planning":
             return [
                 "マップを見て調べたい場所を1つ選ぶ",
