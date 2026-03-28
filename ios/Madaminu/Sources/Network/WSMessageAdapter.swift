@@ -36,6 +36,10 @@ struct WSMessageAdapter {
                 store.game.localRemainingSec = remaining
             }
         case "phase.ended":
+            if let nextType = data["next_phase_type"], !nextType.isEmpty {
+                store.game.showPhaseTransition = true
+                store.game.nextPhaseType = nextType
+            }
             store.game.currentPhase = nil
         case "speech.granted":
             store.game.isSpeaking = true
@@ -260,7 +264,10 @@ struct WSMessageAdapter {
         if store.screen == .generating || store.screen == .lobby {
             store.screen = .playing
         }
-        store.game.showPhaseTransition = true
+        if !store.game.showPhaseTransition {
+            store.game.showPhaseTransition = true
+        }
+        store.game.nextPhaseType = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             store.game.showPhaseTransition = false
         }

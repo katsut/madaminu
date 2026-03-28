@@ -46,9 +46,12 @@ struct GamePlayView: View {
                         bottomBar
                     }
 
-                    if store.game.showPhaseTransition, let phase = store.game.currentPhase {
+                    if store.game.showPhaseTransition {
                         PhaseTransitionOverlay(
-                            phase: phase,
+                            phaseType: store.game.currentPhase?.phaseType ?? store.game.nextPhaseType ?? "",
+                            turnNumber: store.game.currentPhase?.turnNumber ?? 1,
+                            totalTurns: store.game.currentPhase?.totalTurns ?? 3,
+                            durationSec: store.game.currentPhase?.durationSec ?? 0,
                             sceneImageUrl: store.game.scenarioSetting.sceneImageUrl
                         )
                         .transition(.opacity)
@@ -1025,7 +1028,10 @@ struct SVGWebView: UIViewRepresentable {
 }
 
 struct PhaseTransitionOverlay: View {
-    let phase: PhaseInfo
+    let phaseType: String
+    let turnNumber: Int
+    let totalTurns: Int
+    let durationSec: Int
     let sceneImageUrl: String?
 
     var body: some View {
@@ -1044,23 +1050,23 @@ struct PhaseTransitionOverlay: View {
             }
 
             VStack(spacing: Spacing.md) {
-                Text("ターン \(phase.turnNumber) / \(phase.totalTurns)")
+                Text("ターン \(turnNumber) / \(totalTurns)")
                     .font(.system(size: 14, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color.mdTextMuted)
                     .tracking(4)
 
-                Text(phaseTitle(phase.phaseType))
+                Text(phaseTitle(phaseType))
                     .font(.system(size: 36, weight: .bold))
                     .foregroundStyle(Color.mdTextPrimary)
 
-                Text(phaseSubtitle(phase.phaseType))
+                Text(phaseSubtitle(phaseType))
                     .font(.mdBody)
                     .foregroundStyle(Color.mdTextSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Spacing.xl)
 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
-                    ForEach(phaseGuide(phase.phaseType), id: \.self) { step in
+                    ForEach(phaseGuide(phaseType), id: \.self) { step in
                         HStack(alignment: .top, spacing: Spacing.xs) {
                             Text("•")
                                 .foregroundStyle(Color.mdPrimary)
@@ -1073,10 +1079,16 @@ struct PhaseTransitionOverlay: View {
                 .padding(.horizontal, Spacing.xl)
                 .padding(.top, Spacing.sm)
 
-                Text(formatDuration(phase.durationSec))
-                    .font(.system(size: 14, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color.mdTextMuted)
-                    .padding(.top, Spacing.xs)
+                if durationSec > 0 {
+                    Text(formatDuration(durationSec))
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.mdTextMuted)
+                        .padding(.top, Spacing.xs)
+                } else {
+                    ProgressView()
+                        .tint(Color.mdTextMuted)
+                        .padding(.top, Spacing.xs)
+                }
             }
         }
     }

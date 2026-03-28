@@ -29,7 +29,9 @@ class PhaseManager:
         self._intro_ready: dict[str, set[str]] = {}
         self._paused: dict[str, int] = {}  # game_id -> remaining_sec when paused
 
-    def set_investigation_selection(self, room_code: str, player_id: str, location_id: str | None, feature: str | None = None):
+    def set_investigation_selection(
+        self, room_code: str, player_id: str, location_id: str | None, feature: str | None = None,
+    ):
         if room_code not in self._investigation_selections:
             self._investigation_selections[room_code] = {}
         self._investigation_selections[room_code][player_id] = {"location_id": location_id, "feature": feature}
@@ -94,6 +96,7 @@ class PhaseManager:
         return first_phase
 
     async def advance_phase(self, game_id: str, room_code: str) -> Phase | None:
+        logger.info("advance_phase called for game %s room %s", game_id, room_code)
         self._cancel_timer(game_id)
 
         async with self._session_factory() as db:
@@ -270,11 +273,38 @@ class PhaseManager:
             return
 
         logger.info("Phase timer expired for game %s, phase %s", game_id, phase_id)
-        await self.advance_phase(game_id, room_code)
+        try:
+            await self.advance_phase(game_id, room_code)
+        except Exception:
+            logger.exception("advance_phase failed after timer expired for game %s", game_id)
 
     async def _generate_room_discoveries(self, game_id: str, room_code: str):
+        import random
+
         from madaminu.services.scenario_engine import investigate_location
         from madaminu.ws.handler import manager
+
+        selections = self.get_investigation_selections(room_code)
+
+        # Assign random locations to players who didn't select
+        async with self._session_factory() as db:
+            game_result = await db.execute(
+                select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+            )
+            game = game_result.scalar_one()
+            map_data = (game.scenario_skeleton or {}).get("map", {})
+            all_rooms = []
+            for area in map_data.get("areas", []):
+                for room in area.get("rooms", []):
+                    room_type = room.get("room_type", "room")
+                    if room_type not in ("corridor", "entrance", "stairs"):
+                        all_rooms.append(room["id"])
+
+            for player in game.players:
+                if player.id not in selections and all_rooms:
+                    loc = random.choice(all_rooms)
+                    self.set_investigation_selection(room_code, player.id, loc)
+                    logger.info("Auto-assigned location %s to player %s", loc, player.id)
 
         selections = self.get_investigation_selections(room_code)
         logger.info("Generating discoveries for %s: %d selections", room_code, len(selections))
@@ -324,6 +354,10 @@ class PhaseManager:
                             discovery, usage = await investigate_location(
                                 db, game_id, player_id, location_id, feature
                             )
+                            logger.info(
+                                "Discovery result for %s: %s",
+                                feature, type(discovery).__name__ if discovery else "None",
+                            )
                             if discovery:
                                 discovery["can_tamper"] = is_alone
                                 discoveries.append(discovery)
@@ -331,6 +365,7 @@ class PhaseManager:
                         except Exception:
                             logger.exception("Discovery generation failed: %s/%s", location_id, feature)
 
+                    logger.info("Total discoveries for %s: %d", player_id, len(discoveries))
                     if discoveries:
                         await manager.send_to_player(
                             room_code,
