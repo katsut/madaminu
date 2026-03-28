@@ -7,7 +7,7 @@ This module generates: corridors, entrances, stairs, connections
 import math
 
 
-def build_map_structure(llm_map: dict) -> dict:
+def build_map_structure(llm_map: dict, victim: dict | None = None) -> dict:
     """Transform LLM room list into complete map with backbone and connections."""
     areas = llm_map.get("areas", [])
     if not areas:
@@ -16,18 +16,17 @@ def build_map_structure(llm_map: dict) -> dict:
     all_connections: list[dict] = []
     indoor_areas_with_stairs: list[dict] = []
 
-    # Ensure at least one crime scene is set
-    has_crime_scene = any(
-        r.get("is_crime_scene")
-        for a in areas
-        for r in a.get("rooms", [])
-    )
-    if not has_crime_scene:
-        # Pick the first size>=2 room, or fallback to first room
-        all_rooms = [r for a in areas for r in a.get("rooms", [])]
-        candidate = next((r for r in all_rooms if r.get("size", 1) >= 2), None)
-        if candidate is None and all_rooms:
-            candidate = all_rooms[0]
+    # Set crime scene from victim data
+    crime_room_id = (victim or {}).get("crime_scene_room_id")
+    all_rooms_flat = [r for a in areas for r in a.get("rooms", [])]
+    if crime_room_id:
+        for r in all_rooms_flat:
+            r["is_crime_scene"] = r["id"] == crime_room_id
+    # Fallback: if no crime scene set, pick first size>=2 room
+    if not any(r.get("is_crime_scene") for r in all_rooms_flat):
+        candidate = next((r for r in all_rooms_flat if r.get("size", 1) >= 2), None)
+        if candidate is None and all_rooms_flat:
+            candidate = all_rooms_flat[0]
         if candidate:
             candidate["is_crime_scene"] = True
 
