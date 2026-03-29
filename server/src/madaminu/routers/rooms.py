@@ -36,9 +36,18 @@ async def list_rooms_endpoint(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=CreateRoomResponse)
-async def create_room_endpoint(req: CreateRoomRequest, db: AsyncSession = Depends(get_db), x_device_id: str | None = Header(None)):
+async def create_room_endpoint(
+    req: CreateRoomRequest, db: AsyncSession = Depends(get_db), x_device_id: str | None = Header(None)
+):
     try:
-        game, player = await create_room(db, req.display_name, req.password, device_id=x_device_id, turn_count=req.turn_count, room_name=req.room_name)
+        game, player = await create_room(
+            db,
+            req.display_name,
+            req.password,
+            device_id=x_device_id,
+            turn_count=req.turn_count,
+            room_name=req.room_name,
+        )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e)) from None
     return CreateRoomResponse(
@@ -49,7 +58,9 @@ async def create_room_endpoint(req: CreateRoomRequest, db: AsyncSession = Depend
 
 
 @router.post("/{room_code}/join", response_model=JoinRoomResponse)
-async def join_room_endpoint(room_code: str, req: JoinRoomRequest, db: AsyncSession = Depends(get_db), x_device_id: str | None = Header(None)):
+async def join_room_endpoint(
+    room_code: str, req: JoinRoomRequest, db: AsyncSession = Depends(get_db), x_device_id: str | None = Header(None)
+):
     try:
         _, player = await join_room(db, room_code, req.display_name, req.password, device_id=x_device_id)
     except ValueError as e:
@@ -121,24 +132,24 @@ async def list_my_rooms(x_device_id: str = Header(...), db: AsyncSession = Depen
         if g is None or g.id in seen_game_ids:
             continue
         seen_game_ids.add(g.id)
-        rooms.append({
-            "room_code": g.room_code,
-            "status": g.status,
-            "is_host": p.is_host,
-            "display_name": p.display_name,
-            "character_name": p.character_name,
-            "session_token": p.session_token,
-            "player_id": p.id,
-            "created_at": str(g.created_at) if g.created_at else None,
-        })
+        rooms.append(
+            {
+                "room_code": g.room_code,
+                "status": g.status,
+                "is_host": p.is_host,
+                "display_name": p.display_name,
+                "character_name": p.character_name,
+                "session_token": p.session_token,
+                "player_id": p.id,
+                "created_at": str(g.created_at) if g.created_at else None,
+            }
+        )
     return rooms
 
 
 @router.delete("/{room_code}")
 async def delete_room(room_code: str, x_device_id: str = Header(...), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code)
-    )
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
         raise HTTPException(status_code=404, detail="Room not found") from None
@@ -149,7 +160,7 @@ async def delete_room(room_code: str, x_device_id: str = Header(...), db: AsyncS
 
     from sqlalchemy import delete as sa_delete
 
-    from madaminu.models import Evidence, Phase, SpeechLog, Vote
+    from madaminu.models import Evidence, SpeechLog, Vote
     from madaminu.models.game_ending import GameEnding
     from madaminu.models.note import Note
 

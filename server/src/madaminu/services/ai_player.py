@@ -30,6 +30,7 @@ async def _generate_ai_character(existing_characters: list[str], setting: str) -
     )
     raw, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
     from madaminu.services.scenario_engine import _parse_scenario_json
+
     return _parse_scenario_json(raw)
 
 
@@ -131,13 +132,11 @@ async def generate_ai_speech(
     recent_logs = logs_result.scalars().all()
 
     id_to_name = {p.id: p.character_name or p.display_name for p in game.players}
-    conversation = "\n".join(
-        f"[{id_to_name.get(log.player_id, '?')}]: {log.transcript}"
-        for log in recent_logs[-10:]
-    )
+    conversation = "\n".join(f"[{id_to_name.get(log.player_id, '?')}]: {log.transcript}" for log in recent_logs[-10:])
 
     phase_instruction = PHASE_SPEECH_INSTRUCTIONS.get(
-        phase_type, PHASE_SPEECH_INSTRUCTIONS["discussion"],
+        phase_type,
+        PHASE_SPEECH_INSTRUCTIONS["discussion"],
     )
     system_prompt = (
         f"あなたは「{player.character_name}」本人です。"

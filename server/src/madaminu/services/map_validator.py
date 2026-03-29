@@ -1,6 +1,5 @@
 """Validate map structure consistency for generated scenarios."""
 
-
 VALID_CONNECTION_TYPES = {"door", "corridor", "stairs", "window", "hidden_passage"}
 VALID_AREA_TYPES = {"indoor", "outdoor", "semi_outdoor"}
 
