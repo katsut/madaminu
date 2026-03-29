@@ -77,11 +77,13 @@ def _build_indoor(area: dict, rooms: list[dict], add_stairs: bool) -> list[dict]
 
     corridors = []
     for i in range(corridor_count):
-        corridors.append({
-            "id": f"{area_id}_corridor_{i}",
-            "name": "廊下",
-            "room_type": "corridor",
-        })
+        corridors.append(
+            {
+                "id": f"{area_id}_corridor_{i}",
+                "name": "廊下",
+                "room_type": "corridor",
+            }
+        )
 
     stairs = None
     if add_stairs:
@@ -97,20 +99,24 @@ def _build_indoor(area: dict, rooms: list[dict], add_stairs: bool) -> list[dict]
         backbone.append(stairs)
 
     for i in range(len(backbone) - 1):
-        connections.append({
-            "from": backbone[i]["id"],
-            "to": backbone[i + 1]["id"],
-            "type": "corridor",
-        })
+        connections.append(
+            {
+                "from": backbone[i]["id"],
+                "to": backbone[i + 1]["id"],
+                "type": "corridor",
+            }
+        )
 
     # Connect rooms to corridors (max 2 per corridor)
     for i, room in enumerate(rooms):
         corridor_idx = min(i // 2, corridor_count - 1)
-        connections.append({
-            "from": corridors[corridor_idx]["id"],
-            "to": room["id"],
-            "type": "door",
-        })
+        connections.append(
+            {
+                "from": corridors[corridor_idx]["id"],
+                "to": room["id"],
+                "type": "door",
+            }
+        )
 
     # Crime scene: ensure 2+ connections
     for room in rooms:
@@ -122,11 +128,13 @@ def _build_indoor(area: dict, rooms: list[dict], add_stairs: bool) -> list[dict]
                 corridor_idx = min(room_idx // 2, corridor_count - 1)
                 alt_idx = corridor_idx + 1 if corridor_idx + 1 < corridor_count else corridor_idx - 1
                 if 0 <= alt_idx < corridor_count:
-                    connections.append({
-                        "from": corridors[alt_idx]["id"],
-                        "to": room["id"],
-                        "type": "door",
-                    })
+                    connections.append(
+                        {
+                            "from": corridors[alt_idx]["id"],
+                            "to": room["id"],
+                            "type": "door",
+                        }
+                    )
 
     # Prepend infrastructure nodes to area rooms
     infra = [entrance] + corridors
@@ -147,11 +155,13 @@ def _build_outdoor(area: dict, rooms: list[dict]) -> list[dict]:
 
     # Linear chain: room0 → room1 → room2 → ...
     for i in range(len(rooms) - 1):
-        connections.append({
-            "from": rooms[i]["id"],
-            "to": rooms[i + 1]["id"],
-            "type": "corridor",
-        })
+        connections.append(
+            {
+                "from": rooms[i]["id"],
+                "to": rooms[i + 1]["id"],
+                "type": "corridor",
+            }
+        )
 
     area["rooms"] = rooms
     return connections
@@ -168,11 +178,13 @@ def _connect_floors(indoor_areas: list[dict]) -> list[dict]:
         stairs_a = _find_stairs(sorted_areas[i])
         stairs_b = _find_stairs(sorted_areas[i + 1])
         if stairs_a and stairs_b:
-            connections.append({
-                "from": stairs_a["id"],
-                "to": stairs_b["id"],
-                "type": "stairs",
-            })
+            connections.append(
+                {
+                    "from": stairs_a["id"],
+                    "to": stairs_b["id"],
+                    "type": "stairs",
+                }
+            )
 
     return connections
 
@@ -198,11 +210,13 @@ def _connect_indoor_outdoor(areas: list[dict]) -> list[dict]:
                 break
 
     if indoor_entrance and outdoor_first_room:
-        connections.append({
-            "from": indoor_entrance["id"],
-            "to": outdoor_first_room["id"],
-            "type": "door",
-        })
+        connections.append(
+            {
+                "from": indoor_entrance["id"],
+                "to": outdoor_first_room["id"],
+                "type": "door",
+            }
+        )
 
     return connections
 
@@ -396,11 +410,7 @@ def generate_travel_narrative(
         dest_name = all_nodes.get(loc_id, {}).get("name", loc_id)
 
         # Who else is going to the same place?
-        companions = [
-            id_to_name.get(other, "?")
-            for other in dest_groups.get(loc_id, [])
-            if other != pid
-        ]
+        companions = [id_to_name.get(other, "?") for other in dest_groups.get(loc_id, []) if other != pid]
 
         parts = []
         if len(room_names) > 2:

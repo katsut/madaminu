@@ -25,8 +25,8 @@ final class AppStore: ObservableObject, @unchecked Sendable {
 
     func dispatch(_ action: AppAction) {
         switch action {
-        case .createRoom(let password):
-            Task { @MainActor in await performCreateRoom(password: password) }
+        case .createRoom(let roomName, let password):
+            Task { @MainActor in await performCreateRoom(roomName: roomName, password: password) }
         case .joinRoom(let code, let password):
             Task { @MainActor in await performJoinRoom(code: code, password: password) }
         case .leaveRoom:
@@ -182,7 +182,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
 
     // MARK: - Private Actions
 
-    @MainActor private func performCreateRoom(password: String?) async {
+    @MainActor private func performCreateRoom(roomName: String?, password: String?) async {
         guard !room.displayName.isEmpty else {
             errorMessage = "名前を入力してください"
             return
@@ -192,7 +192,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         errorMessage = nil
 
         do {
-            let response = try await api.createRoom(displayName: room.displayName, password: password, turnCount: room.turnCount)
+            let response = try await api.createRoom(displayName: room.displayName, roomName: roomName, password: password, turnCount: room.turnCount)
             room.roomCode = response.roomCode
             room.playerId = response.playerId
             room.sessionToken = response.sessionToken

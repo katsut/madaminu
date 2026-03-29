@@ -59,7 +59,9 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
         "victim": game.scenario_skeleton.get("victim", {}) if game.scenario_skeleton else None,
         "scene_image_url": f"/api/v1/images/game/{game.room_code}/scene" if game.scene_image else None,
         "victim_image_url": f"/api/v1/images/game/{game.room_code}/victim" if game.victim_image else None,
-        "map_url": f"/api/v1/images/game/{game.room_code}/map" if game.scenario_skeleton and "map" in game.scenario_skeleton else None,
+        "map_url": f"/api/v1/images/game/{game.room_code}/map"
+        if game.scenario_skeleton and "map" in game.scenario_skeleton
+        else None,
     }
 
     from madaminu.models import Evidence
@@ -77,16 +79,13 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
     )
     my_evidences = ev_result.scalars().all()
     state["my_evidences"] = [
-        {"evidence_id": e.id, "title": e.title, "content": e.content, "source": e.source}
-        for e in my_evidences
+        {"evidence_id": e.id, "title": e.title, "content": e.content, "source": e.source} for e in my_evidences
     ]
 
     if game.current_phase_id:
         phase_info = await _get_current_phase_dict(db, game.current_phase_id)
         if phase_info:
-            total_result = await db.execute(
-                select(func.count()).select_from(Phase).where(Phase.game_id == game.id)
-            )
+            total_result = await db.execute(select(func.count()).select_from(Phase).where(Phase.game_id == game.id))
             phase_info["total_phases"] = total_result.scalar_one()
             phase_info["turn_number"] = max(1, (phase_info["phase_order"] - 2) // 3 + 1)
             phase_info["total_turns"] = game.turn_count or 3

@@ -128,9 +128,7 @@ async def _activate_phase_by_type(session_factory, phase_type: PhaseType):
     from datetime import UTC, datetime
 
     async with session_factory() as db:
-        result = await db.execute(
-            select(Game).where(Game.status == GameStatus.playing)
-        )
+        result = await db.execute(select(Game).where(Game.status == GameStatus.playing))
         games = result.scalars().all()
         for game in games:
             phase_result = await db.execute(

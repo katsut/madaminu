@@ -221,9 +221,7 @@ async def _handle_intro_ready(db: AsyncSession, room_code: str, player_id: str, 
         WSMessage(type="intro.ready.count", data={"count": count}),
     )
 
-    result = await db.execute(
-        select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code)
-    )
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game:
         human_count = sum(1 for p in game.players if not p.is_ai)
@@ -281,7 +279,9 @@ async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str,
         await pm.resume_phase(game.id, room_code)
 
 
-async def _handle_investigate_select(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+async def _handle_investigate_select(
+    db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket
+):
     from madaminu.models import Phase, PhaseType
     from madaminu.services.scenario_engine import investigate_location
 
@@ -328,19 +328,13 @@ async def _handle_investigate_select(db: AsyncSession, room_code: str, player_id
 
 def _is_alone_at_location(pm, room_code: str, player_id: str, location_id: str) -> bool:
     selections = pm.get_investigation_selections(room_code)
-    others = [
-        pid for pid, sel in selections.items()
-        if sel.get("location_id") == location_id and pid != player_id
-    ]
+    others = [pid for pid, sel in selections.items() if sel.get("location_id") == location_id and pid != player_id]
     return len(others) == 0
 
 
 async def _broadcast_colocated_players(db: AsyncSession, room_code: str, location_id: str, pm):
     selections = pm.get_investigation_selections(room_code)
-    colocated_ids = [
-        pid for pid, sel in selections.items()
-        if sel.get("location_id") == location_id
-    ]
+    colocated_ids = [pid for pid, sel in selections.items() if sel.get("location_id") == location_id]
     if len(colocated_ids) < 2:
         return
 
@@ -407,9 +401,7 @@ async def _handle_evidence_reveal(db: AsyncSession, room_code: str, player_id: s
     if not evidence_id:
         return
 
-    result = await db.execute(
-        select(Evidence).where(Evidence.id == evidence_id, Evidence.player_id == player_id)
-    )
+    result = await db.execute(select(Evidence).where(Evidence.id == evidence_id, Evidence.player_id == player_id))
     evidence = result.scalar_one_or_none()
     if evidence is None:
         return
@@ -461,7 +453,9 @@ async def _handle_investigate_keep(db: AsyncSession, room_code: str, player_id: 
     )
 
 
-async def _handle_investigate_tamper(db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket):
+async def _handle_investigate_tamper(
+    db: AsyncSession, room_code: str, player_id: str, data: dict, websocket: WebSocket
+):
     from madaminu.services.scenario_engine import tamper_evidence
 
     pm = _get_phase_manager(websocket)
@@ -478,7 +472,9 @@ async def _handle_investigate_tamper(db: AsyncSession, room_code: str, player_id
     sel = selections.get(player_id, {})
     location_id = sel.get("location_id")
     if not location_id or not _is_alone_at_location(pm, room_code, player_id, location_id):
-        await websocket.send_json(WSMessage(type="error", data={"message": "同室に他のプレイヤーがいます"}).model_dump())
+        await websocket.send_json(
+            WSMessage(type="error", data={"message": "同室に他のプレイヤーがいます"}).model_dump()
+        )
         return
 
     result = await db.execute(select(Game).where(Game.room_code == room_code))
@@ -515,9 +511,7 @@ async def _handle_room_message(db: AsyncSession, room_code: str, player_id: str,
     if not sender_location:
         return
 
-    result = await db.execute(
-        select(Player).where(Player.id == player_id)
-    )
+    result = await db.execute(select(Player).where(Player.id == player_id))
     sender = result.scalar_one_or_none()
     if sender is None:
         return

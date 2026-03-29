@@ -1,5 +1,5 @@
 enum AppAction {
-    case createRoom(password: String?)
+    case createRoom(roomName: String?, password: String?)
     case joinRoom(code: String, password: String?)
     case leaveRoom
     case showCharacterCreation

@@ -127,27 +127,31 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
 
         initial_ev = sp.get("initial_evidence")
         if initial_ev:
-            db.add(Evidence(
-                id=str(uuid.uuid4()),
-                game_id=game.id,
-                player_id=player.id,
-                phase_id=initial_phase.id,
-                title=initial_ev.get("title", "証拠"),
-                content=initial_ev.get("content", ""),
-                source=EvidenceSource.gm_push,
-            ))
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game.id,
+                    player_id=player.id,
+                    phase_id=initial_phase.id,
+                    title=initial_ev.get("title", "証拠"),
+                    content=initial_ev.get("content", ""),
+                    source=EvidenceSource.gm_push,
+                )
+            )
 
         initial_alibi = sp.get("initial_alibi")
         if initial_alibi:
-            db.add(Evidence(
-                id=str(uuid.uuid4()),
-                game_id=game.id,
-                player_id=player.id,
-                phase_id=initial_phase.id,
-                title=initial_alibi.get("title", "アリバイ"),
-                content=initial_alibi.get("content", ""),
-                source=EvidenceSource.gm_push,
-            ))
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game.id,
+                    player_id=player.id,
+                    phase_id=initial_phase.id,
+                    title=initial_alibi.get("title", "アリバイ"),
+                    content=initial_alibi.get("content", ""),
+                    source=EvidenceSource.gm_push,
+                )
+            )
 
     game.total_llm_cost_usd += sum(u.estimated_cost_usd for u in usages)
     await db.commit()
@@ -171,9 +175,7 @@ async def generate_initial_evidence(db: AsyncSession, game_id: str) -> tuple[lis
 
     players_info = _format_players_for_adjustment(game.players)
     first_phase = None
-    phase_result = await db.execute(
-        select(Phase).where(Phase.game_id == game_id).order_by(Phase.phase_order).limit(1)
-    )
+    phase_result = await db.execute(select(Phase).where(Phase.game_id == game_id).order_by(Phase.phase_order).limit(1))
     first_phase = phase_result.scalar_one_or_none()
     phase_id = first_phase.id if first_phase else ""
 
@@ -367,7 +369,10 @@ async def investigate_location(
 
 
 async def keep_evidence(
-    db: AsyncSession, game_id: str, player_id: str, discovery: dict,
+    db: AsyncSession,
+    game_id: str,
+    player_id: str,
+    discovery: dict,
 ) -> Evidence:
     result = await db.execute(select(Game).where(Game.id == game_id))
     game = result.scalar_one()
@@ -387,7 +392,10 @@ async def keep_evidence(
 
 
 async def tamper_evidence(
-    db: AsyncSession, game_id: str, player_id: str, discovery: dict,
+    db: AsyncSession,
+    game_id: str,
+    player_id: str,
+    discovery: dict,
 ) -> dict:
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
     game = result.scalar_one()
@@ -572,18 +580,22 @@ def _resolve_investigation_locations(raw_locations: list, map_locations: dict) -
         if isinstance(loc, str):
             map_loc = map_locations.get(loc)
             if map_loc:
-                resolved.append({
-                    "id": map_loc["id"],
-                    "name": map_loc["name"],
-                    "description": map_loc.get("description", ""),
-                    "features": map_loc.get("features", []),
-                })
+                resolved.append(
+                    {
+                        "id": map_loc["id"],
+                        "name": map_loc["name"],
+                        "description": map_loc.get("description", ""),
+                        "features": map_loc.get("features", []),
+                    }
+                )
         elif isinstance(loc, dict) and "id" in loc:
-            resolved.append({
-                "id": loc["id"],
-                "name": loc.get("name", loc["id"]),
-                "description": loc.get("description", ""),
-            })
+            resolved.append(
+                {
+                    "id": loc["id"],
+                    "name": loc.get("name", loc["id"]),
+                    "description": loc.get("description", ""),
+                }
+            )
     return resolved
 
 

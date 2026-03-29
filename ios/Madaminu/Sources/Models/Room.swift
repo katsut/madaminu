@@ -139,6 +139,7 @@ struct MyRoomItem: Codable, Identifiable, Sendable {
 struct RoomListItem: Codable, Identifiable, Sendable {
     var id: String { roomCode }
     let roomCode: String
+    let roomName: String?
     let status: String
     let playerCount: Int
     let hostName: String?
@@ -146,6 +147,7 @@ struct RoomListItem: Codable, Identifiable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case roomCode = "room_code"
+        case roomName = "room_name"
         case status
         case playerCount = "player_count"
         case hostName = "host_name"
