@@ -442,6 +442,20 @@ async def _handle_investigate_keep(db: AsyncSession, room_code: str, player_id: 
     if game is None:
         return
 
+    # Prevent duplicate keep per player per phase
+    from madaminu.models import Evidence
+
+    existing = await db.execute(
+        select(Evidence).where(
+            Evidence.game_id == game.id,
+            Evidence.player_id == player_id,
+            Evidence.phase_id == game.current_phase_id,
+            Evidence.source == "investigation",
+        )
+    )
+    if existing.scalar_one_or_none() is not None:
+        return
+
     evidence = await keep_evidence(db, game.id, player_id, discovery)
     await manager.send_to_player(
         room_code,
