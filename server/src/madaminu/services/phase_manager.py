@@ -257,25 +257,25 @@ class PhaseManager:
                 elapsed = (datetime.utcnow() - started_at).total_seconds()
                 remaining = max(0, duration_sec - int(elapsed))
 
-                await manager.broadcast(
-                    room_code,
-                    WSMessage(
-                        type="phase.timer",
-                        data=PhaseTimerData(
-                            phase_id=phase_id,
-                            remaining_sec=remaining,
-                        ).model_dump(),
-                    ),
-                )
+                try:
+                    await manager.broadcast(
+                        room_code,
+                        WSMessage(
+                            type="phase.timer",
+                            data=PhaseTimerData(
+                                phase_id=phase_id,
+                                remaining_sec=remaining,
+                            ).model_dump(),
+                        ),
+                    )
+                except Exception:
+                    logger.warning("Timer broadcast failed for %s, continuing", game_id)
 
                 if remaining <= 0:
                     break
 
                 await asyncio.sleep(min(TIMER_TICK_INTERVAL, remaining))
         except asyncio.CancelledError:
-            return
-        except Exception:
-            logger.exception("Timer error for game %s", game_id)
             return
 
         logger.info("Phase timer expired for game %s, phase %s", game_id, phase_id)
