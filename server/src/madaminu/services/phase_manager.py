@@ -664,6 +664,7 @@ class PhaseManager:
                     type="game.ending",
                     data={
                         "ending_text": ending.ending_text,
+                        "criminal_epilogue": ending.criminal_epilogue,
                         "true_criminal_id": ending.true_criminal_id,
                         "objective_results": ending.objective_results,
                         "vote_details": vote_details,

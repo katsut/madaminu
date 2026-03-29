@@ -267,6 +267,22 @@ struct GamePlayView: View {
                         }
                     }
 
+                    // 2.5. Criminal Epilogue
+                    if let epilogue = ending.criminalEpilogue, !epilogue.isEmpty {
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.md) {
+                                Label("真相 — 犯人の告白", systemImage: "eye.trianglebadge.exclamationmark")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdAccent)
+
+                                Text(epilogue)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                    .italic()
+                            }
+                        }
+                    }
+
                     // 3. Rankings
                     if let rankings = ending.rankings, !rankings.isEmpty {
                         MDCard {
