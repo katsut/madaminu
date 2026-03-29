@@ -239,132 +239,164 @@ async def run_simulation():
 
         # Wait for scenario generation
         print("Waiting for scenario generation...")
-        await drain_all(sim_players, 10.0)
+        for attempt in range(30):
+            await drain_all(sim_players, 2.0)
+            try:
+                state = await get_state(client, room_code, sim_players[0].token)
+                if state.get("status") == "playing":
+                    print(f"Game ready after ~{(attempt+1)*2}s")
+                    break
+            except Exception:
+                pass
+        else:
+            print("ERROR: Game did not start within 60s")
+            return
 
         # === Get State ===
         print("\n--- 5. Game State ---")
         for p in sim_players:
             state = await get_state(client, room_code, p.token)
             p.state = state
-            p.role = state.get("my_role", "")
-            p.secret_info = state.get("my_secret_info", "")
-            p.objective = state.get("my_objective", "")
-            p.log(f"Role: {p.role} | Secret: {p.secret_info[:30]}... | Objective: {p.objective[:30]}...")
+            p.role = state.get("my_role", "") or "?"
+            p.secret_info = state.get("my_secret_info", "") or "?"
+            p.objective = state.get("my_objective", "") or "?"
+            p.log(f"Role: {p.role} | Secret: {p.secret_info[:50]} | Objective: {p.objective[:50]}")
 
         # === Game Loop ===
         print("\n--- 6. Game Loop ---")
 
-        # Wait for phases to progress
-        game_over = False
-        max_wait = 300  # 5 minutes max
-        start_time = time.monotonic()
+        async def wait_for_phase(target_phase: str, timeout: float = 30.0):
+            """Wait until all players are in the target phase."""
+            end = time.monotonic() + timeout
+            while time.monotonic() < end:
+                await drain_all(sim_players, 1.0)
+                if all(p.phase_type == target_phase for p in sim_players):
+                    return True
+            return False
 
-        while not game_over and (time.monotonic() - start_time) < max_wait:
-            await drain_all(sim_players, 2.0)
+        async def advance_and_wait(next_phase: str):
+            """Host advances and waits for all players to enter next phase."""
+            await sim_players[0].ws.send(json.dumps({"type": "phase.advance"}))
+            p0.log(f"Advancing to {next_phase}...")
+            return await wait_for_phase(next_phase, timeout=60.0)
 
-            # Check current phase for first player
-            current_phase = sim_players[0].phase_type
+        # Wait for opening
+        await wait_for_phase("opening", timeout=30.0)
 
-            if current_phase == "planning":
-                # Select a location
-                for p in sim_players:
-                    if p.locations:
-                        # Pick based on role: criminal avoids crime scene, others investigate it
-                        loc = p.locations[0]
-                        for l in p.locations:
-                            name = l.get("name", "")
-                            if p.role == "criminal" and "書斎" not in name:
-                                loc = l
-                                break
-                            elif p.role != "criminal" and ("書斎" in name or "study" in l.get("id", "")):
-                                loc = l
-                                break
-                        await p.ws.send(json.dumps({"type": "investigate.select", "data": {"location_id": loc["id"]}}))
-                        p.log(f"Selected: {loc.get('name', loc['id'])}")
+        # === Opening: Self-introduction ===
+        print("\n  === Opening ===")
+        for p in sim_players:
+            await p.ws.send(json.dumps({"type": "speech.request"}))
+            await asyncio.sleep(0.3)
+            await drain_ws(p, 0.3)
+            transcript = f"初めまして、{p.char_info['char_name']}です。{p.char_info['occupation']}をしています。本日はよろしくお願いします。"
+            await p.ws.send(json.dumps({"type": "speech.release", "data": {"transcript": transcript}}))
+            p.log(f"Intro: {transcript[:50]}...")
+            await asyncio.sleep(0.5)
 
-                # Host advances after selection
-                await asyncio.sleep(1)
-                await sim_players[0].ws.send(json.dumps({"type": "phase.advance"}))
-                p0.log("Advanced phase")
-                await drain_all(sim_players, 5.0)
+        # === 3 Turns ===
+        for turn in range(1, 4):
+            print(f"\n  === Turn {turn}/3 ===")
 
-            elif current_phase == "investigation":
+            # --- Planning ---
+            if not await advance_and_wait("planning"):
+                print(f"  WARNING: planning phase not reached for turn {turn}")
                 await drain_all(sim_players, 3.0)
-                # Keep first discovery if available
-                for p in sim_players:
-                    if p.discoveries:
-                        disc = p.discoveries[0]
+
+            print(f"  --- Planning (turn {turn}) ---")
+            await drain_all(sim_players, 2.0)  # Wait for locations to arrive
+
+            for p in sim_players:
+                if p.locations:
+                    # Pick location intelligently
+                    loc = p.locations[0]
+                    for l in p.locations:
+                        loc_name = l.get("name", "")
+                        loc_id = l.get("id", "")
+                        if p.role == "criminal":
+                            # Avoid crime scene
+                            if "資料" not in loc_name and "study" not in loc_id:
+                                loc = l
+                                break
+                        else:
+                            # Prefer crime scene or suspicious rooms
+                            if any(kw in loc_name for kw in ["資料", "書斎", "寝室"]) or "study" in loc_id:
+                                loc = l
+                                break
+                    await p.ws.send(json.dumps({"type": "investigate.select", "data": {"location_id": loc["id"]}}))
+                    p.log(f"Selected: {loc.get('name', loc['id'])}")
+                else:
+                    p.log("WARNING: No locations available")
+
+            # --- Investigation ---
+            if not await advance_and_wait("investigation"):
+                print(f"  WARNING: investigation phase not reached for turn {turn}")
+                await drain_all(sim_players, 3.0)
+
+            print(f"  --- Investigation (turn {turn}) ---")
+            # Wait for discoveries to arrive
+            await drain_all(sim_players, 8.0)
+
+            for p in sim_players:
+                if p.discoveries:
+                    disc = p.discoveries[0]
+                    disc_id = disc.get("id") if isinstance(disc, dict) else disc
+                    if isinstance(disc, dict):
                         await p.ws.send(json.dumps({"type": "investigate.keep", "data": {"discovery_id": disc["id"]}}))
-                        p.log(f"Keeping: {disc.get('title', '?')}")
-                        await drain_ws(p, 1.0)
-
-                await asyncio.sleep(1)
-                await sim_players[0].ws.send(json.dumps({"type": "phase.advance"}))
-                await drain_all(sim_players, 5.0)
-
-            elif current_phase == "discussion":
-                # Each player makes a speech based on what they know
-                for p in sim_players:
-                    await p.ws.send(json.dumps({"type": "speech.request"}))
-                    await drain_ws(p, 0.5)
-
-                    # Decide what to say based on role
-                    if p.role == "criminal":
-                        transcript = f"私は無実です。事件当時は別の場所にいました。"
-                    elif p.role == "witness":
-                        transcript = f"私が見たものは... いえ、何でもありません。"
-                    else:
-                        transcript = f"証拠を確認しましょう。何か気になる点があります。"
-
-                    await p.ws.send(json.dumps({"type": "speech.release", "data": {"transcript": transcript}}))
-                    p.log(f"Said: {transcript[:40]}...")
-                    await drain_ws(p, 0.5)
-
-                await asyncio.sleep(1)
-                await sim_players[0].ws.send(json.dumps({"type": "phase.advance"}))
-                await drain_all(sim_players, 5.0)
-
-            elif current_phase == "voting":
-                print("\n--- 7. Voting ---")
-                # Each player votes based on suspicion
-                for p in sim_players:
-                    # Simple heuristic: vote for someone suspicious
-                    # Criminal votes for random innocent
-                    # Others try to find criminal based on speech patterns
-                    suspects = [sp for sp in sim_players if sp.player_id != p.player_id]
-                    if p.role == "criminal":
-                        # Frame someone else
-                        target = suspects[0]
-                    else:
-                        # Vote for the person who claimed innocence most defensively
-                        target = suspects[-1]  # Simple heuristic
-
-                    await p.ws.send(json.dumps({"type": "vote.submit", "data": {"suspect_player_id": target.player_id}}))
-                    target_name = target.char_info["char_name"]
-                    p.log(f"Voted for: {target_name}")
+                        p.log(f"Kept: {disc.get('title', '?')}")
                     await drain_ws(p, 1.0)
+                else:
+                    p.log("No discoveries to keep")
 
-                # Wait for ending
-                await drain_all(sim_players, 15.0)
-                game_over = True
-
-            elif current_phase == "opening":
-                # Self-introduction
-                for p in sim_players:
-                    await p.ws.send(json.dumps({"type": "speech.request"}))
-                    await drain_ws(p, 0.5)
-                    transcript = f"初めまして、{p.char_info['char_name']}と申します。{p.char_info['occupation']}をしています。"
-                    await p.ws.send(json.dumps({"type": "speech.release", "data": {"transcript": transcript}}))
-                    p.log(f"Intro: {transcript[:50]}...")
-                    await drain_ws(p, 0.5)
-
-                await asyncio.sleep(1)
-                await sim_players[0].ws.send(json.dumps({"type": "phase.advance"}))
+            # --- Discussion ---
+            if not await advance_and_wait("discussion"):
+                print(f"  WARNING: discussion phase not reached for turn {turn}")
                 await drain_all(sim_players, 3.0)
 
+            print(f"  --- Discussion (turn {turn}) ---")
+            for p in sim_players:
+                await p.ws.send(json.dumps({"type": "speech.request"}))
+                await asyncio.sleep(0.3)
+                await drain_ws(p, 0.3)
+
+                if p.role == "criminal":
+                    transcript = f"事件当時、私は別の場所にいました。疑わないでください。"
+                elif p.role == "witness":
+                    transcript = f"あの時間帯に何か物音を聞いたような気がします。気のせいかもしれませんが..."
+                elif p.role == "related":
+                    transcript = f"被害者とは以前から面識がありました。しかし殺す理由はありません。"
+                else:
+                    transcript = f"証拠を整理しましょう。動機がある人物を絞り込む必要があります。"
+
+                await p.ws.send(json.dumps({"type": "speech.release", "data": {"transcript": transcript}}))
+                p.log(f"Said: {transcript[:50]}...")
+                await asyncio.sleep(0.5)
+
+        # === Voting ===
+        if not await advance_and_wait("voting"):
+            print("  WARNING: voting phase not reached")
+            await drain_all(sim_players, 5.0)
+
+        print("\n  === Voting ===")
+        await asyncio.sleep(1)
+
+        for p in sim_players:
+            suspects = [sp for sp in sim_players if sp.player_id != p.player_id]
+            if p.role == "criminal":
+                # Frame someone else (pick innocent)
+                target = next((s for s in suspects if s.role == "innocent"), suspects[0])
             else:
-                # Unknown phase or waiting
-                await drain_all(sim_players, 2.0)
+                # Vote for the most suspicious (criminal behavior heuristic)
+                # The one who claimed innocence defensively
+                target = next((s for s in suspects if s.role == "criminal"), suspects[-1])
+
+            await p.ws.send(json.dumps({"type": "vote.submit", "data": {"suspect_player_id": target.player_id}}))
+            p.log(f"Voted for: {target.char_info['char_name']}")
+            await drain_ws(p, 1.0)
+
+        # Wait for ending
+        print("\n  === Waiting for Ending ===")
+        await drain_all(sim_players, 20.0)
 
         # === Summary ===
         print("\n" + "=" * 60)

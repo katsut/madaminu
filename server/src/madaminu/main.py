@@ -26,6 +26,12 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.testing:
+        async with engine.begin() as conn:
+            from madaminu.models import Base
+
+            await conn.run_sync(Base.metadata.create_all)
+
     app.state.phase_manager = PhaseManager(async_session)
     app.state.speech_manager = SpeechManager(async_session)
 
