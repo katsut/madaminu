@@ -8,7 +8,7 @@ enum APIError: Error {
 }
 
 actor APIClient {
-    static let defaultBaseURL = "https://murder-production.up.railway.app"
+    static let defaultBaseURL = "http://127.0.0.1:8000"
 
     let baseURL: String
 
@@ -20,8 +20,11 @@ actor APIClient {
         return try await get("/api/v1/rooms")
     }
 
-    func createRoom(displayName: String, password: String? = nil, turnCount: Int = 3) async throws -> CreateRoomResponse {
+    func createRoom(displayName: String, roomName: String? = nil, password: String? = nil, turnCount: Int = 3) async throws -> CreateRoomResponse {
         var body: [String: Any] = ["display_name": displayName, "turn_count": turnCount]
+        if let roomName, !roomName.isEmpty {
+            body["room_name"] = roomName
+        }
         if let password, !password.isEmpty {
             body["password"] = password
         }

@@ -24,6 +24,7 @@ async def create_room(
     password: str | None = None,
     device_id: str | None = None,
     turn_count: int = 3,
+    room_name: str | None = None,
 ) -> tuple[Game, Player]:
     for _ in range(10):
         code = _generate_room_code()
@@ -36,6 +37,7 @@ async def create_room(
     game = Game(
         id=str(uuid.uuid4()),
         room_code=code,
+        room_name=room_name if room_name else None,
         status=GameStatus.waiting,
         password=password if password else None,
         turn_count=turn_count,

@@ -171,7 +171,7 @@ struct HomeScreen: View {
                                 HStack {
                                     VStack(alignment: .leading, spacing: Spacing.xxs) {
                                         HStack(spacing: Spacing.xs) {
-                                            Text(room.roomCode)
+                                            Text(room.roomName ?? room.roomCode)
                                                 .font(.mdHeadline)
                                                 .foregroundStyle(Color.mdPrimary)
                                             if room.hasPassword {
@@ -180,7 +180,7 @@ struct HomeScreen: View {
                                                     .foregroundStyle(Color.mdWarning)
                                             }
                                         }
-                                        Text("\(room.hostName ?? "?") のルーム・\(room.playerCount)人")
+                                        Text("\(room.hostName ?? "?") のルーム・\(room.playerCount)人・\(room.roomCode)")
                                             .font(.mdCaption)
                                             .foregroundStyle(Color.mdTextSecondary)
                                     }
@@ -252,6 +252,7 @@ struct HomeScreen: View {
 struct CreateRoomSheet: View {
     @ObservedObject var store: AppStore
     @Binding var isPresented: Bool
+    @State private var roomName = ""
     @State private var usePassword = false
     @State private var password = ""
 
@@ -270,6 +271,8 @@ struct CreateRoomSheet: View {
                     }
                 }
 
+                MDTextField(label: "ルーム名（任意）", text: $roomName, placeholder: "例: 週末ミステリー会")
+
                 Toggle(isOn: $usePassword) {
                     Label("パスワードを設定", systemImage: "lock")
                         .font(.mdBody)
@@ -284,7 +287,10 @@ struct CreateRoomSheet: View {
                 Spacer()
 
                 MDButton("作成", isLoading: store.isLoading) {
-                    store.dispatch(.createRoom(password: usePassword ? password : nil))
+                    store.dispatch(.createRoom(
+                        roomName: roomName.isEmpty ? nil : roomName,
+                        password: usePassword ? password : nil
+                    ))
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         if store.screen == .lobby { isPresented = false }
                     }

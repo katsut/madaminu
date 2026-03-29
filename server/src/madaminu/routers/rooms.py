@@ -25,6 +25,7 @@ async def list_rooms_endpoint(db: AsyncSession = Depends(get_db)):
     return [
         RoomListItem(
             room_code=g.room_code,
+            room_name=g.room_name,
             status=g.status,
             player_count=len(g.players),
             host_name=next((p.display_name for p in g.players if p.is_host), None),
@@ -37,7 +38,7 @@ async def list_rooms_endpoint(db: AsyncSession = Depends(get_db)):
 @router.post("", response_model=CreateRoomResponse)
 async def create_room_endpoint(req: CreateRoomRequest, db: AsyncSession = Depends(get_db), x_device_id: str | None = Header(None)):
     try:
-        game, player = await create_room(db, req.display_name, req.password, device_id=x_device_id, turn_count=req.turn_count)
+        game, player = await create_room(db, req.display_name, req.password, device_id=x_device_id, turn_count=req.turn_count, room_name=req.room_name)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e)) from None
     return CreateRoomResponse(
@@ -67,6 +68,7 @@ async def get_room_endpoint(room_code: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(e)) from None
     return RoomInfoResponse(
         room_code=game.room_code,
+        room_name=game.room_name,
         status=game.status,
         host_player_id=game.host_player_id,
         has_password=game.password is not None,

@@ -27,6 +27,7 @@ class Game(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "games"
 
     room_code: Mapped[str] = mapped_column(String(6), unique=True, nullable=False, index=True)
+    room_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
     host_player_id: Mapped[str | None] = mapped_column(ForeignKey("players.id", use_alter=True), nullable=True)
     status: Mapped[GameStatus] = mapped_column(Enum(GameStatus), default=GameStatus.waiting, nullable=False)
     current_phase_id: Mapped[str | None] = mapped_column(ForeignKey("phases.id", use_alter=True), nullable=True)
