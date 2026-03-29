@@ -30,7 +30,11 @@ class PhaseManager:
         self._paused: dict[str, int] = {}  # game_id -> remaining_sec when paused
 
     def set_investigation_selection(
-        self, room_code: str, player_id: str, location_id: str | None, feature: str | None = None,
+        self,
+        room_code: str,
+        player_id: str,
+        location_id: str | None,
+        feature: str | None = None,
     ):
         if room_code not in self._investigation_selections:
             self._investigation_selections[room_code] = {}
@@ -299,9 +303,7 @@ class PhaseManager:
 
         # Assign random locations to players who didn't select
         async with self._session_factory() as db:
-            game_result = await db.execute(
-                select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-            )
+            game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
             game = game_result.scalar_one()
             map_data = (game.scenario_skeleton or {}).get("map", {})
             all_rooms = []
@@ -362,12 +364,11 @@ class PhaseManager:
                     discoveries = []
                     for feature in features:
                         try:
-                            discovery, usage = await investigate_location(
-                                db, game_id, player_id, location_id, feature
-                            )
+                            discovery, usage = await investigate_location(db, game_id, player_id, location_id, feature)
                             logger.info(
                                 "Discovery result for %s: %s",
-                                feature, type(discovery).__name__ if discovery else "None",
+                                feature,
+                                type(discovery).__name__ if discovery else "None",
                             )
                             if discovery:
                                 discovery["can_tamper"] = is_alone
@@ -482,22 +483,18 @@ class PhaseManager:
                 )
                 game = game_result.scalar_one()
                 map_data = (game.scenario_skeleton or {}).get("map", {})
-                id_to_name = {
-                    p.id: p.character_name or p.display_name
-                    for p in game.players
-                }
+                id_to_name = {p.id: p.character_name or p.display_name for p in game.players}
 
             loc_selections = {
-                pid: sel.get("location_id", "")
-                for pid, sel in selections.items()
-                if sel.get("location_id")
+                pid: sel.get("location_id", "") for pid, sel in selections.items() if sel.get("location_id")
             }
             narratives = generate_travel_narrative(map_data, loc_selections, id_to_name)
 
             for pid, text in narratives.items():
                 if text:
                     await manager.send_to_player(
-                        room_code, pid,
+                        room_code,
+                        pid,
                         WSMessage(type="travel.narrative", data={"text": text}),
                     )
         except Exception:
@@ -632,25 +629,29 @@ class PhaseManager:
                     speeches = speech_counts.get(p.id, 0)
                     evidences = evidence_counts.get(p.id, 0)
                     score = speeches * 1 + evidences * 3
-                    rankings.append({
-                        "player_id": p.id,
-                        "character_name": p.character_name or p.display_name,
-                        "speech_count": speeches,
-                        "evidence_count": evidences,
-                        "score": score,
-                    })
+                    rankings.append(
+                        {
+                            "player_id": p.id,
+                            "character_name": p.character_name or p.display_name,
+                            "speech_count": speeches,
+                            "evidence_count": evidences,
+                            "score": score,
+                        }
+                    )
                 rankings.sort(key=lambda x: -x["score"])
 
                 # Character reveals
                 reveals = []
                 for p in game.players:
-                    reveals.append({
-                        "player_id": p.id,
-                        "character_name": p.character_name or p.display_name,
-                        "role": p.role,
-                        "secret_info": p.secret_info,
-                        "objective": p.objective,
-                    })
+                    reveals.append(
+                        {
+                            "player_id": p.id,
+                            "character_name": p.character_name or p.display_name,
+                            "role": p.role,
+                            "secret_info": p.secret_info,
+                            "objective": p.objective,
+                        }
+                    )
 
             await manager.broadcast(
                 room_code,

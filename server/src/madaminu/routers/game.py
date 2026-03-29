@@ -71,22 +71,26 @@ async def _generate_images(game_id: str, room_code: str, session_factory):
             victim = game.scenario_skeleton.get("victim", {})
             if victim.get("name"):
                 victim_coro = generate_victim_portrait(
-                    client, victim["name"], victim.get("description", ""),
+                    client,
+                    victim["name"],
+                    victim.get("description", ""),
                 )
                 tasks.append(("victim", None, victim_coro))
 
         for player in game.players:
             if player.character_name:
-                tasks.append((
-                    "portrait",
-                    player.id,
-                    generate_character_portrait(
-                        client,
-                        player.character_gender or "不明",
-                        player.character_age or "不明",
-                        player.character_appearance or "",
-                    ),
-                ))
+                tasks.append(
+                    (
+                        "portrait",
+                        player.id,
+                        generate_character_portrait(
+                            client,
+                            player.character_gender or "不明",
+                            player.character_age or "不明",
+                            player.character_appearance or "",
+                        ),
+                    )
+                )
 
         results = await asyncio.gather(*[t[2] for t in tasks], return_exceptions=True)
 
@@ -111,7 +115,8 @@ async def _generate_images(game_id: str, room_code: str, session_factory):
 async def _generate_scenario_background(game_id: str, room_code: str, session_factory, phase_manager):
     try:
         await ws_manager.broadcast(
-            room_code, WSMessage(type="progress", data={"step": "scenario", "status": "in_progress"}),
+            room_code,
+            WSMessage(type="progress", data={"step": "scenario", "status": "in_progress"}),
         )
 
         for attempt in range(3):
@@ -121,7 +126,9 @@ async def _generate_scenario_background(game_id: str, room_code: str, session_fa
                     total_cost = sum(u.estimated_cost_usd for u in gen_usages)
                     logger.info(
                         "Scenario generated for %s (attempt %d), cost: $%.4f",
-                        room_code, attempt + 1, total_cost,
+                        room_code,
+                        attempt + 1,
+                        total_cost,
                     )
                     break
             except Exception:
@@ -145,19 +152,23 @@ async def _generate_scenario_background(game_id: str, room_code: str, session_fa
 
         # Generate images
         await ws_manager.broadcast(
-            room_code, WSMessage(type="progress", data={"step": "scene_image", "status": "in_progress"}),
+            room_code,
+            WSMessage(type="progress", data={"step": "scene_image", "status": "in_progress"}),
         )
         await ws_manager.broadcast(
-            room_code, WSMessage(type="progress", data={"step": "portraits", "status": "in_progress"}),
+            room_code,
+            WSMessage(type="progress", data={"step": "portraits", "status": "in_progress"}),
         )
 
         await _generate_images(game_id, room_code, session_factory)
 
         await ws_manager.broadcast(
-            room_code, WSMessage(type="progress", data={"step": "scene_image", "status": "done"}),
+            room_code,
+            WSMessage(type="progress", data={"step": "scene_image", "status": "done"}),
         )
         await ws_manager.broadcast(
-            room_code, WSMessage(type="progress", data={"step": "portraits", "status": "done"}),
+            room_code,
+            WSMessage(type="progress", data={"step": "portraits", "status": "done"}),
         )
 
         # Send updated game state with image URLs
@@ -272,11 +283,13 @@ async def get_debug_info(
     all_evidence = evidence_result.scalars().all()
     evidence_by_player: dict[str, list[dict]] = {}
     for ev in all_evidence:
-        evidence_by_player.setdefault(ev.player_id, []).append({
-            "title": ev.title,
-            "content": ev.content,
-            "source": ev.source,
-        })
+        evidence_by_player.setdefault(ev.player_id, []).append(
+            {
+                "title": ev.title,
+                "content": ev.content,
+                "source": ev.source,
+            }
+        )
 
     return {
         "players": [

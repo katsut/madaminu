@@ -1,22 +1,17 @@
 import asyncio
-import contextlib
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
 from fastapi import Depends, FastAPI, WebSocket
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from madaminu.config import settings
 from madaminu.db import get_db
 from madaminu.db.database import async_session, engine
-from madaminu.models import Base, Game, GameStatus
 from madaminu.events import EventBus, ImagesReady, ScenarioReady
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger(__name__)
+from madaminu.models import Game, GameStatus
 from madaminu.routers.characters import router as characters_router
 from madaminu.routers.game import router as game_router
 from madaminu.routers.images import router as images_router
@@ -24,6 +19,9 @@ from madaminu.routers.rooms import router as rooms_router
 from madaminu.services.phase_manager import PhaseManager
 from madaminu.services.speech_manager import SpeechManager
 from madaminu.ws.handler import handle_websocket
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -58,8 +56,7 @@ async def _cleanup_old_rooms():
     try:
         async with async_session() as db:
             result = await db.execute(
-                select(Game)
-                .where(Game.created_at < cutoff, Game.status.in_([GameStatus.ended, GameStatus.waiting]))
+                select(Game).where(Game.created_at < cutoff, Game.status.in_([GameStatus.ended, GameStatus.waiting]))
             )
             old_games = result.scalars().all()
             for game in old_games:
@@ -82,9 +79,10 @@ async def health_check():
 @app.get("/debug/llm-test")
 async def llm_test():
     from madaminu.llm.client import llm_client
+
     try:
         text, usage = await llm_client.generate(
-            "You are a test assistant.", "Say hello in JSON: {\"message\": \"hello\"}", max_tokens=100
+            "You are a test assistant.", 'Say hello in JSON: {"message": "hello"}', max_tokens=100
         )
         return {"text": text, "usage": str(usage), "model": usage.model}
     except Exception as e:

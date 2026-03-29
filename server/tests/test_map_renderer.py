@@ -2,11 +2,12 @@
 
 from madaminu.services.map_renderer import render_map_svg
 
-
 GRAPH_MAP = {
     "areas": [
         {
-            "id": "main_1f", "name": "本館1階", "area_type": "indoor",
+            "id": "main_1f",
+            "name": "本館1階",
+            "area_type": "indoor",
             "nodes": [
                 {"id": "entrance", "name": "玄関", "type": "entrance"},
                 {"id": "corridor_1", "name": "廊下", "type": "passage"},
@@ -22,7 +23,9 @@ GRAPH_MAP = {
             ],
         },
         {
-            "id": "main_2f", "name": "本館2階", "area_type": "indoor",
+            "id": "main_2f",
+            "name": "本館2階",
+            "area_type": "indoor",
             "nodes": [
                 {"id": "stairs_2f", "name": "階段", "type": "stairs"},
                 {"id": "corridor_2", "name": "廊下", "type": "passage"},
@@ -34,7 +37,9 @@ GRAPH_MAP = {
             ],
         },
         {
-            "id": "outside", "name": "屋外", "area_type": "outdoor",
+            "id": "outside",
+            "name": "屋外",
+            "area_type": "outdoor",
             "nodes": [
                 {"id": "garden", "name": "庭園", "type": "room", "features": ["噴水"]},
             ],

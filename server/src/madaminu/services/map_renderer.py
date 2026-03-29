@@ -79,11 +79,7 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
     connections = map_data.get("connections", [])
     floor_conns = map_data.get("floor_connections", [])
     if not floor_conns:
-        floor_conns = [
-            [c.get("from", ""), c.get("to", "")]
-            for c in connections
-            if c.get("type") == "stairs"
-        ]
+        floor_conns = [[c.get("from", ""), c.get("to", "")] for c in connections if c.get("type") == "stairs"]
 
     if not areas:
         return _empty_svg()
@@ -119,7 +115,11 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
             edges = [[c.get("from", ""), c.get("to", "")] for c in area_conns]
         if not edges and connections:
             node_ids = {n["id"] for n in nodes}
-            edges = [[c.get("from", ""), c.get("to", "")] for c in connections if c.get("from") in node_ids and c.get("to") in node_ids]
+            edges = [
+                [c.get("from", ""), c.get("to", "")]
+                for c in connections
+                if c.get("from") in node_ids and c.get("to") in node_ids
+            ]
         area_type = area.get("area_type", "indoor")
 
         # Find backbone: chain of passage/entrance/stairs nodes
@@ -200,7 +200,11 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
             for rid in branches.get(pid, []):
                 rw, _ = _node_size(node_map[rid])
                 max_room_w = max(max_room_w, rw)
-        content_w = max(backbone_w, n_backbone * max(PASSAGE_W + PASSAGE_GAP, max_room_w + BRANCH_GAP) - BRANCH_GAP) if max_room_w > 0 else backbone_w
+        content_w = (
+            max(backbone_w, n_backbone * max(PASSAGE_W + PASSAGE_GAP, max_room_w + BRANCH_GAP) - BRANCH_GAP)
+            if max_room_w > 0
+            else backbone_w
+        )
 
         above_h = max_above_stacks * (CELL + BRANCH_GAP) if max_above_stacks else 0
         below_h = max_below_stacks * (CELL + BRANCH_GAP) if max_below_stacks else 0
@@ -211,14 +215,22 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
         if block_w > max_block_w:
             max_block_w = block_w
 
-        area_blocks.append({
-            "area": area, "backbone": backbone, "branches": branches,
-            "node_map": node_map, "edges": edges, "room_placement": room_placement,
-            "w": block_w, "h": block_h,
-            "content_w": content_w,
-            "above_h": above_h, "below_h": below_h,
-            "area_type": area_type,
-        })
+        area_blocks.append(
+            {
+                "area": area,
+                "backbone": backbone,
+                "branches": branches,
+                "node_map": node_map,
+                "edges": edges,
+                "room_placement": room_placement,
+                "w": block_w,
+                "h": block_h,
+                "content_w": content_w,
+                "above_h": above_h,
+                "below_h": below_h,
+                "area_type": area_type,
+            }
+        )
 
     # Position blocks vertically
     y_cursor = PADDING
@@ -235,8 +247,12 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
             px = ox + i * (PASSAGE_W + PASSAGE_GAP)
             py = oy + above_h
             node_positions[nid] = {
-                "x": px, "y": py, "w": PASSAGE_W, "h": PASSAGE_H,
-                "cx": px + PASSAGE_W // 2, "cy": py + PASSAGE_H // 2,
+                "x": px,
+                "y": py,
+                "w": PASSAGE_W,
+                "h": PASSAGE_H,
+                "cx": px + PASSAGE_W // 2,
+                "cy": py + PASSAGE_H // 2,
                 "is_backbone": True,
             }
 
@@ -259,8 +275,12 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
                 else:
                     ry = oy + above_h + PASSAGE_H + BRANCH_GAP + stack * (CELL + BRANCH_GAP)
                 node_positions[rid] = {
-                    "x": rx, "y": ry, "w": rw, "h": rh,
-                    "cx": rx + rw // 2, "cy": ry + rh // 2,
+                    "x": rx,
+                    "y": ry,
+                    "w": rw,
+                    "h": rh,
+                    "cx": rx + rw // 2,
+                    "cy": ry + rh // 2,
                     "is_backbone": False,
                 }
 
@@ -272,12 +292,17 @@ def _render_map(map_data: dict, highlight_room: str | None = None) -> str:
     floor_conn_h = len(floor_conns) * 8 if floor_conns else 0
     total_h = y_cursor + floor_conn_h + legend_h
 
-    svg = Element("svg", {
-        "xmlns": "http://www.w3.org/2000/svg",
-        "viewBox": f"0 0 {total_w} {total_h}",
-        "width": str(total_w), "height": str(total_h),
-        "role": "img", "aria-label": "マップ",
-    })
+    svg = Element(
+        "svg",
+        {
+            "xmlns": "http://www.w3.org/2000/svg",
+            "viewBox": f"0 0 {total_w} {total_h}",
+            "width": str(total_w),
+            "height": str(total_h),
+            "role": "img",
+            "aria-label": "マップ",
+        },
+    )
     SubElement(svg, "title").text = "ゲームマップ"
     defs = SubElement(svg, "defs")
     _add_glow_filter(defs)
@@ -368,33 +393,62 @@ def _draw_area(svg, block, node_pos, highlight_room):
     g = SubElement(svg, "g", {"role": "group", "aria-label": area.get("name", area["id"])})
 
     # Background
-    SubElement(g, "rect", {
-        "x": str(block["x"]), "y": str(block["y"]),
-        "width": str(block["w"]), "height": str(block["h"]),
-        "fill": colors["bg"], "stroke": colors["stroke"],
-        "stroke-width": "2", "rx": "8",
-        **({"stroke-dasharray": "8,4"} if area_type == "outdoor" else {}),
-    })
+    SubElement(
+        g,
+        "rect",
+        {
+            "x": str(block["x"]),
+            "y": str(block["y"]),
+            "width": str(block["w"]),
+            "height": str(block["h"]),
+            "fill": colors["bg"],
+            "stroke": colors["stroke"],
+            "stroke-width": "2",
+            "rx": "8",
+            **({"stroke-dasharray": "8,4"} if area_type == "outdoor" else {}),
+        },
+    )
 
     # Header
-    SubElement(g, "rect", {
-        "x": str(block["x"]), "y": str(block["y"]),
-        "width": str(block["w"]), "height": str(AREA_HEADER),
-        "fill": colors["header"], "rx": "8",
-    })
-    SubElement(g, "rect", {
-        "x": str(block["x"]), "y": str(block["y"] + AREA_HEADER - 8),
-        "width": str(block["w"]), "height": "8", "fill": colors["header"],
-    })
+    SubElement(
+        g,
+        "rect",
+        {
+            "x": str(block["x"]),
+            "y": str(block["y"]),
+            "width": str(block["w"]),
+            "height": str(AREA_HEADER),
+            "fill": colors["header"],
+            "rx": "8",
+        },
+    )
+    SubElement(
+        g,
+        "rect",
+        {
+            "x": str(block["x"]),
+            "y": str(block["y"] + AREA_HEADER - 8),
+            "width": str(block["w"]),
+            "height": "8",
+            "fill": colors["header"],
+        },
+    )
     icon = AREA_ICONS.get(area_type, "")
     lbl = f"{icon} {area.get('name', area['id'])}" if icon else area.get("name", area["id"])
-    SubElement(g, "text", {
-        "x": str(block["x"] + block["w"] // 2),
-        "y": str(block["y"] + AREA_HEADER // 2 + 1),
-        "text-anchor": "middle", "dominant-baseline": "central",
-        "fill": COLORS["text"], "font-size": str(FONT_SIZE + 1),
-        "font-weight": "bold", "font-family": "sans-serif",
-    }).text = lbl
+    SubElement(
+        g,
+        "text",
+        {
+            "x": str(block["x"] + block["w"] // 2),
+            "y": str(block["y"] + AREA_HEADER // 2 + 1),
+            "text-anchor": "middle",
+            "dominant-baseline": "central",
+            "fill": COLORS["text"],
+            "font-size": str(FONT_SIZE + 1),
+            "font-weight": "bold",
+            "font-family": "sans-serif",
+        },
+    ).text = lbl
 
     node_map = block["node_map"]
     backbone = block["backbone"]
@@ -421,12 +475,19 @@ def _draw_area(svg, block, node_pos, highlight_room):
         x2 = p2["x"]
         cy = p1["cy"]
         if x2 > x1:
-            SubElement(g, "line", {
-                "x1": str(x1), "y1": str(cy),
-                "x2": str(x2), "y2": str(p2["cy"]),
-                "stroke": COLORS["edge"], "stroke-width": "3",
-                "stroke-linecap": "round",
-            })
+            SubElement(
+                g,
+                "line",
+                {
+                    "x1": str(x1),
+                    "y1": str(cy),
+                    "x2": str(x2),
+                    "y2": str(p2["cy"]),
+                    "stroke": COLORS["edge"],
+                    "stroke-width": "3",
+                    "stroke-linecap": "round",
+                },
+            )
 
     # Draw branch edges (passage → room, visible on top)
     for pid in backbone:
@@ -441,12 +502,19 @@ def _draw_area(svg, block, node_pos, highlight_room):
                 # Room is below
                 y1 = pp["y"] + pp["h"]
                 y2 = rp["y"]
-            SubElement(g, "line", {
-                "x1": str(pp["cx"]), "y1": str(y1),
-                "x2": str(rp["cx"]), "y2": str(y2),
-                "stroke": COLORS["branch_edge"], "stroke-width": "2",
-                "stroke-linecap": "round",
-            })
+            SubElement(
+                g,
+                "line",
+                {
+                    "x1": str(pp["cx"]),
+                    "y1": str(y1),
+                    "x2": str(rp["cx"]),
+                    "y2": str(y2),
+                    "stroke": COLORS["branch_edge"],
+                    "stroke-width": "2",
+                    "stroke-linecap": "round",
+                },
+            )
 
 
 def _draw_node(svg, node, pos, highlighted, area_type):
@@ -457,12 +525,19 @@ def _draw_node(svg, node, pos, highlighted, area_type):
     rg = SubElement(svg, "g", {"role": "img", "aria-label": name})
 
     if highlighted:
-        SubElement(rg, "rect", {
-            "x": str(x - 3), "y": str(y - 3),
-            "width": str(w + 6), "height": str(h + 6),
-            "fill": COLORS["highlight_glow"], "rx": "6",
-            "filter": "url(#glow)",
-        })
+        SubElement(
+            rg,
+            "rect",
+            {
+                "x": str(x - 3),
+                "y": str(y - 3),
+                "width": str(w + 6),
+                "height": str(h + 6),
+                "fill": COLORS["highlight_glow"],
+                "rx": "6",
+                "filter": "url(#glow)",
+            },
+        )
 
     if ntype == "passage":
         fill = COLORS["passage"]
@@ -494,46 +569,81 @@ def _draw_node(svg, node, pos, highlighted, area_type):
         fill = COLORS["highlight_fill"]
         stroke = COLORS["highlight_stroke"]
 
-    SubElement(rg, "rect", {
-        "x": str(x), "y": str(y),
-        "width": str(w), "height": str(h),
-        "fill": fill, "stroke": stroke,
-        "stroke-width": sw, "rx": "4",
-    })
+    SubElement(
+        rg,
+        "rect",
+        {
+            "x": str(x),
+            "y": str(y),
+            "width": str(w),
+            "height": str(h),
+            "fill": fill,
+            "stroke": stroke,
+            "stroke-width": sw,
+            "rx": "4",
+        },
+    )
 
     # Crime scene marker
     if ntype == "crime_scene" and not highlighted:
-        SubElement(rg, "text", {
-            "x": str(x + 6), "y": str(y + 10),
-            "fill": COLORS["crime_scene_stroke"], "font-size": "10",
-        }).text = "☠"
+        SubElement(
+            rg,
+            "text",
+            {
+                "x": str(x + 6),
+                "y": str(y + 10),
+                "fill": COLORS["crime_scene_stroke"],
+                "font-size": "10",
+            },
+        ).text = "☠"
 
     # Meeting room marker
     if ntype == "meeting" and not highlighted:
-        SubElement(rg, "text", {
-            "x": str(x + 6), "y": str(y + 10),
-            "fill": COLORS["meeting_stroke"], "font-size": "10",
-        }).text = "👥"
+        SubElement(
+            rg,
+            "text",
+            {
+                "x": str(x + 6),
+                "y": str(y + 10),
+                "fill": COLORS["meeting_stroke"],
+                "font-size": "10",
+            },
+        ).text = "👥"
 
     # Stairs decoration
     if ntype == "stairs" and not highlighted:
         for s in range(1, 4):
             sy = y + s * h // 4
-            SubElement(rg, "line", {
-                "x1": str(x + 6), "y1": str(sy),
-                "x2": str(x + w - 6), "y2": str(sy),
-                "stroke": COLORS["stairs_step"], "stroke-width": "1",
-            })
+            SubElement(
+                rg,
+                "line",
+                {
+                    "x1": str(x + 6),
+                    "y1": str(sy),
+                    "x2": str(x + w - 6),
+                    "y2": str(sy),
+                    "stroke": COLORS["stairs_step"],
+                    "stroke-width": "1",
+                },
+            )
 
     text_color = COLORS["text"] if ntype == "room" else COLORS["text_passage"]
     if highlighted:
         text_color = COLORS["text"]
-    SubElement(rg, "text", {
-        "x": str(x + w // 2), "y": str(y + h // 2 + 1),
-        "text-anchor": "middle", "dominant-baseline": "central",
-        "fill": text_color, "font-size": str(FONT_SIZE if ntype == "room" else FONT_SIZE - 1),
-        "font-weight": "bold", "font-family": "sans-serif",
-    }).text = name
+    SubElement(
+        rg,
+        "text",
+        {
+            "x": str(x + w // 2),
+            "y": str(y + h // 2 + 1),
+            "text-anchor": "middle",
+            "dominant-baseline": "central",
+            "fill": text_color,
+            "font-size": str(FONT_SIZE if ntype == "room" else FONT_SIZE - 1),
+            "font-weight": "bold",
+            "font-family": "sans-serif",
+        },
+    ).text = name
 
 
 def _draw_floor_connection(svg, p1, p2):
@@ -543,13 +653,19 @@ def _draw_floor_connection(svg, p1, p2):
     if y1 > y2:
         x1, y1, x2, y2 = x2, p2["y"] + p2["h"], x1, p1["y"]
 
-    mx = (x1 + x2) // 2
-    SubElement(svg, "line", {
-        "x1": str(x1), "y1": str(y1),
-        "x2": str(x2), "y2": str(y2),
-        "stroke": COLORS["floor_conn"], "stroke-width": "2",
-        "stroke-dasharray": "6,4",
-    })
+    SubElement(
+        svg,
+        "line",
+        {
+            "x1": str(x1),
+            "y1": str(y1),
+            "x2": str(x2),
+            "y2": str(y2),
+            "stroke": COLORS["floor_conn"],
+            "stroke-width": "2",
+            "stroke-dasharray": "6,4",
+        },
+    )
 
 
 def _add_glow_filter(defs):
@@ -561,11 +677,18 @@ def _add_glow_filter(defs):
 
 
 def _draw_legend(svg, x, y, total_w):
-    SubElement(svg, "line", {
-        "x1": str(x), "y1": str(y - 4),
-        "x2": str(total_w - x), "y2": str(y - 4),
-        "stroke": "#333344", "stroke-width": "1",
-    })
+    SubElement(
+        svg,
+        "line",
+        {
+            "x1": str(x),
+            "y1": str(y - 4),
+            "x2": str(total_w - x),
+            "y2": str(y - 4),
+            "stroke": "#333344",
+            "stroke-width": "1",
+        },
+    )
     cx = x + 8
     items = [
         (COLORS["room"], COLORS["room_stroke"], "部屋"),
@@ -576,15 +699,32 @@ def _draw_legend(svg, x, y, total_w):
         (COLORS["meeting"], COLORS["meeting_stroke"], "👥集合"),
     ]
     for fill, stroke, label in items:
-        SubElement(svg, "rect", {
-            "x": str(cx), "y": str(y + 2), "width": "14", "height": "10",
-            "fill": fill, "stroke": stroke, "stroke-width": "1", "rx": "2",
-        })
-        SubElement(svg, "text", {
-            "x": str(cx + 20), "y": str(y + 8),
-            "dominant-baseline": "central",
-            "fill": COLORS["text_dim"], "font-size": str(LEGEND_FONT_SIZE), "font-family": "sans-serif",
-        }).text = label
+        SubElement(
+            svg,
+            "rect",
+            {
+                "x": str(cx),
+                "y": str(y + 2),
+                "width": "14",
+                "height": "10",
+                "fill": fill,
+                "stroke": stroke,
+                "stroke-width": "1",
+                "rx": "2",
+            },
+        )
+        SubElement(
+            svg,
+            "text",
+            {
+                "x": str(cx + 20),
+                "y": str(y + 8),
+                "dominant-baseline": "central",
+                "fill": COLORS["text_dim"],
+                "font-size": str(LEGEND_FONT_SIZE),
+                "font-family": "sans-serif",
+            },
+        ).text = label
         cx += 56
 
 
@@ -592,21 +732,39 @@ def _render_flat_map(map_data: dict, highlight_room: str | None = None) -> str:
     locations = map_data.get("locations", [])
     if not locations:
         return _empty_svg()
-    nodes = [{"id": loc["id"], "name": loc.get("name", loc["id"]), "type": "room", "features": loc.get("features", [])} for loc in locations]
+    nodes = [
+        {"id": loc["id"], "name": loc.get("name", loc["id"]), "type": "room", "features": loc.get("features", [])}
+        for loc in locations
+    ]
     edges = [[c["from"], c["to"]] for c in map_data.get("connections", [])]
-    return _render_map({
-        "areas": [{"id": "main", "name": "マップ", "area_type": "indoor", "nodes": nodes, "edges": edges}],
-    }, highlight_room)
+    return _render_map(
+        {
+            "areas": [{"id": "main", "name": "マップ", "area_type": "indoor", "nodes": nodes, "edges": edges}],
+        },
+        highlight_room,
+    )
 
 
 def _empty_svg() -> str:
-    svg = Element("svg", {
-        "xmlns": "http://www.w3.org/2000/svg",
-        "viewBox": "0 0 200 100", "width": "200", "height": "100",
-    })
+    svg = Element(
+        "svg",
+        {
+            "xmlns": "http://www.w3.org/2000/svg",
+            "viewBox": "0 0 200 100",
+            "width": "200",
+            "height": "100",
+        },
+    )
     SubElement(svg, "rect", {"width": "200", "height": "100", "fill": COLORS["background"]})
-    SubElement(svg, "text", {
-        "x": "100", "y": "55", "text-anchor": "middle",
-        "fill": COLORS["text"], "font-size": "14",
-    }).text = "マップなし"
+    SubElement(
+        svg,
+        "text",
+        {
+            "x": "100",
+            "y": "55",
+            "text-anchor": "middle",
+            "fill": COLORS["text"],
+            "font-size": "14",
+        },
+    ).text = "マップなし"
     return tostring(svg, encoding="unicode")

@@ -1,7 +1,6 @@
 import base64
 import hashlib
 import io
-from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
