@@ -118,23 +118,26 @@ def _build_indoor(area: dict, rooms: list[dict], add_stairs: bool) -> list[dict]
             }
         )
 
-    # Crime scene: ensure 2+ connections
+    # Crime scene: ensure 2+ connections (without exceeding corridor limits)
     for room in rooms:
         if room.get("is_crime_scene"):
             room_conns = [c for c in connections if c["to"] == room["id"] or c["from"] == room["id"]]
             if len(room_conns) < 2:
-                # Connect to an adjacent corridor
                 room_idx = rooms.index(room)
                 corridor_idx = min(room_idx // 2, corridor_count - 1)
-                alt_idx = corridor_idx + 1 if corridor_idx + 1 < corridor_count else corridor_idx - 1
-                if 0 <= alt_idx < corridor_count:
-                    connections.append(
-                        {
-                            "from": corridors[alt_idx]["id"],
-                            "to": room["id"],
-                            "type": "door",
-                        }
-                    )
+                for offset in [1, -1]:
+                    alt_idx = corridor_idx + offset
+                    if 0 <= alt_idx < corridor_count:
+                        alt_count = sum(1 for c in connections if c["from"] == corridors[alt_idx]["id"] and c["type"] == "door")
+                        if alt_count < 2:
+                            connections.append(
+                                {
+                                    "from": corridors[alt_idx]["id"],
+                                    "to": room["id"],
+                                    "type": "door",
+                                }
+                            )
+                            break
 
     # Prepend infrastructure nodes to area rooms
     infra = [entrance] + corridors
