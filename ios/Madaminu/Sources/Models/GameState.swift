@@ -44,6 +44,7 @@ struct EvidenceItem: Codable, Identifiable, Sendable {
 
 struct EndingData: Codable, Sendable {
     let endingText: String
+    let criminalEpilogue: String?
     let trueCriminalId: String
     let objectiveResults: [String: ObjectiveResult]?
     let voteDetails: [VoteDetail]?
@@ -54,6 +55,7 @@ struct EndingData: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case endingText = "ending_text"
+        case criminalEpilogue = "criminal_epilogue"
         case trueCriminalId = "true_criminal_id"
         case objectiveResults = "objective_results"
         case voteDetails = "vote_details"

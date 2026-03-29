@@ -459,6 +459,7 @@ async def generate_ending(db: AsyncSession, game_id: str) -> tuple[GameEnding, L
         id=str(uuid.uuid4()),
         game_id=game_id,
         ending_text=result.get("ending_text", ""),
+        criminal_epilogue=result.get("criminal_epilogue", ""),
         true_criminal_id=result.get("true_criminal_id", ""),
         objective_results=result.get("objective_results"),
     )
