@@ -23,10 +23,7 @@ from madaminu.models import Base, Game, GameStatus, Phase, PhaseType, Player, Vo
 from madaminu.models.player import ConnectionStatus, PlayerRole
 from madaminu.services.speech_manager import SpeechManager
 
-_ws_skip = pytest.mark.skipif(
-    os.environ.get("CI") == "true",
-    reason="Sync TestClient incompatible with aiosqlite on Linux CI",
-)
+_ws_skip = pytest.mark.skip(reason="Sync TestClient incompatible with aiosqlite")
 
 MOCK_SCENARIO = {
     "setting": {"location": "洋館", "era": "現代", "situation": "パーティー中に殺人事件が発生"},
@@ -38,12 +35,24 @@ MOCK_SCENARIO = {
                 "name": "1階",
                 "area_type": "indoor",
                 "rooms": [
-                    {"id": "study", "name": "書斎", "features": ["本棚", "机"]},
-                    {"id": "garden", "name": "庭園", "features": ["噴水", "花壇"]},
+                    {"id": "study", "name": "書斎", "size": 2, "features": ["本棚", "机", "窓", "椅子", "ランプ", "絨毯"]},
+                    {"id": "garden", "name": "庭園", "size": 1, "features": ["噴水", "花壇", "ベンチ"]},
+                    {"id": "kitchen", "name": "厨房", "size": 1, "features": ["調理台", "冷蔵庫", "食器棚"]},
+                    {"id": "dining", "name": "食堂", "size": 2, "features": ["テーブル", "シャンデリア", "窓", "食器棚", "暖炉", "絵画"]},
+                ],
+            },
+            {
+                "id": "second_floor",
+                "name": "2階",
+                "area_type": "indoor",
+                "rooms": [
+                    {"id": "master_bedroom", "name": "主寝室", "size": 2, "features": ["ベッド", "クローゼット", "鏡台", "窓", "サイドテーブル", "絵画"]},
+                    {"id": "guest_room", "name": "客室", "size": 1, "features": ["ベッド", "机", "窓"]},
+                    {"id": "library", "name": "図書室", "size": 1, "features": ["本棚", "机", "ソファ"]},
+                    {"id": "storage", "name": "物置", "size": 1, "features": ["棚", "箱", "古い家具"]},
                 ],
             },
         ],
-        "connections": [{"from": "study", "to": "garden", "type": "door"}],
     },
     "relationships": [
         {"player1": "探偵", "player2": "医者", "relationship": "旧友"},
@@ -167,7 +176,8 @@ class _NoOpPhaseManager:
     """No-op PhaseManager for E2E tests. Avoids session conflicts and background tasks."""
 
     def __init__(self, session_factory=None):
-        pass
+        self._session_factory = session_factory
+        self._intro_ready: dict[str, set[str]] = {}
 
     async def start_first_phase(self, game_id, room_code):
         pass
@@ -180,6 +190,37 @@ class _NoOpPhaseManager:
 
     def cleanup_game(self, game_id):
         pass
+
+    def set_intro_ready(self, room_code, player_id):
+        if room_code not in self._intro_ready:
+            self._intro_ready[room_code] = set()
+        self._intro_ready[room_code].add(player_id)
+
+    def get_intro_ready_count(self, room_code):
+        return len(self._intro_ready.get(room_code, set()))
+
+    def clear_intro_ready(self, room_code):
+        self._intro_ready.pop(room_code, None)
+
+    async def _generate_and_broadcast_ending(self, game_id, room_code):
+        from madaminu.services.scenario_engine import generate_ending
+        from madaminu.ws.handler import manager
+        from madaminu.ws.messages import WSMessage
+
+        async with self._session_factory() as db:
+            ending, _ = await generate_ending(db, game_id)
+
+        await manager.broadcast(
+            room_code,
+            WSMessage(
+                type="game.ending",
+                data={
+                    "ending_text": ending.ending_text,
+                    "true_criminal_id": ending.true_criminal_id,
+                    "objective_results": ending.objective_results,
+                },
+            ),
+        )
 
 
 @pytest.fixture()
@@ -200,6 +241,7 @@ def e2e_client(e2e_session_factory):
     sm = SpeechManager(e2e_session_factory)
     app.state.phase_manager = pm
     app.state.speech_manager = sm
+    app.state._session_factory = e2e_session_factory
 
     client = TestClient(app, raise_server_exceptions=False)
     yield client
@@ -213,6 +255,8 @@ def e2e_client(e2e_session_factory):
         del app.state.phase_manager
     if hasattr(app.state, "speech_manager"):
         del app.state.speech_manager
+    if hasattr(app.state, "_session_factory"):
+        del app.state._session_factory
 
 
 @pytest.fixture()
@@ -229,6 +273,7 @@ async def async_client(e2e_session_factory):
     sm = SpeechManager(e2e_session_factory)
     app.state.phase_manager = pm
     app.state.speech_manager = sm
+    app.state._session_factory = e2e_session_factory
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -243,12 +288,26 @@ async def async_client(e2e_session_factory):
         del app.state.phase_manager
     if hasattr(app.state, "speech_manager"):
         del app.state.speech_manager
+    if hasattr(app.state, "_session_factory"):
+        del app.state._session_factory
 
 
 def _mock_llm_generate(responses: list[tuple[str, LLMUsage]]):
     """Create a mock that returns different responses on successive calls."""
     mock = AsyncMock(side_effect=responses)
     return mock
+
+
+async def _noop_generate_background(game_id, room_code, session_factory, phase_manager):
+    """No-op replacement for _generate_scenario_background in E2E tests.
+
+    Runs generate_scenario synchronously so DB state is set up,
+    but skips image generation and WS broadcasts.
+    """
+    from madaminu.services.scenario_engine import generate_scenario
+
+    async with session_factory() as db:
+        await generate_scenario(db, game_id)
 
 
 def _scenario_and_validation_mock():
@@ -298,14 +357,22 @@ async def test_full_game_lifecycle_http(async_client):
         )
         assert resp.status_code == 200
 
-    # 4. Verify room state
+    # 4. Set all players ready
+    for name in ["Bob", "Charlie", "Dave"]:
+        ready_resp = await async_client.post(
+            f"/api/v1/rooms/{room_code}/ready",
+            headers={"x-session-token": tokens[name]},
+        )
+        assert ready_resp.status_code == 200
+
+    # 5. Verify room state
     room_resp = await async_client.get(f"/api/v1/rooms/{room_code}")
     assert room_resp.status_code == 200
     room_data = room_resp.json()
     assert room_data["status"] == "waiting"
     assert len(room_data["players"]) == 4
 
-    # 5. Start game
+    # 6. Start game
     mock_generate = _scenario_and_validation_mock()
 
     with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
@@ -316,8 +383,7 @@ async def test_full_game_lifecycle_http(async_client):
 
     assert start_resp.status_code == 200
     start_data = start_resp.json()
-    assert start_data["status"] == "playing"
-    assert start_data["scenario_setting"]["location"] == "洋館"
+    assert start_data["status"] == "generating"
     assert start_data["total_cost_usd"] >= 0
 
 
@@ -352,15 +418,21 @@ async def test_full_game_flow_with_websocket(e2e_client, e2e_session_factory):
             headers={"x-session-token": tokens[name]},
         )
 
+    for name in ["Bob", "Charlie", "Dave"]:
+        e2e_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": tokens[name]})
+
     # --- Start game with mocked LLM ---
     mock_generate = _scenario_and_validation_mock()
-    with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
+    with (
+        patch("madaminu.llm.client.llm_client.generate_json", mock_generate),
+        patch("madaminu.routers.game._generate_scenario_background", _noop_generate_background),
+    ):
         start_resp = e2e_client.post(
             f"/api/v1/rooms/{room_code}/start",
             headers={"x-session-token": host_token},
         )
     assert start_resp.status_code == 200
-    assert start_resp.json()["status"] == "playing"
+    assert start_resp.json()["status"] == "generating"
 
     await _activate_first_phase(e2e_session_factory)
 
@@ -404,8 +476,14 @@ async def test_websocket_investigation_flow(e2e_client, e2e_session_factory):
             headers={"x-session-token": player_tokens[name]},
         )
 
+    for name in ["Bob", "Charlie", "Dave"]:
+        e2e_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": player_tokens[name]})
+
     mock_generate = _scenario_and_validation_mock()
-    with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
+    with (
+        patch("madaminu.llm.client.llm_client.generate_json", mock_generate),
+        patch("madaminu.routers.game._generate_scenario_background", _noop_generate_background),
+    ):
         e2e_client.post(f"/api/v1/rooms/{room_code}/start", headers={"x-session-token": host_token})
 
     await _activate_phase_by_type(e2e_session_factory, PhaseType.investigation)
@@ -452,8 +530,14 @@ async def test_websocket_speech_flow(e2e_client, e2e_session_factory):
             headers={"x-session-token": player_tokens[name]},
         )
 
+    for name in ["Bob", "Charlie", "Dave"]:
+        e2e_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": player_tokens[name]})
+
     mock_generate = _scenario_and_validation_mock()
-    with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
+    with (
+        patch("madaminu.llm.client.llm_client.generate_json", mock_generate),
+        patch("madaminu.routers.game._generate_scenario_background", _noop_generate_background),
+    ):
         e2e_client.post(f"/api/v1/rooms/{room_code}/start", headers={"x-session-token": host_token})
 
     await _activate_first_phase(e2e_session_factory)
@@ -691,8 +775,14 @@ async def test_non_host_cannot_advance_phase(e2e_client, e2e_session_factory):
             headers={"x-session-token": player_tokens[name]},
         )
 
+    for name in ["Bob", "Charlie", "Dave"]:
+        e2e_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": player_tokens[name]})
+
     mock_generate = _scenario_and_validation_mock()
-    with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
+    with (
+        patch("madaminu.llm.client.llm_client.generate_json", mock_generate),
+        patch("madaminu.routers.game._generate_scenario_background", _noop_generate_background),
+    ):
         start_resp = e2e_client.post(
             f"/api/v1/rooms/{room_code}/start",
             headers={"x-session-token": host_token},
@@ -735,13 +825,26 @@ async def test_room_state_after_game_start(async_client, e2e_session_factory):
             headers={"x-session-token": player_tokens[name]},
         )
 
+    for name in ["Bob", "Charlie", "Dave"]:
+        await async_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": player_tokens[name]})
+
+    import asyncio
+
     mock_generate = _scenario_and_validation_mock()
-    with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
+    mock_images = AsyncMock()
+
+    with (
+        patch("madaminu.llm.client.llm_client.generate_json", mock_generate),
+        patch("madaminu.routers.game._generate_images", mock_images),
+    ):
         start_resp = await async_client.post(
             f"/api/v1/rooms/{room_code}/start",
             headers={"x-session-token": host_token},
         )
-    assert start_resp.status_code == 200
+        assert start_resp.status_code == 200
+
+        # Give background task time to complete
+        await asyncio.sleep(0.5)
 
     await _activate_first_phase(e2e_session_factory)
 
@@ -755,11 +858,14 @@ async def test_room_state_after_game_start(async_client, e2e_session_factory):
 
         phases_result = await db.execute(select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order))
         phases = phases_result.scalars().all()
-        assert len(phases) == 10  # 3 turns × 3 phases + voting
-        assert phases[0].phase_type == PhaseType.planning
-        assert phases[1].phase_type == PhaseType.investigation
-        assert phases[2].phase_type == PhaseType.discussion
-        assert phases[9].phase_type == PhaseType.voting
+        # initial + opening + 3 turns * (planning + investigation + discussion) + voting = 12
+        assert len(phases) == 12
+        assert phases[0].phase_type == PhaseType.initial
+        assert phases[1].phase_type == PhaseType.opening
+        assert phases[2].phase_type == PhaseType.planning
+        assert phases[3].phase_type == PhaseType.investigation
+        assert phases[4].phase_type == PhaseType.discussion
+        assert phases[11].phase_type == PhaseType.voting
 
         players_result = await db.execute(select(Player).where(Player.game_id == game.id))
         players = players_result.scalars().all()
