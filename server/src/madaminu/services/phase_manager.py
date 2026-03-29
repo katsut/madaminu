@@ -124,8 +124,9 @@ class PhaseManager:
                 return None
 
             next_phase = sorted_phases[current_idx + 1]
-            next_phase.started_at = datetime.utcnow()
-            next_phase.deadline_at = datetime.utcnow() + timedelta(seconds=next_phase.duration_sec)
+            if next_phase.phase_type != PhaseType.investigation:
+                next_phase.started_at = datetime.utcnow()
+                next_phase.deadline_at = datetime.utcnow() + timedelta(seconds=next_phase.duration_sec)
             game.current_phase_id = next_phase.id
 
             if next_phase.phase_type == PhaseType.voting:
@@ -137,6 +138,10 @@ class PhaseManager:
 
         if current_phase.phase_type == PhaseType.investigation:
             self.clear_discoveries(room_code)
+        if current_phase.phase_type == PhaseType.planning:
+            pass  # Keep selections for investigation
+        elif current_phase.phase_type != PhaseType.investigation:
+            self.clear_investigation_selections(room_code)
 
         if current_phase.phase_type != PhaseType.planning:
             await self._run_phase_adjustment(game_id, room_code, current_phase.id)

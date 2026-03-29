@@ -246,7 +246,7 @@ def e2e_client(e2e_session_factory):
     client = TestClient(app, raise_server_exceptions=False)
     yield client
 
-    for room_code in list(sm._locks.keys()):
+    for room_code in list(sm._speakers.keys()):
         sm.cleanup_room(room_code)
     ws_manager._connections.clear()
 
@@ -279,7 +279,7 @@ async def async_client(e2e_session_factory):
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    for room_code in list(sm._locks.keys()):
+    for room_code in list(sm._speakers.keys()):
         sm.cleanup_room(room_code)
     ws_manager._connections.clear()
 

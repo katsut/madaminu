@@ -31,7 +31,7 @@ async def _generate_ai_character(existing_characters: list[str], setting: str) -
     raw, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
     from madaminu.services.scenario_engine import _parse_scenario_json
 
-    return _parse_scenario_json(raw)
+    return _parse_scenario_json(raw), usage
 
 
 async def fill_ai_players(db: AsyncSession, game_id: str, target_count: int = 4) -> list[Player]:
@@ -52,7 +52,8 @@ async def fill_ai_players(db: AsyncSession, game_id: str, target_count: int = 4)
     ai_players = []
     for _ in range(needed):
         try:
-            char = await _generate_ai_character(existing_names, setting)
+            char, usage = await _generate_ai_character(existing_names, setting)
+            game.total_llm_cost_usd += usage.estimated_cost_usd
             name = char.get("character_name", f"AI_{uuid.uuid4().hex[:6]}")
             player = Player(
                 id=str(uuid.uuid4()),

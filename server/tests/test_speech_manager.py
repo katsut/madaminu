@@ -165,7 +165,7 @@ async def test_cleanup_room(session_factory, speech_manager):
     speech_manager.cleanup_room(room_code)
 
     assert speech_manager.get_current_speaker(room_code) is None
-    assert room_code not in speech_manager._locks
+    assert room_code not in speech_manager._speakers
 
 
 async def test_get_current_speaker_no_room(speech_manager):
