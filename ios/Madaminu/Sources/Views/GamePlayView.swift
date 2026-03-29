@@ -55,7 +55,8 @@ struct GamePlayView: View {
                             turnNumber: store.game.currentPhase?.turnNumber ?? 1,
                             totalTurns: store.game.currentPhase?.totalTurns ?? 3,
                             durationSec: store.game.currentPhase?.durationSec ?? 0,
-                            sceneImageUrl: store.game.scenarioSetting.sceneImageUrl
+                            sceneImageUrl: store.game.scenarioSetting.sceneImageUrl,
+                            travelNarrative: store.game.travelNarrative
                         )
                         .transition(.opacity)
                         .zIndex(100)
@@ -1288,6 +1289,7 @@ struct PhaseTransitionOverlay: View {
     let totalTurns: Int
     let durationSec: Int
     let sceneImageUrl: String?
+    var travelNarrative: String? = nil
 
     var body: some View {
         ZStack {
@@ -1333,6 +1335,16 @@ struct PhaseTransitionOverlay: View {
                 }
                 .padding(.horizontal, Spacing.xl)
                 .padding(.top, Spacing.sm)
+
+                if let narrative = travelNarrative, !narrative.isEmpty {
+                    Text(narrative)
+                        .font(.mdBody)
+                        .foregroundStyle(Color.mdTextPrimary)
+                        .italic()
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Spacing.xl)
+                        .padding(.top, Spacing.sm)
+                }
 
                 if durationSec > 0 {
                     Text(formatDuration(durationSec))

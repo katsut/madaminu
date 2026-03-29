@@ -77,7 +77,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
 
     raw_map = scenario.get("map", {})
     complete_map = build_map_structure(raw_map, victim=scenario.get("victim"))
-    route_text = generate_route_text(complete_map)
+    route_text = generate_route_text(complete_map, players=scenario.get("players"))
 
     game.scenario_skeleton = {
         "setting": scenario["setting"],
