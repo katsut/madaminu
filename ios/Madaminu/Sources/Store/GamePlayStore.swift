@@ -14,6 +14,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var isConnected = false
     @Published var showPhaseTransition = false
     @Published var nextPhaseType: String?
+    @Published var travelNarrative: String?
     @Published var isPaused = false
     @Published var localRemainingSec: Int = 0
     @Published var selectedLocationId: String?
@@ -48,6 +49,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         isConnected = false
         showPhaseTransition = false
         nextPhaseType = nil
+        travelNarrative = nil
         isPaused = false
         localRemainingSec = 0
         selectedLocationId = nil

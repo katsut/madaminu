@@ -138,6 +138,7 @@ class PhaseManager:
             await self._run_phase_adjustment(game_id, room_code, current_phase.id)
 
         if next_phase.phase_type == PhaseType.investigation:
+            await self._send_travel_narratives(game_id, room_code)
             await self._generate_room_discoveries(game_id, room_code)
             async with self._session_factory() as db:
                 phase_result = await db.execute(select(Phase).where(Phase.id == next_phase.id))
@@ -465,6 +466,42 @@ class PhaseManager:
             return
         except Exception:
             logger.exception("AI speech scheduling failed for game %s", game_id)
+
+    async def _send_travel_narratives(self, game_id: str, room_code: str):
+        from madaminu.services.map_builder import generate_travel_narrative
+        from madaminu.ws.handler import manager
+
+        try:
+            selections = self.get_investigation_selections(room_code)
+            if not selections:
+                return
+
+            async with self._session_factory() as db:
+                game_result = await db.execute(
+                    select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+                )
+                game = game_result.scalar_one()
+                map_data = (game.scenario_skeleton or {}).get("map", {})
+                id_to_name = {
+                    p.id: p.character_name or p.display_name
+                    for p in game.players
+                }
+
+            loc_selections = {
+                pid: sel.get("location_id", "")
+                for pid, sel in selections.items()
+                if sel.get("location_id")
+            }
+            narratives = generate_travel_narrative(map_data, loc_selections, id_to_name)
+
+            for pid, text in narratives.items():
+                if text:
+                    await manager.send_to_player(
+                        room_code, pid,
+                        WSMessage(type="travel.narrative", data={"text": text}),
+                    )
+        except Exception:
+            logger.exception("Travel narrative failed for game %s", game_id)
 
     async def _run_phase_adjustment(self, game_id: str, room_code: str, ended_phase_id: str):
         from madaminu.services.scenario_engine import adjust_phase

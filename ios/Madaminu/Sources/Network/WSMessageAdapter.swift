@@ -35,6 +35,8 @@ struct WSMessageAdapter {
             if let remainingStr = data["remaining_sec"], let remaining = Int(remainingStr) {
                 store.game.localRemainingSec = remaining
             }
+        case "travel.narrative":
+            store.game.travelNarrative = data["text"]
         case "phase.ended":
             let endedType = data["phase_type"] ?? store.game.currentPhase?.phaseType ?? ""
             if endedType == "discussion" {
@@ -284,6 +286,7 @@ struct WSMessageAdapter {
         store.game.hasRevealedEvidence = false
         store.game.colocatedPlayers = []
         store.game.roomMessages = []
+        store.game.travelNarrative = nil
         if store.screen == .generating || store.screen == .lobby {
             store.screen = .playing
         }

@@ -221,7 +221,7 @@ def _find_entrance(area: dict) -> dict | None:
     return None
 
 
-def generate_route_text(map_data: dict) -> str:
+def generate_route_text(map_data: dict, players: list[dict] | None = None) -> str:
     """Convert map structure to natural language route description for LLM context."""
     areas = map_data.get("areas", [])
     connections = map_data.get("connections", [])
@@ -303,7 +303,117 @@ def generate_route_text(map_data: dict) -> str:
             if room.get("is_crime_scene"):
                 lines.append(f"● 犯行現場: {room.get('name', room['id'])}（{area.get('name', area['id'])}）")
 
+    # Character locations at time of incident
+    if players:
+        lines.append("")
+        lines.append("■ 事件発生時のキャラクター位置")
+        for p in players:
+            name = p.get("character_name", "?")
+            alibi_room = p.get("alibi_room_id")
+            personal_room = p.get("personal_room_id")
+            alibi_name = all_nodes.get(alibi_room, {}).get("name", alibi_room) if alibi_room else "不明"
+            parts = [f"  - {name}: 居場所={alibi_name}"]
+            if personal_room:
+                personal_name = all_nodes.get(personal_room, {}).get("name", personal_room)
+                parts.append(f"(個室={personal_name})")
+            lines.append(" ".join(parts))
+
     return "\n".join(lines)
+
+
+def generate_travel_narrative(
+    map_data: dict,
+    selections: dict[str, str],
+    id_to_name: dict[str, str],
+) -> dict[str, str]:
+    """Generate travel narrative for each player from a common start point.
+
+    Args:
+        map_data: Complete map with areas and connections.
+        selections: {player_id: location_id} - where each player is going.
+        id_to_name: {player_id: character_name}.
+
+    Returns:
+        {player_id: narrative_text} for each player.
+    """
+    connections = map_data.get("connections", [])
+    all_nodes: dict[str, dict] = {}
+    for area in map_data.get("areas", []):
+        for room in area.get("rooms", []):
+            all_nodes[room["id"]] = room
+
+    # Build adjacency
+    adj: dict[str, list[str]] = {}
+    for c in connections:
+        a, b = c["from"], c["to"]
+        adj.setdefault(a, []).append(b)
+        adj.setdefault(b, []).append(a)
+
+    # Find common start: first entrance
+    start = None
+    for area in map_data.get("areas", []):
+        for room in area.get("rooms", []):
+            if room.get("room_type") == "entrance":
+                start = room["id"]
+                break
+        if start:
+            break
+
+    if not start:
+        return {pid: "" for pid in selections}
+
+    # BFS shortest path for each destination
+    def find_path(from_id: str, to_id: str) -> list[str]:
+        if from_id == to_id:
+            return [from_id]
+        visited = {from_id}
+        queue = [(from_id, [from_id])]
+        while queue:
+            current, path = queue.pop(0)
+            for nb in adj.get(current, []):
+                if nb in visited:
+                    continue
+                visited.add(nb)
+                new_path = path + [nb]
+                if nb == to_id:
+                    return new_path
+                queue.append((nb, new_path))
+        return []
+
+    # Group players by destination
+    dest_groups: dict[str, list[str]] = {}
+    for pid, loc_id in selections.items():
+        dest_groups.setdefault(loc_id, []).append(pid)
+
+    narratives: dict[str, str] = {}
+    for pid, loc_id in selections.items():
+        path = find_path(start, loc_id)
+        if not path:
+            narratives[pid] = ""
+            continue
+
+        room_names = [all_nodes.get(nid, {}).get("name", nid) for nid in path]
+        dest_name = all_nodes.get(loc_id, {}).get("name", loc_id)
+
+        # Who else is going to the same place?
+        companions = [
+            id_to_name.get(other, "?")
+            for other in dest_groups.get(loc_id, [])
+            if other != pid
+        ]
+
+        parts = []
+        if len(room_names) > 2:
+            route = " → ".join(room_names[1:-1])
+            parts.append(f"{route}を通って")
+        parts.append(f"{dest_name}に向かった。")
+
+        if companions:
+            parts.append(f"{', '.join(companions)}も同じ場所に向かっている。")
+
+        narratives[pid] = "".join(parts)
+
+    return narratives
 
 
 def _find_area_for_node(areas: list[dict], node_id: str) -> str:
