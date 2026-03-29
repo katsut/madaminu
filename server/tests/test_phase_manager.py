@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -121,7 +122,9 @@ async def test_advance_past_last_phase_ends_game(session_factory, phase_manager)
     await phase_manager.start_first_phase(game_id, room_code)
     await phase_manager.advance_phase(game_id, room_code)
     await phase_manager.advance_phase(game_id, room_code)
-    result = await phase_manager.advance_phase(game_id, room_code)
+
+    with patch.object(phase_manager, "_generate_and_broadcast_ending", new_callable=AsyncMock):
+        result = await phase_manager.advance_phase(game_id, room_code)
 
     assert result is None
 

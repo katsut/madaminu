@@ -70,14 +70,14 @@ async def test_request_speech_granted(session_factory, speech_manager):
     speech_manager.cleanup_room(room_code)
 
 
-async def test_request_speech_denied_when_occupied(session_factory, speech_manager):
+async def test_request_speech_preempts_current_speaker(session_factory, speech_manager):
     _, room_code, p1_id, p2_id = await _create_playing_game(session_factory)
 
     await speech_manager.request_speech(room_code, p1_id)
     result = await speech_manager.request_speech(room_code, p2_id)
 
-    assert result is False
-    assert speech_manager.get_current_speaker(room_code) == p1_id
+    assert result is True
+    assert speech_manager.get_current_speaker(room_code) == p2_id
 
     speech_manager.cleanup_room(room_code)
 

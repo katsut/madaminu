@@ -20,7 +20,7 @@ def test_llm_usage_cost_nano():
 def test_render_template():
     text = render_template("scenario_generate", characters="Alice, Bob")
     assert "Alice, Bob" in text
-    assert "investigation" in text
+    assert "murder mystery" in text
 
 
 def test_format_characters():
