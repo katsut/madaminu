@@ -180,6 +180,15 @@ async def _handle_speech_request(room_code: str, player_id: str, websocket: WebS
     if sm is None:
         return
 
+    # Only allow speech during active game phases
+    pm = _get_phase_manager(websocket)
+    if pm:
+        async with pm._session_factory() as db:
+            game_result = await db.execute(select(Game).where(Game.room_code == room_code))
+            game = game_result.scalar_one_or_none()
+            if game and game.status == GameStatus.ended:
+                return
+
     granted = await sm.request_speech(room_code, player_id)
     if granted:
         await manager.send_to_player(
