@@ -14,12 +14,24 @@ MOCK_SCENARIO = {
                 "name": "1階",
                 "area_type": "indoor",
                 "rooms": [
-                    {"id": "study", "name": "書斎", "features": ["本棚", "机"]},
-                    {"id": "garden", "name": "庭園", "features": ["噴水", "花壇"]},
+                    {"id": "study", "name": "書斎", "size": 2, "features": ["本棚", "机", "窓", "椅子", "ランプ", "絨毯"]},
+                    {"id": "garden", "name": "庭園", "size": 1, "features": ["噴水", "花壇", "ベンチ"]},
+                    {"id": "kitchen", "name": "厨房", "size": 1, "features": ["調理台", "冷蔵庫", "食器棚"]},
+                    {"id": "dining", "name": "食堂", "size": 2, "features": ["テーブル", "シャンデリア", "窓", "食器棚", "暖炉", "絵画"]},
+                ],
+            },
+            {
+                "id": "second_floor",
+                "name": "2階",
+                "area_type": "indoor",
+                "rooms": [
+                    {"id": "master_bedroom", "name": "主寝室", "size": 2, "features": ["ベッド", "クローゼット", "鏡台", "窓", "サイドテーブル", "絵画"]},
+                    {"id": "guest_room", "name": "客室", "size": 1, "features": ["ベッド", "机", "窓"]},
+                    {"id": "library", "name": "図書室", "size": 1, "features": ["本棚", "机", "ソファ"]},
+                    {"id": "storage", "name": "物置", "size": 1, "features": ["棚", "箱", "古い家具"]},
                 ],
             },
         ],
-        "connections": [{"from": "study", "to": "garden", "type": "door"}],
     },
     "relationships": [
         {"player1": "探偵", "player2": "医者", "relationship": "旧友"},
@@ -98,7 +110,7 @@ async def test_start_game_endpoint(client, test_session):
             headers={"x-session-token": token},
         )
 
-    for token in tokens:
+    for token in tokens[1:]:
         await client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": token})
 
     mock_generate = AsyncMock(return_value=(json.dumps(MOCK_SCENARIO, ensure_ascii=False), MOCK_USAGE))
@@ -111,8 +123,7 @@ async def test_start_game_endpoint(client, test_session):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] == "playing"
-    assert "scenario_setting" in data
+    assert data["status"] == "generating"
     assert data["total_cost_usd"] >= 0
 
 
@@ -131,6 +142,24 @@ async def test_start_game_not_ready(client, test_session):
     room_resp = await client.post("/api/v1/rooms", json={"display_name": "Alice"})
     room_code = room_resp.json()["room_code"]
     host_token = room_resp.json()["session_token"]
+
+    # Add players and set characters but don't set ready
+    tokens = [host_token]
+    for name in ["Bob", "Charlie", "Dave"]:
+        join_resp = await client.post(f"/api/v1/rooms/{room_code}/join", json={"display_name": name})
+        tokens.append(join_resp.json()["session_token"])
+
+    char_names = ["探偵", "医者", "執事", "令嬢"]
+    for token, char_name in zip(tokens, char_names, strict=True):
+        await client.post(
+            f"/api/v1/rooms/{room_code}/characters",
+            json={
+                "character_name": char_name,
+                "character_personality": "テスト性格",
+                "character_background": "テスト背景",
+            },
+            headers={"x-session-token": token},
+        )
 
     resp = await client.post(f"/api/v1/rooms/{room_code}/start", headers={"x-session-token": host_token})
     assert resp.status_code == 400
