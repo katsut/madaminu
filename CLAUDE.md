@@ -2,7 +2,7 @@
 
 ## アーキテクチャ
 
-詳細: [docs/architecture-v2.md](docs/architecture-v2.md)
+詳細: [docs/planning/architecture.md](docs/planning/architecture.md)
 
 ### サーバー (Python/FastAPI)
 - Router → Service → Repository → DB
