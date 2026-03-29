@@ -24,6 +24,11 @@ struct NotebookView: View {
                 tabBar
                 tabContent
             }
+            .onChange(of: tabs.count) { _ in
+                if selectedTab >= tabs.count {
+                    selectedTab = 0
+                }
+            }
         }
     }
 

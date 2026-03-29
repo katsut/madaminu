@@ -102,6 +102,7 @@ struct GamePlayView: View {
     }
 
     private func startLocalTimer() {
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             DispatchQueue.main.async {
                 if store.game.localRemainingSec > 0 && !store.game.isPaused {
@@ -1461,6 +1462,7 @@ struct EndingRevealView: View {
     let players: [PlayerInfo]
     @Binding var phase: Int
     @State private var textOpacity: Double = 0
+    @State private var revealTask: Task<Void, Never>?
 
     private var arrestedPlayer: PlayerInfo? {
         guard let name = ending.arrestedName else { return nil }
@@ -1508,26 +1510,32 @@ struct EndingRevealView: View {
         .onAppear {
             startReveal()
         }
+        .onDisappear {
+            revealTask?.cancel()
+        }
     }
 
     private func startReveal() {
-        phase = 1
-        withAnimation(.easeIn(duration: 1.5)) {
-            textOpacity = 1
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+        revealTask?.cancel()
+        revealTask = Task { @MainActor in
+            phase = 1
+            withAnimation(.easeIn(duration: 1.5)) {
+                textOpacity = 1
+            }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.5)) {
                 textOpacity = 0
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                phase = 2
-                withAnimation(.easeIn(duration: 1.0)) {
-                    textOpacity = 1
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                    phase = 3
-                }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            phase = 2
+            withAnimation(.easeIn(duration: 1.0)) {
+                textOpacity = 1
             }
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            phase = 3
         }
     }
 }
