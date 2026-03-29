@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import uuid
 
@@ -14,27 +13,17 @@ logger = logging.getLogger(__name__)
 class SpeechManager:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self._session_factory = session_factory
-        self._locks: dict[str, asyncio.Lock] = {}
         self._speakers: dict[str, str | None] = {}
 
-    def _get_lock(self, room_code: str) -> asyncio.Lock:
-        if room_code not in self._locks:
-            self._locks[room_code] = asyncio.Lock()
-        return self._locks[room_code]
-
     async def request_speech(self, room_code: str, player_id: str) -> bool:
-        lock = self._get_lock(room_code)
-
         current = self._speakers.get(room_code)
         if current == player_id:
             return True
 
-        if current and lock.locked():
+        if current:
             self._speakers[room_code] = None
-            lock.release()
             await self.broadcast_speech_released(room_code, current)
 
-        await lock.acquire()
         self._speakers[room_code] = player_id
         return True
 
@@ -47,11 +36,7 @@ class SpeechManager:
         if self._speakers.get(room_code) != player_id:
             return False
 
-        lock = self._get_lock(room_code)
         self._speakers[room_code] = None
-
-        if lock.locked():
-            lock.release()
 
         if transcript:
             await self._save_transcript(room_code, player_id, transcript)
@@ -62,16 +47,10 @@ class SpeechManager:
         return self._speakers.get(room_code)
 
     def cleanup_room(self, room_code: str):
-        lock = self._locks.pop(room_code, None)
-        if lock and lock.locked():
-            lock.release()
         self._speakers.pop(room_code, None)
 
     def force_release(self, room_code: str):
-        lock = self._get_lock(room_code)
         self._speakers[room_code] = None
-        if lock.locked():
-            lock.release()
 
     async def _save_transcript(self, room_code: str, player_id: str, transcript: str):
         async with self._session_factory() as db:
