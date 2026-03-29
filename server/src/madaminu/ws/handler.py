@@ -279,6 +279,11 @@ async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str,
         return
 
     if msg_type == "phase.advance":
+        if game.status == GameStatus.voting:
+            await websocket.send_json(
+                WSMessage(type="error", data={"message": "投票フェーズは全員投票完了で進行します"}).model_dump()
+            )
+            return
         await pm.advance_phase(game.id, room_code)
     elif msg_type == "phase.extend":
         await pm.extend_phase(game.id, room_code)
