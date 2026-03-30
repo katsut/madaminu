@@ -178,6 +178,42 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         ws.send(type: type, data: data)
     }
 
+    @MainActor func pollGameState() async {
+        guard let token = room.sessionToken, !room.roomCode.isEmpty else { return }
+        let urlString = APIClient.defaultBaseURL + "/api/v1/rooms/\(room.roomCode)/state"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.setValue(token, forHTTPHeaderField: "X-Session-Token")
+
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                // Convert to [String: String] for WSMessageAdapter
+                var stringData: [String: String] = [:]
+                for (key, value) in json {
+                    if let str = value as? String {
+                        stringData[key] = str
+                    } else if let num = value as? NSNumber {
+                        stringData[key] = num.stringValue
+                    } else if let obj = value as? [String: Any],
+                              let jsonData = try? JSONSerialization.data(withJSONObject: obj),
+                              let jsonStr = String(data: jsonData, encoding: .utf8) {
+                        stringData[key] = jsonStr
+                    } else if let arr = value as? [Any],
+                              let jsonData = try? JSONSerialization.data(withJSONObject: arr),
+                              let jsonStr = String(data: jsonData, encoding: .utf8) {
+                        stringData[key] = jsonStr
+                    }
+                }
+                print("[AppStore] pollGameState: applying state")
+                WSMessageAdapter.apply(type: "game.state", data: stringData, store: self)
+            }
+        } catch {
+            print("[AppStore] pollGameState failed: \(error)")
+        }
+    }
+
     func reconnectWebSocket() {
         ws.disconnect()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
