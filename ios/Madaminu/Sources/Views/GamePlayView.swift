@@ -546,7 +546,6 @@ struct PlanningPhaseView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         SVGWebView(svgContent: svg)
                             .frame(width: 500, height: 220)
-                            .id(selectedLocationId ?? "none")
                     }
                     .frame(height: 220)
                     .background(Color(red: 0.067, green: 0.067, blue: 0.094))
