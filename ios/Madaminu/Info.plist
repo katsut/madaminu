@@ -22,6 +22,17 @@
 	<string>ゲーム中の発言を録音するためにマイクを使用します</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>ゲーム中の発言を文字起こしするために音声認識を使用します</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.katsut.madaminu</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>madaminu</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

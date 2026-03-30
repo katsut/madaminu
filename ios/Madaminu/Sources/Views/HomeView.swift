@@ -26,6 +26,15 @@ public struct HomeView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: store.screen)
+        .onOpenURL { url in
+            // Handle madaminu://join/{roomCode}
+            guard url.scheme == "madaminu",
+                  url.host == "join",
+                  let roomCode = url.pathComponents.last,
+                  !roomCode.isEmpty,
+                  roomCode != "/" else { return }
+            store.handleDeepLink(roomCode: roomCode)
+        }
     }
 }
 
@@ -223,6 +232,13 @@ struct HomeScreen: View {
         }
         .sheet(isPresented: $showJoinSheet) {
             JoinRoomSheet(store: store, isPresented: $showJoinSheet, joinCode: $joinCode, password: $password)
+        }
+        .onChange(of: store.pendingJoinCode) {
+            if let code = store.pendingJoinCode {
+                joinCode = code
+                store.pendingJoinCode = nil
+                showJoinSheet = true
+            }
         }
     }
 
