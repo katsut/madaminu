@@ -124,6 +124,7 @@ struct SpeechEntry: Identifiable, Sendable {
     let playerId: String?
     let characterName: String
     let transcript: String
+    let timestamp: Date = Date()
 }
 
 struct RevealedEvidence: Identifiable, Sendable {
@@ -132,6 +133,7 @@ struct RevealedEvidence: Identifiable, Sendable {
     let playerName: String
     let title: String
     let content: String
+    let timestamp: Date = Date()
 }
 
 struct ColocatedPlayer: Identifiable, Sendable {
