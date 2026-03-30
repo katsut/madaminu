@@ -7,7 +7,7 @@ struct NotebookView: View {
     @State private var selectedTab = 0
 
     private var tabs: [String] {
-        var t = ["事件", "自分", "登場人物", "証拠", "議論", "メモ"]
+        var t = ["事件", "登場人物", "非公開情報", "証拠", "議論", "メモ"]
         if store.game.scenarioSetting.mapUrl != nil {
             t.insert("マップ", at: 3)
         }
@@ -74,8 +74,8 @@ struct NotebookView: View {
         let hasMap = store.game.scenarioSetting.mapUrl != nil
         return TabView(selection: $selectedTab) {
             caseSummaryPage.tag(0)
-            myInfoPage.tag(1)
-            playersPage.tag(2)
+            playersPage.tag(1)
+            myInfoPage.tag(2)
             if hasMap {
                 mapPage.tag(3)
                 evidencePage.tag(4)
