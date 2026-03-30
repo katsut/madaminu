@@ -281,7 +281,11 @@ struct WSMessageAdapter {
         if let phaseJSON = data["current_phase"],
            let phaseData = phaseJSON.data(using: .utf8),
            let phaseDict = try? JSONSerialization.jsonObject(with: phaseData) as? [String: Any] {
-            store.game.currentPhase = parsePhaseInfo(phaseDict)
+            let phase = parsePhaseInfo(phaseDict)
+            store.game.currentPhase = phase
+            if let remaining = phase?.remainingSec ?? phase?.durationSec {
+                store.game.localRemainingSec = remaining
+            }
         }
 
         if status == "playing" || status == "voting" {
