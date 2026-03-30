@@ -70,7 +70,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
                 ws.send(type: "investigate.select", data: ["location_id": locationId, "feature": feature])
             }
         case .keepEvidence(let discoveryId):
-            ws.send(type: "investigate.keep", data: ["discovery_id": discoveryId])
+            Task { @MainActor in await performKeepEvidence(discoveryId: discoveryId) }
         case .tamperEvidence(let discoveryId):
             ws.send(type: "investigate.tamper", data: ["discovery_id": discoveryId])
         case .revealEvidence(let evidenceId):
@@ -347,6 +347,38 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         }
 
         isLoading = false
+    }
+
+    @MainActor private func performKeepEvidence(discoveryId: String) async {
+        guard let token = room.sessionToken else { return }
+        let urlString = APIClient.defaultBaseURL + "/api/v1/rooms/\(room.roomCode)/keep-evidence"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(token, forHTTPHeaderField: "X-Session-Token")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["discovery_id": discoveryId])
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let title = json["title"] as? String,
+               let content = json["content"] as? String {
+                game.keptDiscoveryId = discoveryId
+                let evidenceId = json["id"] as? String
+                var item = EvidenceItem(title: title, content: content)
+                item.evidenceId = evidenceId
+                notebook.evidences.append(item)
+                print("[AppStore] keepEvidence: success \(title)")
+            } else {
+                errorMessage = "証拠の保持に失敗しました"
+            }
+        } catch {
+            print("[AppStore] keepEvidence: FAILED \(error)")
+            errorMessage = "証拠の保持に失敗しました"
+        }
     }
 
     @MainActor private func performStartGame() async {
