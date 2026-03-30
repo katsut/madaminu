@@ -114,6 +114,7 @@ struct DiscoveryItem: Identifiable, Sendable {
     let id: String
     let title: String
     var content: String
+    var feature: String = ""
     var canTamper: Bool
     var isTampered: Bool = false
 }

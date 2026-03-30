@@ -651,6 +651,7 @@ struct PlanningPhaseView: View {
 
 struct InvestigationPhaseView: View {
     @ObservedObject var store: AppStore
+    @State private var expandedDiscoveryId: String?
 
     private var selectedLocation: InvestigationLocation? {
         guard let locationId = store.game.selectedLocationId,
@@ -658,79 +659,95 @@ struct InvestigationPhaseView: View {
         return locations.first(where: { $0.id == locationId })
     }
 
+    private var isReady: Bool { !store.game.discoveries.isEmpty }
+
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
                 if let location = selectedLocation {
                     GMGuideCard(
                         title: location.name,
-                        message: "部屋の中を調べています。発見物から1つだけ持ち帰れます。\(store.game.discoveries.first?.canTamper == true ? "誰もいないので、1つすり替えることもできます。" : "")"
+                        message: isReady
+                            ? "調べたいものをタップしてください。1つだけ持ち帰れます。"
+                            : "準備中..."
                     )
                 } else {
-                    GMGuideCard(
-                        title: "調査フェーズ",
-                        message: "調査結果を待っています..."
-                    )
+                    GMGuideCard(title: "調査", message: "準備中...")
                 }
 
                 if !store.game.colocatedPlayers.isEmpty {
                     ColocatedPlayersView(store: store)
                 }
 
-                if store.game.discoveries.isEmpty {
-                    ProgressView("調査結果を取得中...")
+                if !isReady {
+                    ProgressView()
                         .tint(Color.mdPrimary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(Spacing.xl)
                         .task {
-                            // HTTP fallback: poll for discoveries if WS delivery failed
                             for _ in 0..<10 {
                                 try? await Task.sleep(for: .seconds(3))
                                 if !store.game.discoveries.isEmpty { break }
                                 await fetchDiscoveriesHTTP()
                             }
                         }
-                }
-
-                if !store.game.discoveries.isEmpty {
-                    Text("発見物")
-                        .font(.mdHeadline)
-                        .foregroundStyle(Color.mdTextSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
+                } else {
+                    // Feature list with tap-to-reveal
                     ForEach(store.game.discoveries) { discovery in
+                        let isExpanded = expandedDiscoveryId == discovery.id
                         let isKept = store.game.keptDiscoveryId == discovery.id
+
                         MDCard {
                             VStack(alignment: .leading, spacing: Spacing.sm) {
-                                HStack {
-                                    Image(systemName: discovery.isTampered ? "arrow.triangle.2.circlepath" : "doc.text.magnifyingglass")
-                                        .foregroundStyle(discovery.isTampered ? Color.mdWarning : Color.mdSuccess)
-                                    Text(discovery.title)
-                                        .font(.mdHeadline)
-                                        .foregroundStyle(Color.mdTextPrimary)
-                                    Spacer()
-                                    if isKept {
-                                        Text("持ち帰り")
-                                            .font(.mdCaption2)
-                                            .foregroundStyle(Color.mdSuccess)
-                                            .padding(.horizontal, Spacing.xs)
-                                            .padding(.vertical, Spacing.xxs)
-                                            .background(Color.mdSuccess.opacity(0.15))
-                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                // Feature name (always visible, tappable)
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        expandedDiscoveryId = isExpanded ? nil : discovery.id
+                                    }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: isExpanded ? "magnifyingglass.circle.fill" : "magnifyingglass.circle")
+                                            .foregroundStyle(isKept ? Color.mdSuccess : Color.mdPrimary)
+                                        Text(discovery.feature.isEmpty ? discovery.title : discovery.feature)
+                                            .font(.mdHeadline)
+                                            .foregroundStyle(Color.mdTextPrimary)
+                                        Spacer()
+                                        if isKept {
+                                            Text("持ち帰り")
+                                                .font(.mdCaption2)
+                                                .foregroundStyle(Color.mdSuccess)
+                                                .padding(.horizontal, Spacing.xs)
+                                                .padding(.vertical, Spacing.xxs)
+                                                .background(Color.mdSuccess.opacity(0.15))
+                                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                        } else {
+                                            Image(systemName: "chevron.right")
+                                                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                                                .foregroundStyle(Color.mdTextMuted)
+                                        }
                                     }
                                 }
-                                Text(discovery.content)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextPrimary)
 
-                                if store.game.keptDiscoveryId == nil && !discovery.isTampered {
-                                    HStack(spacing: Spacing.sm) {
-                                        MDButton("持ち帰る", style: .primary) {
-                                            store.dispatch(.keepEvidence(discoveryId: discovery.id))
-                                        }
-                                        if discovery.canTamper {
-                                            MDButton("すり替える", style: .danger) {
-                                                store.dispatch(.tamperEvidence(discoveryId: discovery.id))
+                                // Discovery detail (expanded)
+                                if isExpanded {
+                                    Text(discovery.title)
+                                        .font(.mdCallout)
+                                        .foregroundStyle(Color.mdPrimary)
+                                        .fontWeight(.semibold)
+
+                                    Text(discovery.content)
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextPrimary)
+
+                                    if store.game.keptDiscoveryId == nil && !discovery.isTampered {
+                                        HStack(spacing: Spacing.sm) {
+                                            MDButton("持ち帰る", style: .primary) {
+                                                store.dispatch(.keepEvidence(discoveryId: discovery.id))
+                                            }
+                                            if discovery.canTamper {
+                                                MDButton("すり替える", style: .danger) {
+                                                    store.dispatch(.tamperEvidence(discoveryId: discovery.id))
+                                                }
                                             }
                                         }
                                     }
@@ -764,7 +781,8 @@ struct InvestigationPhaseView: View {
                           let title = d["title"] as? String,
                           let content = d["content"] as? String else { return nil }
                     let canTamper = d["can_tamper"] as? Bool ?? false
-                    return DiscoveryItem(id: id, title: title, content: content, canTamper: canTamper)
+                    let feature = d["feature"] as? String ?? ""
+                    return DiscoveryItem(id: id, title: title, content: content, feature: feature, canTamper: canTamper)
                 }
                 print("[InvestigationPhaseView] HTTP fallback got \(store.game.discoveries.count) discoveries")
             }
