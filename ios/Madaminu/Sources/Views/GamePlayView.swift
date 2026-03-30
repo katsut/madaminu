@@ -111,6 +111,15 @@ struct GamePlayView: View {
                     if store.game.localRemainingSec <= 0 {
                         // Nudge server to advance if timer expired
                         store.sendWS(type: "phase.timer_expired")
+                        // HTTP fallback: poll game state after 5s if phase didn't change
+                        let currentPhaseId = store.game.currentPhase?.phaseId
+                        Task {
+                            try? await Task.sleep(for: .seconds(5))
+                            if store.game.currentPhase?.phaseId == currentPhaseId {
+                                print("[GamePlayView] Phase didn't change after timer expired, polling state...")
+                                await store.pollGameState()
+                            }
+                        }
                     }
                 }
             }
