@@ -1,9 +1,11 @@
+import CoreImage.CIFilterBuiltins
 import DesignSystem
 import SwiftUI
 
 struct RoomLobbyView: View {
     @ObservedObject var store: AppStore
     @State private var copied = false
+    @State private var showInviteSheet = false
 
     private var playersWithCharacter: [PlayerInfo] {
         store.room.players.filter { $0.characterName != nil }
@@ -55,6 +57,15 @@ struct RoomLobbyView: View {
 
                     Text(copied ? "コピーしました" : "\(readyCount)/\(store.room.players.count) 人が準備完了")
                         .font(.mdCaption).foregroundStyle(copied ? Color.mdSuccess : Color.mdTextMuted)
+
+                    Button { showInviteSheet = true } label: {
+                        Label("招待する", systemImage: "qrcode")
+                            .font(.mdCallout)
+                            .foregroundStyle(Color.mdPrimary)
+                    }
+                    Text("端末を振っても招待画面が開きます")
+                        .font(.mdCaption2)
+                        .foregroundStyle(Color.mdTextMuted)
                 }
 
                 VStack(spacing: Spacing.xs) {
@@ -153,6 +164,12 @@ struct RoomLobbyView: View {
             }
             .padding(Spacing.lg)
         }
+        .sheet(isPresented: $showInviteSheet) {
+            InviteSheet(roomCode: store.room.roomCode)
+        }
+        .onShake {
+            showInviteSheet = true
+        }
         .task {
             while store.screen == .lobby {
                 store.dispatch(.refreshRoom)
@@ -163,5 +180,110 @@ struct RoomLobbyView: View {
 
     private var meIsReady: Bool {
         store.room.players.first(where: { $0.id == store.room.playerId })?.isReady ?? false
+    }
+}
+
+// MARK: - Invite Sheet
+
+struct InviteSheet: View {
+    let roomCode: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.mdBackground.ignoresSafeArea()
+
+            VStack(spacing: Spacing.lg) {
+                HStack {
+                    Text("ルームに招待")
+                        .font(.mdTitle2)
+                        .foregroundStyle(Color.mdPrimary)
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdTextSecondary)
+                    }
+                }
+
+                Text("このQRコードを読み取ってもらうか、ルームコードを伝えてください")
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdTextSecondary)
+                    .multilineTextAlignment(.center)
+
+                if let qrImage = generateQRCode(from: "madaminu://join/\(roomCode)") {
+                    Image(uiImage: qrImage)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 200, height: 200)
+                        .padding(Spacing.md)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                }
+
+                Text(roomCode)
+                    .font(.system(size: 36, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.mdPrimary)
+                    .tracking(8)
+
+                MDButton("コードをコピー", style: .secondary) {
+                    UIPasteboard.general.string = roomCode
+                }
+
+                Spacer()
+            }
+            .padding(Spacing.lg)
+        }
+    }
+
+    private func generateQRCode(from string: String) -> UIImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(string.utf8)
+        filter.correctionLevel = "M"
+        guard let ciImage = filter.outputImage else { return nil }
+        let transform = CGAffineTransform(scaleX: 10, y: 10)
+        let scaledImage = ciImage.transformed(by: transform)
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+}
+
+// MARK: - Shake Gesture
+
+struct ShakeDetector: ViewModifier {
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        content.overlay(ShakeDetectingView(action: action).frame(width: 0, height: 0))
+    }
+}
+
+struct ShakeDetectingView: UIViewControllerRepresentable {
+    let action: () -> Void
+
+    func makeUIViewController(context: Context) -> ShakeDetectingVC {
+        let vc = ShakeDetectingVC()
+        vc.action = action
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: ShakeDetectingVC, context: Context) {}
+
+    class ShakeDetectingVC: UIViewController {
+        var action: (() -> Void)?
+
+        override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+            if motion == .motionShake {
+                action?()
+            }
+        }
+    }
+}
+
+extension View {
+    func onShake(perform action: @escaping () -> Void) -> some View {
+        modifier(ShakeDetector(action: action))
     }
 }
