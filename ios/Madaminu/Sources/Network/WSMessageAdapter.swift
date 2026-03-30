@@ -55,6 +55,15 @@ struct WSMessageAdapter {
                 store.game.nextPhaseType = "ending"
             }
             store.game.currentPhase = nil
+            // Safety: dismiss transition overlay after 30s if phase.started never arrives
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+                if store.game.showPhaseTransition && store.game.currentPhase == nil {
+                    print("[WSMessageAdapter] Force dismissing stale transition overlay")
+                    store.game.showPhaseTransition = false
+                    // Nudge server
+                    store.sendWS(type: "phase.timer_expired")
+                }
+            }
         case "speech.granted":
             store.game.isSpeaking = true
             store.startRecording()
