@@ -36,6 +36,8 @@ class ConnectionManager:
         ws = conns.get(player_id)
         if ws:
             await ws.send_json(message.model_dump())
+        else:
+            logger.warning("send_to_player: no WS connection for %s in %s (type=%s)", player_id, room_code, message.type)
 
     async def broadcast(self, room_code: str, message: WSMessage, exclude_player_id: str | None = None):
         conns = self._connections.get(room_code, {})
