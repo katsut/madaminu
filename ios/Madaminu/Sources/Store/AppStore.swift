@@ -5,6 +5,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
     @Published var screen: Screen = .home
     @Published var errorMessage: String?
     @Published var isLoading = false
+    @Published var pendingJoinCode: String?
 
     let room = RoomStore()
     let game = GamePlayStore()
@@ -178,6 +179,21 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.connectWebSocket()
         }
+    }
+
+    // MARK: - Deep Link
+
+    @MainActor func handleDeepLink(roomCode: String) {
+        guard screen == .home else {
+            errorMessage = "ゲーム中は参加できません"
+            return
+        }
+        if room.displayName.isEmpty {
+            // Show join dialog with pre-filled code
+            pendingJoinCode = roomCode
+            return
+        }
+        Task { await performJoinRoom(code: roomCode, password: nil) }
     }
 
     // MARK: - Private Actions
