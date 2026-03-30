@@ -111,6 +111,46 @@ async def health_check():
     return {"status": "ok", "version": DEPLOY_VERSION}
 
 
+@app.get("/debug/timers")
+async def debug_timers():
+    pm = getattr(app.state, "phase_manager", None)
+    if not pm:
+        return {"error": "no phase_manager"}
+
+    timers = {}
+    for game_id, task in pm._timers.items():
+        timers[game_id] = {"done": task.done(), "cancelled": task.cancelled()}
+
+    advancing = list(getattr(pm, "_advancing_rooms", set()) if hasattr(pm, "_advancing_rooms") else [])
+
+    # Check active games
+    games_info = []
+    try:
+        async with async_session() as db:
+            result = await db.execute(
+                select(Game).where(Game.status.in_([GameStatus.playing, GameStatus.voting]))
+            )
+            from madaminu.models import Phase
+            for game in result.scalars().all():
+                phase = None
+                if game.current_phase_id:
+                    pr = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
+                    phase = pr.scalar_one_or_none()
+                games_info.append({
+                    "room_code": game.room_code,
+                    "game_id": game.id,
+                    "status": game.status,
+                    "current_phase": phase.phase_type if phase else None,
+                    "deadline_at": str(phase.deadline_at) if phase and phase.deadline_at else None,
+                    "started_at": str(phase.started_at) if phase and phase.started_at else None,
+                    "has_timer": game.id in pm._timers,
+                })
+    except Exception as e:
+        games_info = [{"error": str(e)}]
+
+    return {"timers": timers, "advancing_rooms": advancing, "games": games_info}
+
+
 @app.get("/debug/llm-test")
 async def llm_test():
     from madaminu.llm.client import llm_client
