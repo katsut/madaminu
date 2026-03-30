@@ -28,6 +28,8 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var speechHistory: [SpeechEntry] = []
     @Published var introReady = false
     @Published var introReadyCount = 0
+    @Published var votedCount = 0
+    @Published var totalHumanPlayers = 0
 
     // Preparation checklist
     @Published var aiPlayersReady = false
@@ -63,6 +65,8 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         speechHistory = []
         introReady = false
         introReadyCount = 0
+        votedCount = 0
+        totalHumanPlayers = 0
         aiPlayersReady = false
         scenarioReady = false
         sceneImageReady = false

@@ -101,8 +101,8 @@ async def test_timer_advances_after_broadcast_failure(pm_env):
     assert advance_called.is_set()
 
 
-async def test_voting_timer_does_not_auto_advance(pm_env):
-    """Voting phase timer should NOT auto-advance when it expires."""
+async def test_voting_timer_auto_advances(pm_env):
+    """Voting phase timer SHOULD auto-advance when it expires (time limit or all votes)."""
     pm, session_factory, _ = pm_env
 
     async with session_factory() as db:
@@ -122,17 +122,19 @@ async def test_voting_timer_does_not_auto_advance(pm_env):
         game.current_phase_id = "ph_vote"
         await db.commit()
 
-    advance_called = False
+    advance_called = asyncio.Event()
 
     async def mock_advance(*args, **kwargs):
-        nonlocal advance_called
-        advance_called = True
+        advance_called.set()
 
     with (
         patch("madaminu.ws.handler.manager.broadcast", AsyncMock()),
         patch.object(pm, "advance_phase", mock_advance),
     ):
         pm._start_timer("g1", "TEST01", voting)
-        await asyncio.sleep(3)
+        try:
+            await asyncio.wait_for(advance_called.wait(), timeout=5)
+        except asyncio.TimeoutError:
+            pytest.fail("advance_phase was never called for voting phase")
 
-    assert not advance_called, "advance_phase should NOT be called for voting phase"
+    assert advance_called.is_set()
