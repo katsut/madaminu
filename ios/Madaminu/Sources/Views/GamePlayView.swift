@@ -1385,45 +1385,52 @@ struct SVGWebView: UIViewRepresentable {
     let svgContent: String
 
     func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
-        loadSVG(webView, svg: svgContent)
-        return webView
+        return context.coordinator.webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         if context.coordinator.lastSVG != svgContent {
             context.coordinator.lastSVG = svgContent
-            loadSVG(webView, svg: svgContent)
+            context.coordinator.loadSVG(svgContent)
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator { Coordinator(initialSVG: svgContent) }
 
     class Coordinator {
+        let webView: WKWebView
         var lastSVG: String = ""
-    }
 
-    private func loadSVG(_ webView: WKWebView, svg: String) {
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
-        <style>
-            body { margin: 0; background: #111118; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-            svg { max-width: 100%; height: auto; }
-        </style>
-        </head>
-        <body>
-        \(svg)
-        </body>
-        </html>
-        """
-        webView.loadHTMLString(html, baseURL: nil)
+        init(initialSVG: String) {
+            let config = WKWebViewConfiguration()
+            config.suppressesIncrementalRendering = true
+            webView = WKWebView(frame: .zero, configuration: config)
+            webView.isOpaque = false
+            webView.backgroundColor = .clear
+            webView.scrollView.backgroundColor = .clear
+            webView.scrollView.isScrollEnabled = false
+            loadSVG(initialSVG)
+            lastSVG = initialSVG
+        }
+
+        func loadSVG(_ svg: String) {
+            let html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+            <style>
+                body { margin: 0; background: #111118; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+                svg { max-width: 100%; height: auto; }
+            </style>
+            </head>
+            <body>
+            \(svg)
+            </body>
+            </html>
+            """
+            webView.loadHTMLString(html, baseURL: nil)
+        }
     }
 }
 
