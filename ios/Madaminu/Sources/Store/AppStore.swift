@@ -322,6 +322,7 @@ final class AppStore: ObservableObject, @unchecked Sendable {
 
         isLoading = true
         errorMessage = nil
+        print("[AppStore] createCharacter: starting")
 
         do {
             _ = try await api.createCharacter(
@@ -336,10 +337,12 @@ final class AppStore: ObservableObject, @unchecked Sendable {
                 personality: personality,
                 background: background
             )
+            print("[AppStore] createCharacter: success, setting hasCreatedCharacter=true, screen=lobby")
             room.hasCreatedCharacter = true
             screen = .lobby
             await performRefreshRoom()
         } catch {
+            print("[AppStore] createCharacter: FAILED \(error)")
             errorMessage = "キャラクター作成に失敗しました"
         }
 
