@@ -108,8 +108,8 @@ struct GamePlayView: View {
                 guard let store else { return }
                 if store.game.localRemainingSec > 0 && !store.game.isPaused {
                     store.game.localRemainingSec -= 1
-                    if store.game.localRemainingSec <= 0 {
-                        // Nudge server to advance if timer expired
+                    if store.game.localRemainingSec <= 0 && store.game.currentPhase?.phaseType != "voting" {
+                        // Nudge server to advance if timer expired (not voting)
                         store.sendWS(type: "phase.timer_expired")
                     }
                 }
