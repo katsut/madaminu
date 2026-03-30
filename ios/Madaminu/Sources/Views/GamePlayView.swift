@@ -111,12 +111,13 @@ struct GamePlayView: View {
                     if store.game.localRemainingSec <= 0 {
                         // Nudge server to advance if timer expired
                         store.sendWS(type: "phase.timer_expired")
-                        // HTTP fallback: poll game state after 5s if phase didn't change
+                        // HTTP fallback: poll game state until phase changes
                         let currentPhaseId = store.game.currentPhase?.phaseId
                         Task {
-                            try? await Task.sleep(for: .seconds(5))
-                            if store.game.currentPhase?.phaseId == currentPhaseId {
-                                print("[GamePlayView] Phase didn't change after timer expired, polling state...")
+                            for attempt in 1...6 {
+                                try? await Task.sleep(for: .seconds(5))
+                                guard store.game.currentPhase?.phaseId == currentPhaseId else { break }
+                                print("[GamePlayView] Polling state (attempt \(attempt))...")
                                 await store.pollGameState()
                             }
                         }
@@ -964,13 +965,20 @@ struct DiscussionTimelineView: View {
             case .evidence(let e): e.id
             }
         }
+
+        var timestamp: Date {
+            switch self {
+            case .speech(let s): s.timestamp
+            case .evidence(let e): e.timestamp
+            }
+        }
     }
 
     private var entries: [TimelineEntry] {
         var result: [TimelineEntry] = []
         for s in store.game.speechHistory { result.append(.speech(s)) }
         for e in store.game.revealedEvidences { result.append(.evidence(e)) }
-        return result.reversed()
+        return result.sorted { $0.timestamp > $1.timestamp }
     }
 
     var body: some View {
