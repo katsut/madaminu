@@ -256,23 +256,32 @@ struct ShakeDetector: ViewModifier {
     let action: () -> Void
 
     func body(content: Content) -> some View {
-        content.overlay(ShakeDetectingView(action: action).frame(width: 0, height: 0))
+        content.background(ShakeDetectingView(action: action))
     }
 }
 
-struct ShakeDetectingView: UIViewControllerRepresentable {
+struct ShakeDetectingView: UIViewRepresentable {
     let action: () -> Void
 
-    func makeUIViewController(context: Context) -> ShakeDetectingVC {
-        let vc = ShakeDetectingVC()
-        vc.action = action
-        return vc
+    func makeUIView(context: Context) -> ShakeDetectingUIView {
+        let view = ShakeDetectingUIView()
+        view.action = action
+        return view
     }
 
-    func updateUIViewController(_ uiViewController: ShakeDetectingVC, context: Context) {}
+    func updateUIView(_ uiView: ShakeDetectingUIView, context: Context) {
+        uiView.action = action
+    }
 
-    class ShakeDetectingVC: UIViewController {
+    class ShakeDetectingUIView: UIView {
         var action: (() -> Void)?
+
+        override var canBecomeFirstResponder: Bool { true }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            becomeFirstResponder()
+        }
 
         override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
             if motion == .motionShake {
