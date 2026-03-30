@@ -149,6 +149,7 @@ class PhaseManager:
                 logger.warning("Phase adjustment timed out for game %s", game_id)
 
         if next_phase.phase_type == PhaseType.investigation:
+            logger.info("Entering investigation phase for %s, generating discoveries...", room_code)
             try:
                 await self._send_travel_narratives(game_id, room_code)
             except Exception:
@@ -158,10 +159,13 @@ class PhaseManager:
                     self._generate_room_discoveries(game_id, room_code),
                     timeout=60.0,
                 )
+                logger.info("Discovery generation completed for %s", room_code)
             except asyncio.TimeoutError:
                 logger.warning("Discovery generation timed out for game %s", game_id)
             except Exception:
                 logger.exception("Discovery generation failed for game %s", game_id)
+        else:
+            logger.info("Phase %s for %s (not investigation, skipping discoveries)", next_phase.phase_type, room_code)
 
         # Always set started_at/deadline_at and start timer
         async with self._session_factory() as db:
