@@ -14,6 +14,7 @@ final class WebSocketClient: Sendable {
         var retryCount = 0
         var intentionalDisconnect = false
         var receiveTask: Task<Void, Never>?
+        var pingTask: Task<Void, Never>?
     }
 
     private let state = NSLockProtected(State())
@@ -38,6 +39,8 @@ final class WebSocketClient: Sendable {
             s.intentionalDisconnect = true
             s.receiveTask?.cancel()
             s.receiveTask = nil
+            s.pingTask?.cancel()
+            s.pingTask = nil
             let t = s.webSocketTask
             s.webSocketTask = nil
             return t
@@ -88,6 +91,7 @@ final class WebSocketClient: Sendable {
         logger.info("Connecting to \(url)")
         notifyStateChange(connected: true, error: nil)
         startReceiveLoop()
+        startPingLoop()
     }
 
     private func startReceiveLoop() {
@@ -107,6 +111,24 @@ final class WebSocketClient: Sendable {
         }
 
         state.write { $0.receiveTask = receiveTask }
+    }
+
+    private func startPingLoop() {
+        state.write { s in
+            s.pingTask?.cancel()
+            s.pingTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(30))
+                    guard !Task.isCancelled else { return }
+                    let task = self?.state.read { $0.webSocketTask }
+                    task?.sendPing { error in
+                        if let error {
+                            self?.logger.warning("Ping failed: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func receiveLoop(task: URLSessionWebSocketTask, handler: (@Sendable (String, [String: String]) -> Void)?) async {
