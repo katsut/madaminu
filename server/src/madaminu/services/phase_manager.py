@@ -138,12 +138,8 @@ class PhaseManager:
 
         if current_phase.phase_type == PhaseType.investigation:
             self.clear_discoveries(room_code)
-        if current_phase.phase_type == PhaseType.planning:
-            pass  # Keep selections for investigation
-        elif current_phase.phase_type != PhaseType.investigation:
             self.clear_investigation_selections(room_code)
-
-        if current_phase.phase_type != PhaseType.planning:
+            # Run phase adjustment after investigation (before next discussion)
             try:
                 await asyncio.wait_for(
                     self._run_phase_adjustment(game_id, room_code, current_phase.id),
