@@ -103,7 +103,7 @@ async def _restore_active_timers(pm: PhaseManager):
         logger.exception("Timer restoration failed")
 
 
-DEPLOY_VERSION = "2026-03-27T05"
+DEPLOY_VERSION = "2026-03-30T15"
 
 
 @app.get("/health")
