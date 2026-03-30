@@ -309,6 +309,20 @@ struct NotebookView: View {
                                     .font(.mdCaption)
                                     .foregroundStyle(Color.mdTextMuted)
                             }
+
+                            if let background = player.characterBackground, !background.isEmpty {
+                                Text(background)
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextMuted)
+                            }
+
+                            // Per-player notes
+                            TextField("メモ...", text: Binding(
+                                get: { store.notebook.playerNotes[player.id] ?? "" },
+                                set: { store.notebook.playerNotes[player.id] = $0 }
+                            ))
+                            .font(.mdCaption)
+                            .textFieldStyle(.roundedBorder)
                         }
                     }
                 }

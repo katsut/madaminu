@@ -338,68 +338,67 @@ class PhaseManager:
             logger.warning("No selections found for room %s", room_code)
             return
 
+        async def _generate_for_player(player_id: str, location_id: str):
+            async with self._session_factory() as db:
+                game_result = await db.execute(
+                    select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+                )
+                game = game_result.scalar_one()
+                map_data = (game.scenario_skeleton or {}).get("map", {})
+                location = None
+                for area in map_data.get("areas", []):
+                    for room in area.get("rooms", []):
+                        if room["id"] == location_id:
+                            location = room
+                            break
+
+                if location is None:
+                    logger.warning("Location %s not found in map for player %s", location_id, player_id)
+                    return
+
+                features = location.get("features", [])
+                if not features:
+                    logger.warning("No features for location %s", location_id)
+                    return
+
+                logger.info("Generating %d discoveries for player %s at %s", len(features), player_id, location_id)
+
+                is_alone = all(
+                    other_sel.get("location_id") != location_id
+                    for other_id, other_sel in selections.items()
+                    if other_id != player_id
+                )
+
+                discoveries = []
+                for feature in features:
+                    try:
+                        discovery, usage = await investigate_location(db, game_id, player_id, location_id, feature)
+                        if discovery:
+                            discovery["can_tamper"] = is_alone
+                            discoveries.append(discovery)
+                            self.add_discovery(room_code, player_id, discovery)
+                    except Exception:
+                        logger.exception("Discovery generation failed: %s/%s", location_id, feature)
+
+                logger.info("Total discoveries for %s: %d", player_id, len(discoveries))
+                if discoveries:
+                    await manager.send_to_player(
+                        room_code,
+                        player_id,
+                        WSMessage(
+                            type="investigate.discoveries",
+                            data={"discoveries": discoveries},
+                        ),
+                    )
+
         try:
+            tasks = []
             for player_id, sel in selections.items():
                 location_id = sel.get("location_id")
-                if not location_id:
-                    continue
-
-                async with self._session_factory() as db:
-                    game_result = await db.execute(
-                        select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-                    )
-                    game = game_result.scalar_one()
-                    map_data = (game.scenario_skeleton or {}).get("map", {})
-                    location = None
-                    for area in map_data.get("areas", []):
-                        for room in area.get("rooms", []):
-                            if room["id"] == location_id:
-                                location = room
-                                break
-
-                    if location is None:
-                        logger.warning("Location %s not found in map for player %s", location_id, player_id)
-                        continue
-
-                    features = location.get("features", [])
-                    if not features:
-                        logger.warning("No features for location %s", location_id)
-                        continue
-
-                    logger.info("Generating %d discoveries for player %s at %s", len(features), player_id, location_id)
-
-                    is_alone = all(
-                        other_sel.get("location_id") != location_id
-                        for other_id, other_sel in selections.items()
-                        if other_id != player_id
-                    )
-
-                    discoveries = []
-                    for feature in features:
-                        try:
-                            discovery, usage = await investigate_location(db, game_id, player_id, location_id, feature)
-                            logger.info(
-                                "Discovery result for %s: %s",
-                                feature,
-                                type(discovery).__name__ if discovery else "None",
-                            )
-                            if discovery:
-                                discovery["can_tamper"] = is_alone
-                                discoveries.append(discovery)
-                                self.add_discovery(room_code, player_id, discovery)
-                        except Exception:
-                            logger.exception("Discovery generation failed: %s/%s", location_id, feature)
-
-                    logger.info("Total discoveries for %s: %d", player_id, len(discoveries))
-                    if discoveries:
-                        await manager.send_to_player(
-                            room_code,
-                            player_id,
-                            WSMessage(
-                                type="investigate.discoveries",
-                                data={"discoveries": discoveries},
-                            ),
-                        )
+                if location_id:
+                    tasks.append(_generate_for_player(player_id, location_id))
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
         except Exception:
             logger.exception("Room discovery generation failed for game %s", game_id)
 

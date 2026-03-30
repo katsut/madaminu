@@ -5,6 +5,7 @@ final class NotebookStore: ObservableObject, @unchecked Sendable {
     @Published var evidences: [EvidenceItem] = []
     @Published var discussionLogs: [DiscussionLogEntry] = []
     @Published var notes = ""
+    @Published var playerNotes: [String: String] = [:]  // playerId -> note
 
     func addDiscussionLog(turnNumber: Int, speeches: [SpeechEntry], reveals: [RevealedEvidence]) {
         if speeches.isEmpty && reveals.isEmpty { return }
@@ -19,6 +20,7 @@ final class NotebookStore: ObservableObject, @unchecked Sendable {
         evidences = []
         discussionLogs = []
         notes = ""
+        playerNotes = [:]
     }
 }
 
