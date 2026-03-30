@@ -1403,7 +1403,6 @@ struct SVGWebView: UIViewRepresentable {
 
         init(initialSVG: String) {
             let config = WKWebViewConfiguration()
-            config.suppressesIncrementalRendering = true
             webView = WKWebView(frame: .zero, configuration: config)
             webView.isOpaque = false
             webView.backgroundColor = .clear
