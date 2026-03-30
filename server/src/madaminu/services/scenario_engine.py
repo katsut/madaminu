@@ -523,10 +523,10 @@ def _format_speech_logs(logs, id_to_name: dict[str, str]) -> str:
 
 PHASE_DURATIONS = {
     PhaseType.opening: 300,
-    PhaseType.planning: 180,
+    PhaseType.planning: 120,
     PhaseType.investigation: 120,
-    PhaseType.discussion: 300,
-    PhaseType.voting: 180,
+    PhaseType.discussion: 180,
+    PhaseType.voting: 300,
 }
 
 
