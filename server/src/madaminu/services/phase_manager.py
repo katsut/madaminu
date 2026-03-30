@@ -144,11 +144,23 @@ class PhaseManager:
             self.clear_investigation_selections(room_code)
 
         if current_phase.phase_type != PhaseType.planning:
-            await self._run_phase_adjustment(game_id, room_code, current_phase.id)
+            try:
+                await asyncio.wait_for(
+                    self._run_phase_adjustment(game_id, room_code, current_phase.id),
+                    timeout=30.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Phase adjustment timed out for game %s", game_id)
 
         if next_phase.phase_type == PhaseType.investigation:
             await self._send_travel_narratives(game_id, room_code)
-            await self._generate_room_discoveries(game_id, room_code)
+            try:
+                await asyncio.wait_for(
+                    self._generate_room_discoveries(game_id, room_code),
+                    timeout=60.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Discovery generation timed out for game %s", game_id)
             async with self._session_factory() as db:
                 phase_result = await db.execute(select(Phase).where(Phase.id == next_phase.id))
                 next_phase = phase_result.scalar_one()
