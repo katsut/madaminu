@@ -299,7 +299,9 @@ final class AppStore: ObservableObject, @unchecked Sendable {
             }
 
             if let me = room.players.first(where: { $0.id == room.playerId }) {
-                room.hasCreatedCharacter = me.characterName != nil
+                if me.characterName != nil {
+                    room.hasCreatedCharacter = true
+                }
                 room.isHost = me.isHost
             } else {
                 print("[AppStore] refreshRoom: playerId \(room.playerId ?? "nil") not found in \(room.players.map { $0.id })")
