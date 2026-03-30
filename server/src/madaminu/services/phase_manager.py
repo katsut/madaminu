@@ -149,7 +149,10 @@ class PhaseManager:
                 logger.warning("Phase adjustment timed out for game %s", game_id)
 
         if next_phase.phase_type == PhaseType.investigation:
-            await self._send_travel_narratives(game_id, room_code)
+            try:
+                await self._send_travel_narratives(game_id, room_code)
+            except Exception:
+                logger.exception("Travel narratives failed for game %s", game_id)
             try:
                 await asyncio.wait_for(
                     self._generate_room_discoveries(game_id, room_code),
@@ -157,9 +160,14 @@ class PhaseManager:
                 )
             except asyncio.TimeoutError:
                 logger.warning("Discovery generation timed out for game %s", game_id)
-            async with self._session_factory() as db:
-                phase_result = await db.execute(select(Phase).where(Phase.id == next_phase.id))
-                next_phase = phase_result.scalar_one()
+            except Exception:
+                logger.exception("Discovery generation failed for game %s", game_id)
+
+        # Always set started_at/deadline_at and start timer
+        async with self._session_factory() as db:
+            phase_result = await db.execute(select(Phase).where(Phase.id == next_phase.id))
+            next_phase = phase_result.scalar_one()
+            if not next_phase.started_at:
                 next_phase.started_at = datetime.utcnow()
                 next_phase.deadline_at = datetime.utcnow() + timedelta(seconds=next_phase.duration_sec)
                 await db.commit()
