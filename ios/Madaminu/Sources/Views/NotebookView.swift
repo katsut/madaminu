@@ -7,9 +7,9 @@ struct NotebookView: View {
     @State private var selectedTab = 0
 
     private var tabs: [String] {
-        var t = ["自分", "登場人物", "証拠", "議論", "メモ"]
+        var t = ["事件", "自分", "登場人物", "証拠", "議論", "メモ"]
         if store.game.scenarioSetting.mapUrl != nil {
-            t.insert("マップ", at: 2)
+            t.insert("マップ", at: 3)
         }
         return t
     }
@@ -73,24 +73,102 @@ struct NotebookView: View {
     private var tabContent: some View {
         let hasMap = store.game.scenarioSetting.mapUrl != nil
         return TabView(selection: $selectedTab) {
-            myInfoPage.tag(0)
-            playersPage.tag(1)
+            caseSummaryPage.tag(0)
+            myInfoPage.tag(1)
+            playersPage.tag(2)
             if hasMap {
-                mapPage.tag(2)
+                mapPage.tag(3)
+                evidencePage.tag(4)
+                discussionLogPage.tag(5)
+                notesPage.tag(6)
+            } else {
                 evidencePage.tag(3)
                 discussionLogPage.tag(4)
                 notesPage.tag(5)
-            } else {
-                evidencePage.tag(2)
-                discussionLogPage.tag(3)
-                notesPage.tag(4)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .animation(.easeInOut(duration: 0.2), value: selectedTab)
     }
 
-    // MARK: - Tab 1: My Info
+    // MARK: - Tab: Case Summary
+
+    private var caseSummaryPage: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                if let sceneUrl = store.game.scenarioSetting.sceneImageUrl,
+                   let url = URL(string: APIClient.defaultBaseURL + sceneUrl + "?size=512") {
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Color.mdSurface.frame(height: 160)
+                    }
+                    .frame(height: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                }
+
+                if let location = store.game.scenarioSetting.location {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("舞台", systemImage: "building.2")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdPrimary)
+                            Text(location)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                if let situation = store.game.scenarioSetting.situation {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("状況", systemImage: "exclamationmark.triangle")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdAccent)
+                            Text(situation)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                if let victimName = store.game.scenarioSetting.victimName {
+                    MDCard {
+                        HStack(spacing: Spacing.md) {
+                            if let victimUrl = store.game.scenarioSetting.victimImageUrl,
+                               let url = URL(string: APIClient.defaultBaseURL + victimUrl + "?size=128") {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Circle().fill(Color.mdSurface)
+                                }
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Label("被害者", systemImage: "person.crop.circle.badge.xmark")
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdAccent)
+                                Text(victimName)
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                if let desc = store.game.scenarioSetting.victimDescription {
+                                    Text(desc)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(Spacing.lg)
+        }
+    }
+
+    // MARK: - Tab: My Info
 
     private var myInfoPage: some View {
         ScrollView {
