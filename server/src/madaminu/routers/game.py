@@ -260,6 +260,64 @@ async def start_game(
     )
 
 
+class KeepEvidenceRequest(BaseModel):
+    discovery_id: str
+
+
+@router.post("/{room_code}/keep-evidence")
+async def keep_evidence_http(
+    request: Request,
+    room_code: str,
+    body: KeepEvidenceRequest,
+    x_session_token: str = Header(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """HTTP endpoint to keep a discovery as evidence."""
+    from madaminu.models import Evidence
+    from madaminu.services.scenario_engine import keep_evidence
+
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        raise HTTPException(status_code=404)
+
+    player = next((p for p in game.players if p.session_token == x_session_token), None)
+    if player is None:
+        raise HTTPException(status_code=403)
+
+    # Check duplicate
+    existing = await db.execute(
+        select(Evidence).where(
+            Evidence.game_id == game.id,
+            Evidence.player_id == player.id,
+            Evidence.phase_id == game.current_phase_id,
+            Evidence.source == "investigation",
+        )
+    )
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=400, detail="Already kept evidence this phase")
+
+    # Find discovery in PhaseManager memory or DB
+    pm = getattr(request.app.state, "phase_manager", None)
+    discovery = None
+    if pm:
+        discoveries = pm.get_discoveries(room_code, player.id)
+        discovery = next((d for d in discoveries if d["id"] == body.discovery_id), None)
+
+    if discovery is None:
+        # Fallback: find in DB
+        ev_result = await db.execute(select(Evidence).where(Evidence.id == body.discovery_id))
+        ev = ev_result.scalar_one_or_none()
+        if ev:
+            discovery = {"id": ev.id, "title": ev.title, "content": ev.content}
+
+    if discovery is None:
+        raise HTTPException(status_code=404, detail="Discovery not found")
+
+    evidence = await keep_evidence(db, game.id, player.id, discovery)
+    return {"id": evidence.id, "title": evidence.title, "content": evidence.content}
+
+
 @router.get("/{room_code}/discoveries")
 async def get_discoveries(
     request: Request,
