@@ -141,6 +141,8 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
                 await _handle_room_message(db, room_code, player_id, data, websocket)
             elif msg_type == "vote.submit":
                 await _handle_vote(db, room_code, player_id, data, websocket)
+            elif msg_type == "phase.timer_expired":
+                await _check_and_advance_expired_phase(db, room_code, websocket)
     except WebSocketDisconnect:
         pass
     finally:

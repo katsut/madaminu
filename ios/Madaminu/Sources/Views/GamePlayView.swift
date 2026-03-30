@@ -103,10 +103,15 @@ struct GamePlayView: View {
 
     private func startLocalTimer() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak store] _ in
             DispatchQueue.main.async {
+                guard let store else { return }
                 if store.game.localRemainingSec > 0 && !store.game.isPaused {
                     store.game.localRemainingSec -= 1
+                    if store.game.localRemainingSec <= 0 {
+                        // Nudge server to advance if timer expired
+                        store.sendWS(type: "phase.timer_expired")
+                    }
                 }
             }
         }

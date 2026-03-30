@@ -174,6 +174,10 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         ws.connect(roomCode: room.roomCode, token: token)
     }
 
+    func sendWS(type: String, data: [String: String] = [:]) {
+        ws.send(type: type, data: data)
+    }
+
     func reconnectWebSocket() {
         ws.disconnect()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
