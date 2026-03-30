@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
         event_bus.on(ImagesReady, lambda e: None)
 
         asyncio.create_task(_cleanup_old_rooms())
+        asyncio.create_task(_restore_active_timers(app.state.phase_manager))
 
     yield
 
@@ -72,6 +73,34 @@ async def _cleanup_old_rooms():
                 logger.info("Cleaned up %d old rooms", len(old_games))
     except Exception:
         logger.exception("Room cleanup failed")
+
+
+async def _restore_active_timers(pm: PhaseManager):
+    """Restore timers for games that are currently playing after server restart."""
+    from madaminu.models import Phase
+
+    try:
+        async with async_session() as db:
+            result = await db.execute(
+                select(Game).where(Game.status.in_([GameStatus.playing, GameStatus.voting]))
+            )
+            active_games = result.scalars().all()
+
+            for game in active_games:
+                if not game.current_phase_id:
+                    continue
+                phase_result = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
+                phase = phase_result.scalar_one_or_none()
+                if phase and phase.started_at and phase.duration_sec:
+                    logger.info(
+                        "Restoring timer for game %s phase %s (%s)",
+                        game.room_code,
+                        phase.phase_type,
+                        phase.id,
+                    )
+                    pm._start_timer(game.id, game.room_code, phase)
+    except Exception:
+        logger.exception("Timer restoration failed")
 
 
 DEPLOY_VERSION = "2026-03-27T05"
