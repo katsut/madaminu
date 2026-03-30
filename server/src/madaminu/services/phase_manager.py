@@ -293,14 +293,6 @@ class PhaseManager:
 
         logger.info("Phase timer expired for game %s, phase %s", game_id, phase_id)
 
-        # Don't auto-advance voting phase - wait for all votes
-        async with self._session_factory() as db:
-            phase_result = await db.execute(select(Phase).where(Phase.id == phase_id))
-            phase = phase_result.scalar_one_or_none()
-            if phase and phase.phase_type == PhaseType.voting:
-                logger.info("Voting phase timer expired but waiting for all votes")
-                return
-
         try:
             await self.advance_phase(game_id, room_code)
         except Exception:

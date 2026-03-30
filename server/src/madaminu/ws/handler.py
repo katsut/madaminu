@@ -269,7 +269,6 @@ async def _check_and_advance_expired_phase(db: AsyncSession, room_code: str, web
     from datetime import datetime
 
     from madaminu.models import Phase
-    from madaminu.models.phase import PhaseType
 
     if room_code in _advancing_rooms:
         return
@@ -288,10 +287,6 @@ async def _check_and_advance_expired_phase(db: AsyncSession, room_code: str, web
         phase_result = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
         phase = phase_result.scalar_one_or_none()
         if not phase or not phase.deadline_at:
-            return
-
-        # Voting phase: don't auto-advance
-        if phase.phase_type == PhaseType.voting:
             return
 
         if datetime.utcnow() > phase.deadline_at:
@@ -330,11 +325,6 @@ async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str,
         return
 
     if msg_type == "phase.advance":
-        if game.status == GameStatus.voting:
-            await websocket.send_json(
-                WSMessage(type="error", data={"message": "投票フェーズは全員投票完了で進行します"}).model_dump()
-            )
-            return
         await pm.advance_phase(game.id, room_code)
     elif msg_type == "phase.extend":
         await pm.extend_phase(game.id, room_code)
@@ -643,15 +633,21 @@ async def _handle_vote(db: AsyncSession, room_code: str, player_id: str, data: d
     db.add(vote)
     await db.commit()
 
-    await manager.broadcast(
-        room_code,
-        WSMessage(type="vote.cast", data={"voter_id": player_id}),
-    )
-
     votes_result = await db.execute(select(Vote).where(Vote.game_id == game.id))
     all_votes = votes_result.scalars().all()
+    human_players = [p for p in game.players if not p.is_ai]
+    voted_count = len(all_votes)
+    total_human = len(human_players)
 
-    if len(all_votes) < len(game.players):
+    await manager.broadcast(
+        room_code,
+        WSMessage(
+            type="vote.cast",
+            data={"voter_id": player_id, "voted_count": voted_count, "total_human": total_human},
+        ),
+    )
+
+    if voted_count < total_human:
         return
 
     vote_summary = {}

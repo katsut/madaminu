@@ -108,8 +108,8 @@ struct GamePlayView: View {
                 guard let store else { return }
                 if store.game.localRemainingSec > 0 && !store.game.isPaused {
                     store.game.localRemainingSec -= 1
-                    if store.game.localRemainingSec <= 0 && store.game.currentPhase?.phaseType != "voting" {
-                        // Nudge server to advance if timer expired (not voting)
+                    if store.game.localRemainingSec <= 0 {
+                        // Nudge server to advance if timer expired
                         store.sendWS(type: "phase.timer_expired")
                     }
                 }
@@ -998,9 +998,15 @@ struct VotingPhaseView: View {
         ScrollView {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
-                    title: "投票フェーズ",
-                    message: "調査と議論の結果をもとに、犯人だと思う人物を選んで投票してください。話し合いながら投票できます。"
+                    title: "最終議論 & 投票",
+                    message: "調査と議論の結果をもとに、犯人だと思う人物を選んで投票してください。話し合いながら投票できます。\n\n制限時間経過 or 全員の投票完了で結果発表に進みます。"
                 )
+
+                if store.game.totalHumanPlayers > 0 {
+                    Text("投票状況: \(store.game.votedCount) / \(store.game.totalHumanPlayers) 人")
+                        .font(.mdCallout)
+                        .foregroundStyle(store.game.votedCount >= store.game.totalHumanPlayers ? Color.mdSuccess : Color.mdTextMuted)
+                }
 
                 ForEach(store.room.players) { player in
                     MDCard {

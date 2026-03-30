@@ -158,6 +158,12 @@ struct WSMessageAdapter {
             if store.screen == .intro {
                 store.screen = .playing
             }
+        case "vote.cast":
+            if let votedStr = data["voted_count"], let totalStr = data["total_human"],
+               let voted = Int(votedStr), let total = Int(totalStr) {
+                store.game.votedCount = voted
+                store.game.totalHumanPlayers = total
+            }
         case "game.generation_failed":
             store.setError("シナリオ生成に失敗しました。もう一度お試しください。", level: .transient)
             store.game.reset()
