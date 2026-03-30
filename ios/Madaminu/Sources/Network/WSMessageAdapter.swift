@@ -54,6 +54,11 @@ struct WSMessageAdapter {
                 store.game.showPhaseTransition = true
                 store.game.nextPhaseType = "ending"
             }
+            // Preserve turn info for transition overlay
+            if let phase = store.game.currentPhase {
+                store.game.lastTurnNumber = phase.turnNumber
+                store.game.lastTotalTurns = phase.totalTurns
+            }
             store.game.currentPhase = nil
             // Safety: dismiss transition overlay after 30s if phase.started never arrives
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
