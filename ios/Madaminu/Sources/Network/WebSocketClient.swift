@@ -119,13 +119,9 @@ final class WebSocketClient: Sendable {
             s.pingTask = Task { [weak self] in
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(30))
-                    guard !Task.isCancelled else { return }
-                    let task = self?.state.read { $0.webSocketTask }
-                    task?.sendPing { error in
-                        if let error {
-                            self?.logger.warning("Ping failed: \(error.localizedDescription)")
-                        }
-                    }
+                    guard !Task.isCancelled, let self else { return }
+                    let task = self.state.read { $0.webSocketTask }
+                    task?.sendPing { _ in }
                 }
             }
         }
