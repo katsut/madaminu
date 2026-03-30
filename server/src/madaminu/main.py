@@ -111,6 +111,40 @@ async def health_check():
     return {"status": "ok", "version": DEPLOY_VERSION}
 
 
+@app.get("/debug/discoveries/{room_code}")
+async def debug_discoveries(room_code: str):
+    pm = getattr(app.state, "phase_manager", None)
+    if not pm:
+        return {"error": "no phase_manager"}
+
+    selections = pm.get_investigation_selections(room_code)
+    discoveries = {}
+    for pid in selections:
+        discoveries[pid] = [
+            {"id": d.get("id"), "title": d.get("title")}
+            for d in pm.get_discoveries(room_code, pid)
+        ]
+
+    async with async_session() as db:
+        game_result = await db.execute(select(Game).where(Game.room_code == room_code))
+        game = game_result.scalar_one_or_none()
+        if not game:
+            return {"error": "game not found"}
+        map_data = (game.scenario_skeleton or {}).get("map", {})
+        rooms = []
+        for area in map_data.get("areas", []):
+            for room in area.get("rooms", []):
+                rt = room.get("room_type", "room")
+                if rt not in ("corridor", "entrance", "stairs"):
+                    rooms.append({"id": room["id"], "name": room.get("name"), "features": len(room.get("features", []))})
+
+    return {
+        "selections": selections,
+        "discoveries": discoveries,
+        "investigation_rooms": rooms,
+    }
+
+
 @app.get("/debug/timers")
 async def debug_timers():
     pm = getattr(app.state, "phase_manager", None)
