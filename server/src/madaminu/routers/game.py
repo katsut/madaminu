@@ -267,7 +267,9 @@ async def get_discoveries(
     x_session_token: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
-    """HTTP fallback for getting discoveries when WS delivery fails."""
+    """Get discoveries for current investigation phase from DB."""
+    from madaminu.models import Evidence
+
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
@@ -277,11 +279,20 @@ async def get_discoveries(
     if player is None:
         raise HTTPException(status_code=403)
 
-    pm = getattr(request.app.state, "phase_manager", None)
-    if pm is None:
-        return {"discoveries": []}
+    ev_result = await db.execute(
+        select(Evidence).where(
+            Evidence.game_id == game.id,
+            Evidence.player_id == player.id,
+            Evidence.phase_id == game.current_phase_id,
+            Evidence.source == "discovery",
+        )
+    )
+    evidences = ev_result.scalars().all()
 
-    discoveries = pm.get_discoveries(room_code, player.id)
+    discoveries = [
+        {"id": e.id, "title": e.title, "content": e.content, "can_tamper": False}
+        for e in evidences
+    ]
     return {"discoveries": discoveries}
 
 
