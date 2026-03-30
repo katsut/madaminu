@@ -1397,7 +1397,7 @@ struct SVGWebView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(initialSVG: svgContent) }
 
-    class Coordinator {
+    @MainActor class Coordinator {
         let webView: WKWebView
         var lastSVG: String = ""
 
