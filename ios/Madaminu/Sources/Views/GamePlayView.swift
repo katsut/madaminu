@@ -678,10 +678,18 @@ struct InvestigationPhaseView: View {
                 }
 
                 if store.game.discoveries.isEmpty {
-                    ProgressView()
+                    ProgressView("調査結果を取得中...")
                         .tint(Color.mdPrimary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(Spacing.xl)
+                        .task {
+                            // HTTP fallback: poll for discoveries if WS delivery failed
+                            for _ in 0..<10 {
+                                try? await Task.sleep(for: .seconds(3))
+                                if !store.game.discoveries.isEmpty { break }
+                                await fetchDiscoveriesHTTP()
+                            }
+                        }
                 }
 
                 if !store.game.discoveries.isEmpty {
@@ -737,6 +745,31 @@ struct InvestigationPhaseView: View {
                 }
             }
             .padding(Spacing.lg)
+        }
+    }
+
+    @MainActor
+    private func fetchDiscoveriesHTTP() async {
+        guard let token = store.room.sessionToken else { return }
+        let urlString = APIClient.defaultBaseURL + "/api/v1/rooms/\(store.room.roomCode)/discoveries"
+        guard let url = URL(string: urlString) else { return }
+        var request = URLRequest(url: url)
+        request.setValue(token, forHTTPHeaderField: "X-Session-Token")
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let discs = json["discoveries"] as? [[String: Any]], !discs.isEmpty {
+                store.game.discoveries = discs.compactMap { d in
+                    guard let id = d["id"] as? String,
+                          let title = d["title"] as? String,
+                          let content = d["content"] as? String else { return nil }
+                    let canTamper = d["can_tamper"] as? Bool ?? false
+                    return DiscoveryItem(id: id, title: title, content: content, canTamper: canTamper)
+                }
+                print("[InvestigationPhaseView] HTTP fallback got \(store.game.discoveries.count) discoveries")
+            }
+        } catch {
+            print("[InvestigationPhaseView] HTTP fallback failed: \(error)")
         }
     }
 }
