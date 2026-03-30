@@ -103,6 +103,7 @@ class PhaseManager:
         logger.info("advance_phase called for game %s room %s", game_id, room_code)
         self._cancel_timer(game_id)
 
+        logger.info("advance_phase: fetching game from DB...")
         async with self._session_factory() as db:
             game_result = await db.execute(select(Game).options(selectinload(Game.phases)).where(Game.id == game_id))
             game = game_result.scalar_one()
@@ -111,12 +112,14 @@ class PhaseManager:
             if current_phase is None:
                 raise ValueError("No current phase")
 
+            logger.info("advance_phase: current=%s, finding next...", current_phase.phase_type)
             current_phase.ended_at = datetime.utcnow()
 
             sorted_phases = sorted(game.phases, key=lambda p: p.phase_order)
             current_idx = next(i for i, p in enumerate(sorted_phases) if p.id == current_phase.id)
 
             if current_idx + 1 >= len(sorted_phases):
+                logger.info("advance_phase: last phase, ending game")
                 game.status = GameStatus.ended
                 await db.commit()
                 await self._broadcast_phase_ended(room_code, current_phase, None)
@@ -124,6 +127,7 @@ class PhaseManager:
                 return None
 
             next_phase = sorted_phases[current_idx + 1]
+            logger.info("advance_phase: next=%s", next_phase.phase_type)
             if next_phase.phase_type != PhaseType.investigation:
                 next_phase.started_at = datetime.utcnow()
                 next_phase.deadline_at = datetime.utcnow() + timedelta(seconds=next_phase.duration_sec)
@@ -133,8 +137,10 @@ class PhaseManager:
                 game.status = GameStatus.voting
 
             await db.commit()
+            logger.info("advance_phase: DB committed, broadcasting phase.ended...")
 
         await self._broadcast_phase_ended(room_code, current_phase, next_phase)
+        logger.info("advance_phase: phase.ended broadcast done")
 
         if current_phase.phase_type == PhaseType.investigation:
             self.clear_discoveries(room_code)
