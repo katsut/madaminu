@@ -7,7 +7,7 @@ This module generates: corridors, entrances, stairs, connections
 import math
 
 
-def build_map_structure(llm_map: dict, victim: dict | None = None) -> dict:
+def build_map_structure(llm_map: dict, victim: dict | None = None, setting: dict | None = None) -> dict:
     """Transform LLM room list into complete map with backbone and connections."""
     areas = llm_map.get("areas", [])
     if not areas:
@@ -17,18 +17,34 @@ def build_map_structure(llm_map: dict, victim: dict | None = None) -> dict:
     indoor_areas_with_stairs: list[dict] = []
 
     # Set crime scene from victim data
+    import logging
+
+    _logger = logging.getLogger(__name__)
+
     crime_room_id = (victim or {}).get("crime_scene_room_id")
     all_rooms_flat = [r for a in areas for r in a.get("rooms", [])]
+    room_ids = {r["id"] for r in all_rooms_flat}
     if crime_room_id:
+        if crime_room_id not in room_ids:
+            _logger.warning("crime_scene_room_id '%s' not found in map rooms: %s", crime_room_id, room_ids)
         for r in all_rooms_flat:
             r["is_crime_scene"] = r["id"] == crime_room_id
     # Fallback: if no crime scene set, pick first size>=2 room
     if not any(r.get("is_crime_scene") for r in all_rooms_flat):
+        _logger.warning("No crime scene set, using fallback")
         candidate = next((r for r in all_rooms_flat if r.get("size", 1) >= 2), None)
         if candidate is None and all_rooms_flat:
             candidate = all_rooms_flat[0]
         if candidate:
             candidate["is_crime_scene"] = True
+
+    # Set meeting point
+    meeting_room_id = (setting or {}).get("meeting_room_id")
+    if meeting_room_id:
+        for r in all_rooms_flat:
+            if r["id"] == meeting_room_id:
+                r["is_meeting_point"] = True
+                break
 
     # Determine which areas need stairs (multiple indoor/semi_outdoor areas)
     indoor_areas = [a for a in areas if a.get("area_type", "indoor") != "outdoor"]
@@ -366,15 +382,23 @@ def generate_travel_narrative(
         adj.setdefault(a, []).append(b)
         adj.setdefault(b, []).append(a)
 
-    # Find common start: first entrance
+    # Find common start: meeting point, then fallback to entrance
     start = None
     for area in map_data.get("areas", []):
         for room in area.get("rooms", []):
-            if room.get("room_type") == "entrance":
+            if room.get("is_meeting_point"):
                 start = room["id"]
                 break
         if start:
             break
+    if not start:
+        for area in map_data.get("areas", []):
+            for room in area.get("rooms", []):
+                if room.get("room_type") == "entrance":
+                    start = room["id"]
+                    break
+            if start:
+                break
 
     if not start:
         return {pid: "" for pid in selections}

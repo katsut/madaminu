@@ -12,7 +12,8 @@ Create a complete scenario with the following structure (respond in JSON):
   "setting": {
     "location": "場所の説明",
     "era": "時代設定",
-    "situation": "状況説明（事件の概要）"
+    "situation": "状況説明（事件の概要）",
+    "meeting_room_id": "全員が集まる議論場所のroom_id（リビング、食堂等）"
   },
   "victim": {
     "name": "被害者の名前",
