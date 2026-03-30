@@ -240,12 +240,17 @@ struct NotebookView: View {
         }
     }
 
+    private var sortedPlayers: [PlayerInfo] {
+        let myId = store.room.playerId
+        return store.room.players.sorted { a, _ in a.id == myId }
+    }
+
     // MARK: - Tab 2: Players
 
     private var playersPage: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                ForEach(store.room.players) { player in
+                ForEach(sortedPlayers) { player in
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
                             HStack(spacing: Spacing.sm) {
