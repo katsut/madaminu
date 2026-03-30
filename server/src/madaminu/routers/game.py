@@ -260,6 +260,31 @@ async def start_game(
     )
 
 
+@router.get("/{room_code}/discoveries")
+async def get_discoveries(
+    request: Request,
+    room_code: str,
+    x_session_token: str = Header(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """HTTP fallback for getting discoveries when WS delivery fails."""
+    result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
+    game = result.scalar_one_or_none()
+    if game is None:
+        raise HTTPException(status_code=404)
+
+    player = next((p for p in game.players if p.session_token == x_session_token), None)
+    if player is None:
+        raise HTTPException(status_code=403)
+
+    pm = getattr(request.app.state, "phase_manager", None)
+    if pm is None:
+        return {"discoveries": []}
+
+    discoveries = pm.get_discoveries(room_code, player.id)
+    return {"discoveries": discoveries}
+
+
 @router.get("/{room_code}/debug")
 async def get_debug_info(
     room_code: str,
