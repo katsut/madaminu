@@ -12,6 +12,8 @@ from madaminu.ws.messages import PlayerConnectedData, PlayerDisconnectedData, WS
 
 logger = logging.getLogger(__name__)
 
+_advancing_rooms: set[str] = set()  # Prevent concurrent advance for same room
+
 
 class ConnectionManager:
     def __init__(self):
@@ -109,6 +111,9 @@ async def handle_websocket(websocket: WebSocket, room_code: str, db: AsyncSessio
             data = await websocket.receive_json()
             msg_type = data.get("type", "")
             logger.info("WS message from %s: %s", player_id, msg_type)
+
+            # Auto-recover expired phases
+            await _check_and_advance_expired_phase(db, room_code, websocket)
 
             if msg_type == "intro.ready":
                 await _handle_intro_ready(db, room_code, player_id, websocket)
@@ -255,6 +260,50 @@ async def _handle_intro_unready(room_code: str, player_id: str, websocket: WebSo
         room_code,
         WSMessage(type="intro.ready.count", data={"count": count}),
     )
+
+
+async def _check_and_advance_expired_phase(db: AsyncSession, room_code: str, websocket: WebSocket):
+    """Check if current phase has expired and auto-advance if needed."""
+    from datetime import datetime
+
+    from madaminu.models import Phase
+    from madaminu.models.phase import PhaseType
+
+    if room_code in _advancing_rooms:
+        return
+
+    try:
+        game_result = await db.execute(
+            select(Game).where(Game.room_code == room_code)
+        )
+        game = game_result.scalar_one_or_none()
+        if not game or game.status not in (GameStatus.playing, GameStatus.voting):
+            return
+
+        if not game.current_phase_id:
+            return
+
+        phase_result = await db.execute(select(Phase).where(Phase.id == game.current_phase_id))
+        phase = phase_result.scalar_one_or_none()
+        if not phase or not phase.deadline_at:
+            return
+
+        # Voting phase: don't auto-advance
+        if phase.phase_type == PhaseType.voting:
+            return
+
+        if datetime.utcnow() > phase.deadline_at:
+            pm = _get_phase_manager(websocket)
+            if pm and game.id not in pm._timers:
+                logger.info("Auto-recovering expired phase for %s (deadline was %s)", room_code, phase.deadline_at)
+                _advancing_rooms.add(room_code)
+                try:
+                    await pm.advance_phase(game.id, room_code)
+                finally:
+                    _advancing_rooms.discard(room_code)
+    except Exception:
+        logger.exception("Phase expiry check failed for %s", room_code)
+        _advancing_rooms.discard(room_code)
 
 
 async def _handle_host_command(db: AsyncSession, room_code: str, player_id: str, msg_type: str, websocket: WebSocket):
