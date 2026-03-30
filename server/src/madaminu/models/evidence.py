@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 class EvidenceSource(enum.StrEnum):
     investigation = "investigation"
     gm_push = "gm_push"
+    discovery = "discovery"
 
 
 class Evidence(Base, UUIDPrimaryKeyMixin):

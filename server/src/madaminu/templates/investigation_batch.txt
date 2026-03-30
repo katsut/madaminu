@@ -1,0 +1,50 @@
+## 調査リクエスト（一括）
+
+### シナリオ骨格
+$scenario_skeleton
+
+### マップの動線構造
+$route_text
+
+### GM内部状態
+$gm_internal_state
+
+### 調査プレイヤー
+- ID: $player_id
+- Name: $player_name
+- Role: $player_role
+- Secret: $player_secret
+- Objective: $player_objective
+
+### 調査対象の場所
+- 場所: $location_name
+- この場所の特徴: $location_features
+
+### これまでの調査結果（このプレイヤー）
+$existing_evidence
+
+## タスク
+
+上記のプレイヤーが「$location_name」を調査しました。
+この場所にある全ての特徴（$location_features）を一度に調べた結果をJSON配列で出力してください:
+
+```json
+{
+  "discoveries": [
+    {
+      "feature": "調べた特徴の名前",
+      "title": "発見した証拠のタイトル（日本語、簡潔に）",
+      "content": "調査結果の詳細な描写（日本語、2〜4文）"
+    }
+  ]
+}
+```
+
+### ガイドライン
+- 各 feature に対して1つずつ discovery を生成する
+- マップの動線構造を参照し、空間的に整合性のある描写をすること
+- プレイヤーの秘密に関連する場所なら、秘密に触れる手がかりを含めてよい
+- 犯人の手がかりは段階的に。決定的証拠は避け、推理の材料を提供する
+- 全ての discovery が有益とは限らない。無関係なもの、曖昧なものも混ぜる
+- 結果はフレーバーテキストとして没入感のある描写にする
+- ターンが進むにつれて核心に近づく手がかりを出す

@@ -368,6 +368,95 @@ async def investigate_location(
     }, usage
 
 
+async def investigate_location_batch(
+    db: AsyncSession,
+    game_id: str,
+    player_id: str,
+    location_id: str,
+) -> tuple[list[dict], LLMUsage | None]:
+    """Generate all discoveries for a location in a single LLM call."""
+    game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
+    game = game_result.scalar_one()
+
+    if game.current_phase_id is None:
+        return [], None
+
+    # Find location in map or phase locations
+    location = None
+    map_data = (game.scenario_skeleton or {}).get("map", {})
+    for area in map_data.get("areas", []):
+        for room in area.get("rooms", []):
+            if room.get("id") == location_id:
+                location = room
+                break
+        if location:
+            break
+
+    if location is None:
+        return [], None
+
+    player = next((p for p in game.players if p.id == player_id), None)
+    if player is None:
+        return [], None
+
+    features = location.get("features", [])
+    if not features:
+        return [], None
+
+    existing_result = await db.execute(
+        select(Evidence).where(Evidence.game_id == game_id, Evidence.player_id == player_id)
+    )
+    existing = existing_result.scalars().all()
+    existing_text = "\n".join(f"- {e.title}: {e.content}" for e in existing) if existing else "(なし)"
+
+    route_text = (game.scenario_skeleton or {}).get("route_text", "")
+    system_prompt = load_template("scenario_system")
+    user_prompt = render_template(
+        "investigation_batch",
+        scenario_skeleton=json.dumps(game.scenario_skeleton or {}, ensure_ascii=False, indent=2),
+        route_text=route_text,
+        gm_internal_state=json.dumps(game.gm_internal_state or {}, ensure_ascii=False, indent=2),
+        player_id=player_id,
+        player_name=player.character_name or player.display_name,
+        player_role=player.role or "unknown",
+        player_secret=player.secret_info or "N/A",
+        player_objective=player.objective or "N/A",
+        location_name=location.get("name", location_id),
+        location_features=", ".join(features),
+        existing_evidence=existing_text,
+    )
+
+    raw_response, usage = await llm_client.generate_json(system_prompt, user_prompt, model=LIGHT_MODEL)
+    result = _parse_scenario_json(raw_response)
+
+    # Save discoveries to DB as temporary evidence (source="discovery")
+    discoveries = []
+    for item in result.get("discoveries", []):
+        ev_id = str(uuid.uuid4())
+        ev = Evidence(
+            id=ev_id,
+            game_id=game_id,
+            player_id=player_id,
+            phase_id=game.current_phase_id or "",
+            title=item.get("title", "調査結果"),
+            content=item.get("content", ""),
+            source="discovery",
+        )
+        db.add(ev)
+        discoveries.append({
+            "id": ev_id,
+            "title": ev.title,
+            "content": ev.content,
+            "location_name": location.get("name", location_id),
+            "feature": item.get("feature", ""),
+        })
+
+    game.total_llm_cost_usd += usage.estimated_cost_usd
+    await db.commit()
+
+    return discoveries, usage
+
+
 async def keep_evidence(
     db: AsyncSession,
     game_id: str,
