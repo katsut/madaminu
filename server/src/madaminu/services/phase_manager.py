@@ -313,7 +313,7 @@ class PhaseManager:
     async def _generate_room_discoveries(self, game_id: str, room_code: str):
         import random
 
-        from madaminu.services.scenario_engine import investigate_location
+        from madaminu.services.scenario_engine import investigate_location_batch
         from madaminu.ws.handler import manager
 
         selections = self.get_investigation_selections(room_code)
@@ -337,35 +337,15 @@ class PhaseManager:
                     logger.info("Auto-assigned location %s to player %s", loc, player.id)
 
         selections = self.get_investigation_selections(room_code)
-        logger.info("Generating discoveries for %s: %d selections", room_code, len(selections))
+        logger.info("Generating discoveries (batch) for %s: %d players", room_code, len(selections))
         if not selections:
             logger.warning("No selections found for room %s", room_code)
             return
 
         async def _generate_for_player(player_id: str, location_id: str):
-            async with self._session_factory() as db:
-                game_result = await db.execute(
-                    select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-                )
-                game = game_result.scalar_one()
-                map_data = (game.scenario_skeleton or {}).get("map", {})
-                location = None
-                for area in map_data.get("areas", []):
-                    for room in area.get("rooms", []):
-                        if room["id"] == location_id:
-                            location = room
-                            break
-
-                if location is None:
-                    logger.warning("Location %s not found in map for player %s", location_id, player_id)
-                    return
-
-                features = location.get("features", [])
-                if not features:
-                    logger.warning("No features for location %s", location_id)
-                    return
-
-                logger.info("Generating %d discoveries for player %s at %s", len(features), player_id, location_id)
+            try:
+                async with self._session_factory() as db:
+                    discoveries, usage = await investigate_location_batch(db, game_id, player_id, location_id)
 
                 is_alone = all(
                     other_sel.get("location_id") != location_id
@@ -373,18 +353,12 @@ class PhaseManager:
                     if other_id != player_id
                 )
 
-                discoveries = []
-                for feature in features:
-                    try:
-                        discovery, usage = await investigate_location(db, game_id, player_id, location_id, feature)
-                        if discovery:
-                            discovery["can_tamper"] = is_alone
-                            discoveries.append(discovery)
-                            self.add_discovery(room_code, player_id, discovery)
-                    except Exception:
-                        logger.exception("Discovery generation failed: %s/%s", location_id, feature)
+                for d in discoveries:
+                    d["can_tamper"] = is_alone
+                    self.add_discovery(room_code, player_id, d)
 
-                logger.info("Total discoveries for %s: %d", player_id, len(discoveries))
+                logger.info("Batch discoveries for %s: %d items (cost: $%.4f)", player_id, len(discoveries), usage.estimated_cost_usd if usage else 0)
+
                 if discoveries:
                     await manager.send_to_player(
                         room_code,
@@ -394,15 +368,17 @@ class PhaseManager:
                             data={"discoveries": discoveries},
                         ),
                     )
+            except Exception:
+                logger.exception("Batch discovery generation failed for player %s", player_id)
 
         try:
-            tasks = []
-            for player_id, sel in selections.items():
-                location_id = sel.get("location_id")
-                if location_id:
-                    tasks.append(_generate_for_player(player_id, location_id))
+            tasks = [
+                _generate_for_player(pid, sel.get("location_id", ""))
+                for pid, sel in selections.items()
+                if sel.get("location_id")
+            ]
             if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.gather(*tasks)
         except Exception:
             logger.exception("Room discovery generation failed for game %s", game_id)
 
