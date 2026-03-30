@@ -436,9 +436,9 @@ struct GamePlayView: View {
     private func phaseColor(_ type: String) -> Color {
         switch type {
         case "opening": .mdSuccess
+        case "discussion": .mdPrimary
         case "planning": .mdWarning
         case "investigation": .mdInfo
-        case "discussion": .mdPrimary
         case "voting": .mdAccent
         default: .mdTextMuted
         }
@@ -447,10 +447,10 @@ struct GamePlayView: View {
     private func phaseDisplayName(_ type: String) -> String {
         switch type {
         case "opening": "自己紹介"
+        case "discussion": "議論"
         case "planning": "調査計画"
-        case "investigation": "調査フェーズ"
-        case "discussion": "議論フェーズ"
-        case "voting": "投票フェーズ"
+        case "investigation": "調査"
+        case "voting": "最終議論 & 投票"
         default: type
         }
     }
@@ -1379,10 +1379,10 @@ struct PhaseTransitionOverlay: View {
     private func phaseTitle(_ type: String) -> String {
         switch type {
         case "opening": "自己紹介"
+        case "discussion": "議論"
         case "planning": "調査計画"
-        case "investigation": "調査フェーズ"
-        case "discussion": "議論フェーズ"
-        case "voting": "投票フェーズ"
+        case "investigation": "調査"
+        case "voting": "最終議論 & 投票"
         case "ending": "結果発表"
         default: type
         }
@@ -1391,10 +1391,10 @@ struct PhaseTransitionOverlay: View {
     private func phaseSubtitle(_ type: String) -> String {
         switch type {
         case "opening": "まずはお互いを知りましょう。自己紹介と状況の共有をしてください"
+        case "discussion": "集めた情報をもとに推理を話し合いましょう"
         case "planning": "みんなで相談して、次に調べる場所を決めましょう"
         case "investigation": "選んだ場所で手がかりを探しましょう"
-        case "discussion": "集めた情報をもとに推理を話し合いましょう"
-        case "voting": "犯人だと思う人物に投票してください"
+        case "voting": "最後の議論と投票です。犯人だと思う人物を選んでください"
         case "ending": "投票結果とエピローグを生成中です..."
         default: ""
         }
@@ -1413,6 +1413,12 @@ struct PhaseTransitionOverlay: View {
                 "AIがエピローグを生成中です",
                 "少々お待ちください...",
             ]
+        case "discussion":
+            return [
+                "任意のタイミングで証拠を提出できる",
+                "発言する際は必ず発言ボタンをONにし、マイクを有効にする",
+                "口頭の主張: 1点 / 証拠カードの提出: 3点",
+            ]
         case "planning":
             return [
                 "マップを見て調べたい場所を1つ選ぶ",
@@ -1425,14 +1431,9 @@ struct PhaseTransitionOverlay: View {
                 "手がかりが見つかると手帳に記録される",
                 "同じ場所の人とだけヒソヒソ話ができる",
             ]
-        case "discussion":
-            return [
-                "任意のタイミングで証拠を提出できる",
-                "発言する際は必ず発言ボタンをONにし、マイクを有効にする",
-                "口頭の主張: 1点 / 証拠カードの提出: 3点",
-            ]
         case "voting":
             return [
+                "最後の議論をしてから投票する",
                 "犯人だと思う人物を1人選ぶ",
                 "全員の投票が揃うと結果発表",
             ]
