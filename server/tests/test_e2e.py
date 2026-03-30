@@ -858,13 +858,13 @@ async def test_room_state_after_game_start(async_client, e2e_session_factory):
 
         phases_result = await db.execute(select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order))
         phases = phases_result.scalars().all()
-        # initial + opening + 3 turns * (planning + investigation + discussion) + voting = 12
+        # initial + opening + 3 turns * (discussion + planning + investigation) + voting = 12
         assert len(phases) == 12
         assert phases[0].phase_type == PhaseType.initial
         assert phases[1].phase_type == PhaseType.opening
-        assert phases[2].phase_type == PhaseType.planning
-        assert phases[3].phase_type == PhaseType.investigation
-        assert phases[4].phase_type == PhaseType.discussion
+        assert phases[2].phase_type == PhaseType.discussion
+        assert phases[3].phase_type == PhaseType.planning
+        assert phases[4].phase_type == PhaseType.investigation
         assert phases[11].phase_type == PhaseType.voting
 
         players_result = await db.execute(select(Player).where(Player.game_id == game.id))

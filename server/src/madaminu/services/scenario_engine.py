@@ -552,8 +552,9 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
     db.add(opening_phase)
     phase_order += 1
 
+    # Turn = discussion → planning → investigation
     for _turn in range(turn_count):
-        for phase_type in (PhaseType.planning, PhaseType.investigation, PhaseType.discussion):
+        for phase_type in (PhaseType.discussion, PhaseType.planning, PhaseType.investigation):
             locations = all_locations if phase_type in (PhaseType.planning, PhaseType.investigation) else None
             phase = Phase(
                 game_id=game.id,
@@ -565,6 +566,7 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
             db.add(phase)
             phase_order += 1
 
+    # Final discussion & voting
     voting_phase = Phase(
         game_id=game.id,
         phase_type=PhaseType.voting,
