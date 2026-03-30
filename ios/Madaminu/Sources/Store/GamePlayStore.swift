@@ -14,6 +14,8 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var isConnected = false
     @Published var showPhaseTransition = false
     @Published var nextPhaseType: String?
+    @Published var lastTurnNumber: Int = 1
+    @Published var lastTotalTurns: Int = 3
     @Published var travelNarrative: String?
     @Published var isPaused = false
     @Published var localRemainingSec: Int = 0

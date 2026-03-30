@@ -107,9 +107,30 @@ struct IntroView: View {
                     }
                     .padding(.horizontal, Spacing.lg)
                 }
+
+                if let reader = storyReader {
+                    MDCard {
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .foregroundStyle(Color.mdPrimary)
+                            Text("\(reader)さん、ストーリーを読み上げてください")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                }
             }
             .padding(.bottom, Spacing.xl)
         }
+    }
+
+    private var storyReader: String? {
+        let humans = store.room.players.filter { !($0.isAI) && $0.characterName != nil }
+        guard !humans.isEmpty else { return nil }
+        // Deterministic pick based on room code hash
+        let idx = abs(store.room.roomCode.hashValue) % humans.count
+        return humans[idx].characterName ?? humans[idx].displayName
     }
 
     // MARK: - Page 2: Victim

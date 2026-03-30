@@ -52,8 +52,8 @@ struct GamePlayView: View {
                     if store.game.showPhaseTransition {
                         PhaseTransitionOverlay(
                             phaseType: store.game.currentPhase?.phaseType ?? store.game.nextPhaseType ?? "",
-                            turnNumber: store.game.currentPhase?.turnNumber ?? 1,
-                            totalTurns: store.game.currentPhase?.totalTurns ?? 3,
+                            turnNumber: store.game.currentPhase?.turnNumber ?? store.game.lastTurnNumber,
+                            totalTurns: store.game.currentPhase?.totalTurns ?? store.game.lastTotalTurns,
                             durationSec: store.game.currentPhase?.durationSec ?? 0,
                             sceneImageUrl: store.game.scenarioSetting.sceneImageUrl,
                             travelNarrative: store.game.travelNarrative
@@ -837,9 +837,24 @@ struct DiscussionPhaseView: View {
         ScrollView {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
-                    title: "議論フェーズ",
+                    title: "議論",
                     message: "任意のタイミングで証拠を提出することができます。発言をする際には必ず発言ボタンをONにし、マイクを有効にしてください。\n\n📋 口頭の主張: 1点  |  証拠カードの提出: 3点"
                 )
+
+                if !store.notebook.evidences.isEmpty {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("手持ちの証拠", systemImage: "doc.text.magnifyingglass")
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdInfo)
+                            ForEach(store.notebook.evidences.suffix(3)) { ev in
+                                Text("・\(ev.title)")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                            }
+                        }
+                    }
+                }
 
                 if let speaker = store.game.currentSpeakerId {
                     let name = store.room.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
@@ -865,36 +880,87 @@ struct DiscussionPhaseView: View {
                     }
                 }
 
-                ForEach(store.game.revealedEvidences) { revealed in
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            HStack(spacing: Spacing.sm) {
-                                PlayerAvatarView(playerId: revealed.playerId, players: store.room.players, size: 32)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(revealed.playerName) が証拠を公開")
-                                        .font(.mdCaption)
-                                        .foregroundStyle(Color.mdWarning)
-                                }
-                                Spacer()
-                                Image(systemName: "eye.fill")
-                                    .foregroundStyle(Color.mdWarning)
-                            }
-                            Text(revealed.title)
-                                .font(.mdHeadline)
-                                .foregroundStyle(Color.mdTextPrimary)
-                            Text(revealed.content)
-                                .font(.mdBody)
-                                .foregroundStyle(Color.mdTextSecondary)
-                        }
-                    }
-                }
-
-                SpeechHistoryView(store: store)
+                // Unified timeline (newest first)
+                DiscussionTimelineView(store: store)
             }
             .padding(Spacing.lg)
         }
         .sheet(isPresented: $showRevealSheet) {
             EvidenceRevealSheet(store: store, isPresented: $showRevealSheet)
+        }
+    }
+}
+
+struct DiscussionTimelineView: View {
+    @ObservedObject var store: AppStore
+
+    private enum TimelineEntry: Identifiable {
+        case speech(SpeechEntry)
+        case evidence(RevealedEvidence)
+
+        var id: UUID {
+            switch self {
+            case .speech(let s): s.id
+            case .evidence(let e): e.id
+            }
+        }
+    }
+
+    private var entries: [TimelineEntry] {
+        var result: [TimelineEntry] = []
+        for s in store.game.speechHistory { result.append(.speech(s)) }
+        for e in store.game.revealedEvidences { result.append(.evidence(e)) }
+        return result.reversed()
+    }
+
+    var body: some View {
+        if !entries.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Text("タイムライン")
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdTextMuted)
+
+                ForEach(entries) { entry in
+                    switch entry {
+                    case .speech(let s):
+                        HStack(alignment: .top, spacing: Spacing.sm) {
+                            PlayerAvatarView(playerId: s.playerId, players: store.room.players, size: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(s.characterName)
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdPrimary)
+                                Text(s.transcript)
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                            }
+                        }
+                    case .evidence(let e):
+                        HStack(alignment: .top, spacing: Spacing.sm) {
+                            PlayerAvatarView(playerId: e.playerId, players: store.room.players, size: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: Spacing.xs) {
+                                    Image(systemName: "eye.fill")
+                                        .foregroundStyle(Color.mdWarning)
+                                        .font(.mdCaption2)
+                                    Text("\(e.playerName) が証拠を公開")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdWarning)
+                                }
+                                Text(e.title)
+                                    .font(.mdCallout)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                    .fontWeight(.semibold)
+                                Text(e.content)
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(Spacing.md)
+            .background(Color.mdSurface)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
         }
     }
 }

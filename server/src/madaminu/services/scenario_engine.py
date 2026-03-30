@@ -76,7 +76,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     from madaminu.services.map_builder import build_map_structure, generate_route_text
 
     raw_map = scenario.get("map", {})
-    complete_map = build_map_structure(raw_map, victim=scenario.get("victim"))
+    complete_map = build_map_structure(raw_map, victim=scenario.get("victim"), setting=scenario.get("setting"))
     route_text = generate_route_text(complete_map, players=scenario.get("players"))
 
     game.scenario_skeleton = {
@@ -534,6 +534,9 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
     turn_count = game.turn_count or 3
     phase_order = 0
 
+    human_count = sum(1 for p in game.players if not p.is_ai)
+    opening_duration = max(60, human_count * 60)
+
     initial_phase = Phase(
         game_id=game.id,
         phase_type=PhaseType.initial,
@@ -547,7 +550,7 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
         game_id=game.id,
         phase_type=PhaseType.opening,
         phase_order=phase_order,
-        duration_sec=PHASE_DURATIONS[PhaseType.opening],
+        duration_sec=opening_duration,
     )
     db.add(opening_phase)
     phase_order += 1
