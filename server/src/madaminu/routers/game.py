@@ -279,6 +279,14 @@ async def get_discoveries(
     if player is None:
         raise HTTPException(status_code=403)
 
+    # Try PhaseManager memory first (has feature info)
+    pm = getattr(request.app.state, "phase_manager", None)
+    if pm:
+        mem_discoveries = pm.get_discoveries(room_code, player.id)
+        if mem_discoveries:
+            return {"discoveries": mem_discoveries}
+
+    # Fallback to DB
     ev_result = await db.execute(
         select(Evidence).where(
             Evidence.game_id == game.id,
@@ -290,7 +298,7 @@ async def get_discoveries(
     evidences = ev_result.scalars().all()
 
     discoveries = [
-        {"id": e.id, "title": e.title, "content": e.content, "can_tamper": False}
+        {"id": e.id, "title": e.title, "content": e.content, "feature": "", "can_tamper": False}
         for e in evidences
     ]
     return {"discoveries": discoveries}

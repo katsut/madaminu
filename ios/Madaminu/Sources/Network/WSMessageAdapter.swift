@@ -101,7 +101,8 @@ struct WSMessageAdapter {
                         return nil
                     }
                     let canTamper = d["can_tamper"] as? Bool ?? false
-                    return DiscoveryItem(id: id, title: title, content: content, canTamper: canTamper)
+                    let feature = d["feature"] as? String ?? ""
+                    return DiscoveryItem(id: id, title: title, content: content, feature: feature, canTamper: canTamper)
                 }
                 print("[WSMessageAdapter] final discoveries count: \(store.game.discoveries.count)")
             }
