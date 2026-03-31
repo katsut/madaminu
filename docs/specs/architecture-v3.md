@@ -10,11 +10,260 @@
 
 ---
 
+## ゲームフェーズ
+
+### フェーズ一覧
+
+| # | フェーズ | 時間 | 内容 | 遷移画面メッセージ |
+|---|---------|------|------|------------------|
+| 1 | initial | 0秒 | 初期証拠・アリバイ配布 | (なし) |
+| 2 | storytelling | 3分 | 指名されたプレイヤーがシナリオを読み上げ | 「物語の始まり」「〇〇さん、ストーリーを読み上げてください」 |
+| 3 | opening | 人数×1分 | 自己紹介 | 「自己紹介タイム」「まずはお互いを知りましょう」 |
+| 4 | discussion | 3分 | 議論・証拠公開 | 「議論」「集めた情報をもとに推理を話し合いましょう」 |
+| 5 | planning | 2分 | 調査場所選択 | 「調査計画」「みんなで相談して、次に調べる場所を決めましょう」 |
+| 6 | investigation | 2分 | 調査・証拠保持 | 「調査」「選んだ場所で手がかりを探しましょう」 |
+| | *(4→5→6 を3ターン)* | | | |
+| 7 | voting | 5分 | 最終議論＆投票 | 「最終議論 & 投票」「最後の議論と投票です。犯人だと思う人物を選んでください」 |
+| 8 | ending | — | 結果発表・エピローグ | 「結果発表」「投票結果とエピローグを生成中です...」 |
+
+### フロー
+
+```
+initial → storytelling → opening → [discussion → planning → investigation] × 3 → voting → ending
+```
+
+### generating 画面（シナリオ生成中）に表示するフェーズガイド
+
+| # | フェーズ | やること |
+|---|---------|---------|
+| 1 | 📖 物語の読み上げ | 指名された人がストーリーを声に出して読み上げる |
+| 2 | 🤝 自己紹介 | 発言ボタンを押して自分のキャラクターを紹介する |
+| 3 | 💬 議論 | 情報を共有し、推理を話し合う。証拠カードを公開できる |
+| 4 | 🗺️ 調査計画 | マップを見て、次に調べる場所をみんなで相談して決める |
+| 5 | 🔍 調査 | 選んだ場所を調べる。発見物から1つだけ持ち帰れる |
+| | *3→4→5 を3回繰り返し* | |
+| 6 | 🗳️ 最終議論 & 投票 | 最後の話し合いをして、犯人だと思う人に投票する |
+| 7 | 📜 結果発表 | 真相が明かされる |
+
+### 各フェーズ詳細
+
+#### initial（0秒・自動スキップ）
+- サーバーがシナリオ生成完了後、初期証拠・アリバイをプレイヤーに配布
+- DB: Evidence（source=gm_push）を各プレイヤーに作成
+- 即座に storytelling へ遷移
+
+#### storytelling（3分）
+- 人間プレイヤーからランダムに1人を指名
+- 画面にシナリオテキスト（舞台・状況・被害者）を大きく表示
+- 「〇〇さん、読み上げてください」と表示
+- 発言ボタンはなし（読み上げのみ）
+- 他プレイヤーは聞いている。手帳は開ける
+
+#### opening（人数×1分）
+- 発言ボタンで自己紹介
+- AI も一人称で自己紹介（推理はしない）
+- 手帳で自分の情報を確認
+
+#### discussion（3分）
+- タイムライン表示（発言+証拠公開、タイムスタンプ順、新しい順）
+- 発言ボタンで推理・意見を述べる
+- 証拠カードを公開できる（3pt）
+- 口頭発言（1pt）
+- AI は推理・質問・証拠に基づく主張
+- 提出済みの証拠は除外
+
+#### planning（2分）
+- マップ（SVG）と場所一覧を表示
+- 場所を1つ選択（POST /select-location）
+- 発言ボタンで場所について相談可能
+- 未選択者は制限時間切れ時にランダム割り当て
+
+#### investigation（2分）
+- 遷移時にバックグラウンドで discoveries 一括生成（LLM 1回/プレイヤー、並列）
+- 生成完了まで「準備中...」表示
+- 生成完了後、feature 一覧をタップ可能なカードで表示
+- タップで調査結果を展開
+- 1つだけ持ち帰れる（POST /keep-evidence）
+- 同じ場所に他プレイヤーがいなければ1つ改ざん可能
+- 同室プレイヤー同士でヒソヒソチャット
+
+#### voting（5分）
+- プレイヤー一覧（アバター付き）と投票ボタン
+- 発言ボタンで最後の議論も可能
+- 投票状況「N/M 人投票済み」を表示（AI除外）
+- 遷移条件: 制限時間切れ **or** 全人間プレイヤーの投票完了
+- AI は最後の主張
+
+#### ending
+- ドラマチックリビール: 「〇〇は・・・」(4秒) → 「犯人/冤罪でした」(5秒)
+- 投票結果: 誰に何票。最多票に「監禁」マーク
+- 第1幕（表のエンディング）: 監禁シーン、各キャラのその後
+- 第2幕（犯人視点エピローグ）: 犯人の一人称で真相を語る
+- スコア: ランキング形式（🥇🥈🥉）
+- 個人目的: 達成/未達成
+- ネタバラシ: 全キャラの秘密・役割公開
+- 「もう一度見る」「ホームに戻る」
+
+---
+
+## シーン切り替え制御
+
+### クライアントの状態
+
+```
+enum PhaseScreenState {
+    case active(phase)      // フェーズ画面を表示中
+    case transitioning      // 遷移画面を表示中（サーバー処理待ち）
+}
+```
+
+### 遷移トリガーは2つだけ
+
+| トリガー | 発生条件 | 処理 |
+|---------|---------|------|
+| **自分が advance** | ローカルタイマー0 or ホストが進行ボタン | POST /advance → レスポンスで遷移 |
+| **他人が advance** | WS で game.state 受信 → phase_id が変わっている | 差分検出で遷移 |
+
+### トリガー1: 自分が advance
+
+```
+1. ローカルタイマーが0になる
+2. state = .transitioning（遷移画面を表示）
+3. POST /advance を送信
+4. レスポンスを受信:
+   - "advanced" → 新フェーズ情報あり
+     - discoveries_status == "generating" → 遷移画面を維持（スピナー表示）
+     - それ以外 → 遷移画面を3秒表示 → state = .active(newPhase)
+   - "already_advanced" → 他クライアントが先に遷移済み
+     - 遷移画面を3秒表示 → state = .active(currentPhase)
+   - "not_expired" → まだ早い（クロックずれ）
+     - state = .active(currentPhase)（現フェーズに戻る、タイマー補正）
+```
+
+### トリガー2: 他人が advance（WS で game.state 受信）
+
+```
+1. WS で game.state を受信
+2. server.current_phase.id ≠ local.current_phase.id ?
+   - YES → state = .transitioning → 遷移画面3秒表示 → state = .active(newPhase)
+   - NO → タイマー等の差分だけ更新
+```
+
+### 遷移画面の表示仕様
+
+| 状態 | 表示内容 |
+|------|---------|
+| advance レスポンス待ち | フェーズ名 + メッセージ + スピナー |
+| 次フェーズ確定（investigation 以外） | フェーズ名 + メッセージ + 制限時間 → 3秒後に自動消去 |
+| 次フェーズ確定（investigation、生成中） | 「調査」+「準備中...」+ スピナー |
+| discoveries 生成完了（WS で通知） | 「調査」+ メッセージ + 制限時間 → 3秒後に自動消去 |
+
+### investigation の discoveries 待ち
+
+```
+遷移画面表示中（state = .transitioning）
+  → WS で game.state 受信
+  → discoveries_status == "ready"
+  → 遷移画面を3秒表示 → state = .active(investigation)
+  → GET /discoveries で feature 一覧取得
+```
+
+### WS 再接続時
+
+```
+新しい WS 接続が確立
+  → サーバーが自動的に game.state を送信（現行通り）
+  → クライアントが受信
+  → local.current_phase.id と比較
+  → 違っていたら遷移画面を表示 → state = .active(newPhase)
+```
+
+フォールバックではない。WS 接続確立時の正規プロトコル。
+
+### シーケンス図: 通常のフェーズ遷移
+
+```
+Client A (タイマー切れ)        Server              Client B
+    │                           │                     │
+    │ state = .transitioning    │                     │
+    │ 遷移画面表示              │                     │
+    │                           │                     │
+    │ POST /advance             │                     │
+    │──────────────────────────→│                     │
+    │                           │ DB: discussion.ended_at = now
+    │                           │ DB: planning.started_at = now
+    │                           │ DB: planning.deadline_at = now+120s
+    │                           │                     │
+    │  {result: "advanced",     │                     │
+    │   phase: {planning, 120s}}│                     │
+    │←──────────────────────────│                     │
+    │                           │                     │
+    │ 遷移画面: 「調査計画」    │                     │
+    │ 3秒表示                   │                     │
+    │ state = .active(planning) │                     │
+    │                           │ WS: game.state      │
+    │                           │────────────────────→│
+    │                           │                     │ phase_id が違う
+    │                           │                     │ state = .transitioning
+    │                           │                     │ 遷移画面: 「調査計画」
+    │                           │                     │ 3秒表示
+    │                           │                     │ state = .active(planning)
+```
+
+### シーケンス図: investigation 遷移（LLM 生成あり）
+
+```
+Client A                       Server              Client B
+    │                           │                     │
+    │ POST /advance             │                     │
+    │──────────────────────────→│                     │
+    │                           │ DB: planning → investigation
+    │                           │ DB: discoveries_status = 'generating'
+    │                           │ create_task(generate_discoveries)
+    │                           │                     │
+    │  {result: "advanced",     │                     │
+    │   phase: {investigation,  │                     │
+    │   discoveries_status:     │                     │
+    │   "generating"}}          │                     │
+    │←──────────────────────────│                     │
+    │                           │                     │
+    │ 遷移画面維持（準備中）    │                     │
+    │                           │ WS: game.state      │
+    │                           │────────────────────→│
+    │                           │                     │ 遷移画面（準備中）
+    │                           │                     │
+    │                           │     [LLM処理 3-5秒] │
+    │                           │                     │
+    │                           │ DB: discoveries保存  │
+    │                           │ DB: status = 'ready' │
+    │                           │                     │
+    │ WS: game.state            │ WS: game.state      │
+    │ (discoveries_status=ready)│ (discoveries_status=ready)
+    │←──────────────────────────│────────────────────→│
+    │                           │                     │
+    │ 遷移画面3秒表示           │                     │
+    │ state = .active           │                     │
+    │ GET /discoveries          │                     │
+    │──────────────────────────→│                     │
+    │ [{feature, title, ...}]   │                     │
+    │←──────────────────────────│                     │
+    │ feature一覧表示           │                     │
+```
+
+### 排他制御: 複数クライアントが同時に advance
+
+```sql
+UPDATE phases SET ended_at = NOW()
+WHERE id = :current_phase_id AND ended_at IS NULL
+```
+
+1行更新 → 遷移成功。0行更新 → 他クライアントが先に遷移済み → 現在フェーズを返す。
+
+---
+
 ## 通信設計
 
 ### HTTP API — ユーザーアクション
-
-ユーザーが意図的に行う操作はすべて HTTP。レスポンスで成否がわかる。
 
 | アクション | メソッド | パス |
 |-----------|--------|------|
@@ -39,117 +288,20 @@
 
 ### WS — サーバーからの通知
 
-WS は「何か変わったのでUIを更新してください」という通知のみ。**WS が届かなくてもゲームは止まらない**。なぜなら：
-
-- フェーズ遷移はクライアントの HTTP リクエストで発火する
-- 自分のアクション結果は HTTP レスポンスで受け取る
-- WS が届かないと遅延するのは「他プレイヤーの発言が見えるタイミング」だけ
-
 | 通知 | データ | 用途 |
 |------|--------|------|
-| `phase_changed` | `{phase_type, deadline_at}` | フェーズが変わった（他プレイヤーが advance した場合） |
+| `game.state` | (フルステート) | フェーズ変更時・接続時に送信 |
 | `speech` | `{player_id, character_name, transcript}` | 誰かが発言した |
 | `evidence_revealed` | `{player_id, player_name, title, content}` | 誰かが証拠を公開した |
 | `vote_cast` | `{voted_count, total_human}` | 誰かが投票した |
-| `discoveries_ready` | `{}` | discoveries 生成完了 |
-| `player_joined` | `{player_id}` | プレイヤー参加/切断 |
-| `game_ending` | `{}` | エンディング生成完了 |
 
-WS メッセージにはデータを最小限含める。詳細が必要ならクライアントが HTTP で取得する。
+WS 接続確立時にサーバーが `game.state` を自動送信。フェーズ変更時も `game.state` を全クライアントに送信。クライアントは `game.state` の差分でシーン切り替えを判断。
 
 ### WS 接続維持
 
-- サーバーが **20秒間隔で ping** を送信（Railway の10分アイドルタイムアウト対策）
-- クライアントが **pong を返す**（URLSessionWebSocketTask は自動で返す）
+- サーバーが **20秒間隔で ping** を送信
 - 切断検知 → クライアントが指数バックオフで再接続
-- 再接続成功 → `GET /state` で最新状態を取得（再接続プロトコルの正規手順）
-
----
-
-## フェーズ遷移
-
-### 設計
-
-```
-クライアントのローカルタイマーが0になる
-  → POST /rooms/{code}/advance
-  → サーバーが deadline_at を確認
-  → 期限切れなら DB を更新して次フェーズに遷移
-  → レスポンスで新フェーズ情報を返す
-  → 全クライアントに WS で phase_changed を通知
-```
-
-### なぜこの設計か
-
-- サーバー側タイマー（asyncio.Task）は再起動で消える → 廃止
-- WS push は切断で届かない → クライアントが HTTP で遷移をリクエスト
-- 複数クライアントが同時に advance → DB の排他制御で1回だけ遷移
-
-### 排他制御
-
-```sql
--- 現在のフェーズを終了（他のクライアントが先に終了していたら0行更新）
-UPDATE phases
-SET ended_at = NOW()
-WHERE id = :current_phase_id AND ended_at IS NULL
-```
-
-更新が0行 → 他のクライアントが先に遷移済み → 現在のフェーズ情報を返す。
-
-### advance API
-
-```
-POST /rooms/{code}/advance
-
-Request: (empty body, or {"force": true} for host)
-
-Response (遷移成功):
-{
-  "result": "advanced",
-  "phase": {
-    "id": "...",
-    "phase_type": "planning",
-    "duration_sec": 120,
-    "deadline_at": "2026-03-31T10:02:00Z",
-    "turn_number": 1,
-    "total_turns": 3
-  }
-}
-
-Response (既に遷移済み):
-{
-  "result": "already_advanced",
-  "phase": { ... current phase ... }
-}
-
-Response (まだ期限前):
-{
-  "result": "not_expired",
-  "remaining_sec": 45
-}
-```
-
-### investigation フェーズへの遷移
-
-investigation フェーズは LLM 呼び出しが必要。遷移自体は即座に完了し、LLM はバックグラウンドで実行。
-
-```
-POST /advance
-  → planning を終了、investigation を開始（DB更新、即座に返る）
-  → レスポンスで「investigation 開始、discoveries は生成中」
-  → バックグラウンドで LLM 呼び出し → 結果を DB に保存
-  → WS で discoveries_ready を通知
-  → クライアントが GET /discoveries で取得
-```
-
-クライアントは investigation フェーズに入ったら：
-1. 「準備中...」を表示
-2. WS の `discoveries_ready` を待つ
-3. 受信したら `GET /discoveries` で取得して feature 一覧を表示
-
-WS が切れていた場合：
-- クライアントの再接続時に `GET /state` → discoveries が含まれている → 表示
-- これはフォールバックではなく、再接続プロトコルの正規手順
+- 再接続時 → サーバーが `game.state` を自動送信
 
 ---
 
@@ -157,18 +309,17 @@ WS が切れていた場合：
 
 ### 廃止するメモリ内状態
 
-| データ | 現在の保存先 | v3 |
-|--------|------------|-----|
-| タイマー | asyncio.Task | 廃止。deadline_at のみ |
+| データ | v2 | v3 |
+|--------|-----|-----|
+| タイマー | asyncio.Task | 廃止。DB の deadline_at のみ |
 | investigation_selections | PhaseManager dict | DB テーブル |
 | discoveries | PhaseManager dict | DB（Evidence, source=discovery） |
 | intro_ready | PhaseManager set | DB（players.is_intro_ready） |
 | current_speaker | SpeechManager dict | DB（phases.current_speaker_id） |
-| _timers | PhaseManager dict | 廃止 |
 | _advancing_rooms | handler set | DB 排他制御に置換 |
 | _paused | PhaseManager dict | DB（phases.paused_remaining_sec） |
 
-### 新テーブル
+### 新テーブル: investigation_selections
 
 ```sql
 CREATE TABLE investigation_selections (
@@ -197,10 +348,18 @@ ALTER TABLE phases ADD COLUMN discoveries_status VARCHAR DEFAULT 'pending';
 ALTER TABLE players ADD COLUMN is_intro_ready BOOLEAN DEFAULT FALSE;
 ```
 
-### 廃止するクラス
+### PhaseType 拡張
 
-- **PhaseManager** → `GameService`（DB操作のみ、メモリ状態なし）
-- **SpeechManager** → `SpeechService`（DB操作のみ）
+```python
+class PhaseType(StrEnum):
+    initial = "initial"
+    storytelling = "storytelling"  # NEW
+    opening = "opening"
+    planning = "planning"
+    investigation = "investigation"
+    discussion = "discussion"
+    voting = "voting"
+```
 
 ---
 
@@ -208,123 +367,20 @@ ALTER TABLE players ADD COLUMN is_intro_ready BOOLEAN DEFAULT FALSE;
 
 ### 原則
 
-LLM 呼び出しは HTTP API をブロックしない。
+LLM 呼び出しは HTTP API をブロックしない。DB セッションは LLM 呼び出し中に保持しない。
 
 ```
-advance API
-  → DB を更新（即座）
-  → asyncio.create_task(generate_discoveries(...))
-  → レスポンスを返す
-
 generate_discoveries:
   1. DB からプレイヤー・場所情報を取得 → DB セッション閉じる
   2. LLM 呼び出し（並列、DB セッション不要）
   3. 結果を DB に保存 → DB セッション閉じる
   4. Phase.discoveries_status = 'ready' に更新
-  5. WS で discoveries_ready を通知
-```
-
-ポイント: **LLM 呼び出し中は DB セッションを保持しない**。
-
-### discoveries 生成フロー（シーケンス図）
-
-```
-Client              Server                LLM
-  |                    |                    |
-  | POST /advance      |                    |
-  |───────────────────→|                    |
-  |                    | DB: phase → investigation
-  |                    | DB: discoveries_status = 'generating'
-  |  {phase: investigation, discoveries_status: 'generating'}
-  |←───────────────────|                    |
-  |                    |                    |
-  | 画面: 「準備中...」 |                    |
-  |                    | create_task(generate)
-  |                    |───────────────────→|
-  |                    |                    | LLM processing...
-  |                    |                    |
-  |                    |  discoveries result |
-  |                    |←───────────────────|
-  |                    | DB: save evidences  |
-  |                    | DB: status = 'ready'|
-  |                    |                    |
-  | WS: discoveries_ready                   |
-  |←───────────────────|                    |
-  |                    |                    |
-  | GET /discoveries   |                    |
-  |───────────────────→|                    |
-  | [{feature, title, content}, ...]        |
-  |←───────────────────|                    |
-  |                    |                    |
-  | 画面: feature一覧  |                    |
+  5. WS で game.state を全クライアントに送信
 ```
 
 ---
 
-## iOS クライアント設計
-
-### 状態管理
-
-```
-GameStateManager (ObservableObject)
-  → HTTP でアクション送信
-  → HTTP レスポンスで自分の状態を更新
-  → WS 通知で他プレイヤーの変更を検知
-  → WS 通知受信時に必要なら GET /state で詳細取得
-  → WS 再接続時に GET /state で全状態復元
-```
-
-### タイマー管理
-
-```swift
-// ローカルタイマー
-// deadline_at は HTTP レスポンスまたは GET /state から取得
-func startLocalTimer(deadline: Date) {
-    timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-        let remaining = deadline.timeIntervalSinceNow
-        localRemainingSec = max(0, Int(remaining))
-        if remaining <= 0 {
-            timer?.invalidate()
-            advancePhase() // POST /advance
-        }
-    }
-}
-
-func advancePhase() {
-    Task {
-        let result = await api.advance(roomCode: roomCode)
-        switch result {
-        case .advanced(let phase):
-            applyPhaseTransition(phase)
-            startLocalTimer(deadline: phase.deadlineAt)
-        case .alreadyAdvanced(let phase):
-            applyPhaseTransition(phase)
-            startLocalTimer(deadline: phase.deadlineAt)
-        case .notExpired(let remaining):
-            // まだ早い（サーバーとのクロックずれ）
-            localRemainingSec = remaining
-        }
-    }
-}
-```
-
-### WS 再接続
-
-```swift
-func onWebSocketReconnected() {
-    // 正規手順: 最新状態を HTTP で取得
-    Task {
-        let state = await api.getState(roomCode: roomCode)
-        applyFullState(state)
-    }
-}
-```
-
-これはフォールバックではない。WS は通知チャネルであり、状態のソースは常に HTTP API。
-
----
-
-## 削除対象（v2 の負債）
+## 廃止対象（v2 の負債）
 
 ### 不要なフォールバック
 - `_check_and_advance_expired_phase` — WS メッセージ受信時の期限チェック
@@ -334,12 +390,12 @@ func onWebSocketReconnected() {
 - `_restore_active_timers` — サーバー起動時のタイマー復元
 
 ### 不要な try-catch
-- advance_phase 内の `except Exception: logger.exception(...)` で全例外を握りつぶしている箇所
-- `_generate_room_discoveries` の外側で `return_exceptions=True` にして例外を無視している箇所
+- advance_phase 内の全例外握りつぶし
+- discoveries 生成の `return_exceptions=True`
 
 ### 廃止するクラス
-- `PhaseManager` — メモリ内状態管理を全廃。DB 操作の `GameService` に置換
-- `SpeechManager` — 同上。`SpeechService` に置換
+- **PhaseManager** → `GameService`（DB操作のみ）
+- **SpeechManager** → `SpeechService`（DB操作のみ）
 
 ---
 
@@ -347,14 +403,14 @@ func onWebSocketReconnected() {
 
 ### Phase 1: DB スキーマ拡張
 - investigation_selections テーブル作成
-- phases テーブルに paused_remaining_sec, current_speaker_id, discoveries_status 追加
-- players テーブルに is_intro_ready 追加
+- phases テーブル拡張（paused_remaining_sec, current_speaker_id, discoveries_status）
+- players テーブル拡張（is_intro_ready）
+- PhaseType に storytelling 追加
 - マイグレーション作成
 
 ### Phase 2: サービス層書き換え
-- GameService 作成（PhaseManager 置換）
-- SpeechService 作成（SpeechManager 置換）
-- 全操作が DB ベースに
+- GameService 作成（PhaseManager 置換、DB操作のみ）
+- SpeechService 作成（SpeechManager 置換、DB操作のみ）
 
 ### Phase 3: HTTP API 追加
 - POST /advance（排他制御付き）
@@ -362,18 +418,18 @@ func onWebSocketReconnected() {
 - POST /speech/request, /speech/release
 - POST /reveal-evidence
 - POST /vote
-- GET /state 拡充
+- GET /state 拡充（discoveries_status 含む）
 
 ### Phase 4: WS 簡略化
-- WS handler を通知送信のみに縮小
-- サーバー側 ping/pong 追加
-- WS メッセージからデータを最小化
+- WS handler を game.state 送信 + 通知のみに縮小
+- サーバー側 ping/pong 追加（20秒間隔）
+- フェーズ変更時に game.state を全クライアントに自動送信
 
 ### Phase 5: iOS クライアント書き換え
 - 全アクションを HTTP API に切り替え
-- WS は通知受信のみ
-- ポーリング・フォールバック削除
-- 再接続プロトコル実装
+- WS は game.state 受信 → 差分でシーン切り替え
+- PhaseScreenState（active / transitioning）実装
+- ポーリング・フォールバック全削除
 
 ### Phase 6: クリーンアップ
 - PhaseManager, SpeechManager 削除
