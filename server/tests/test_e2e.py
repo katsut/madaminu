@@ -204,7 +204,7 @@ class _NoOpPhaseManager:
 
     async def _generate_and_broadcast_ending(self, game_id, room_code):
         from madaminu.services.scenario_engine import generate_ending
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
         from madaminu.ws.messages import WSMessage
 
         async with self._session_factory() as db:
@@ -226,7 +226,7 @@ class _NoOpPhaseManager:
 @pytest.fixture()
 def e2e_client(e2e_session_factory):
     """TestClient with PhaseManager and SpeechManager wired up."""
-    from madaminu.ws.handler import manager as ws_manager
+    from madaminu.ws.handler_old import manager as ws_manager
 
     # Ensure clean state before setup
     app.dependency_overrides.clear()
@@ -262,7 +262,7 @@ def e2e_client(e2e_session_factory):
 @pytest.fixture()
 async def async_client(e2e_session_factory):
     """Async client for HTTP-only tests."""
-    from madaminu.ws.handler import manager as ws_manager
+    from madaminu.ws.handler_old import manager as ws_manager
 
     async def override_get_db():
         async with e2e_session_factory() as session:

@@ -102,7 +102,7 @@ class DiscoveryService:
 
         from madaminu.llm.client import LIGHT_MODEL, llm_client
         from madaminu.services.scenario_engine import _parse_scenario_json
-        from madaminu.services.template_loader import load_template, render_template
+        from madaminu.llm.prompts import load_template, render_template
 
         map_data = context["map_data"]
         location = None
@@ -142,7 +142,7 @@ class DiscoveryService:
         result = _parse_scenario_json(raw)
 
         discoveries = []
-        for item in result.get("discoveries", []):
+        for item in result.get("discoveries", [])[:3]:
             discoveries.append({
                 "title": item.get("title", "調査結果"),
                 "content": item.get("content", ""),

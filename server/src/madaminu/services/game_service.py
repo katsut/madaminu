@@ -31,6 +31,20 @@ class GameService:
         """Advance to the next phase. DB-level exclusion prevents double advance."""
         async with self._sf() as db:
             game = await phase_repo.get_game_with_phases(db, game_id)
+
+            # First phase: current_phase_id is None → start the first phase
+            if game.current_phase_id is None:
+                sorted_phases = sorted(game.phases, key=lambda p: p.phase_order)
+                if not sorted_phases:
+                    return AdvanceResult("already_advanced")
+                first = sorted_phases[0]
+                await phase_repo.start_phase(db, first, game)
+                first.discoveries_status = "preparing"
+                game.status = GameStatus.playing
+                await db.commit()
+                logger.info("Started first phase %s for %s", first.phase_type, game.room_code)
+                return AdvanceResult("advanced", phase=first)
+
             current = next((p for p in game.phases if p.id == game.current_phase_id), None)
             if current is None:
                 return AdvanceResult("already_advanced")
@@ -60,10 +74,12 @@ class GameService:
             if next_phase.phase_type == PhaseType.voting:
                 game.status = GameStatus.voting
 
-            # Auto-assign locations for investigation
+            # Set phase readiness
             if next_phase.phase_type == PhaseType.investigation:
                 next_phase.discoveries_status = "generating"
                 await self._auto_assign_locations(db, game, current)
+            else:
+                next_phase.discoveries_status = "preparing"
 
             await db.commit()
             logger.info("Advanced %s → %s for %s", current.phase_type, next_phase.phase_type, game.room_code)
@@ -181,6 +197,10 @@ class GameService:
 
         if not inv_phase:
             return
+
+        # Copy planning selections to investigation phase + auto-assign missing
+        for sel in selections:
+            await selection_repo.upsert_selection(db, game.id, inv_phase.id, sel.player_id, sel.location_id)
 
         for player in game.players:
             if player.id not in selected_players:

@@ -4,6 +4,7 @@ import SwiftUI
 struct NotebookView: View {
     @ObservedObject var store: AppStore
     @Binding var isPresented: Bool
+    var bottomInset: CGFloat = 0
     @State private var selectedTab = 0
 
     private var tabs: [String] {
@@ -37,6 +38,15 @@ struct NotebookView: View {
             Text("個人手帳")
                 .font(.mdTitle)
                 .foregroundStyle(Color.mdPrimary)
+            Spacer()
+            if let phase = store.game.currentPhase {
+                Text(formatTime(store.game.localRemainingSec))
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundStyle(store.game.localRemainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
+                Text(phaseDisplayName(phase.phaseType))
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdTextMuted)
+            }
             Spacer()
             Button { isPresented = false } label: {
                 Image(systemName: "xmark")
@@ -89,6 +99,9 @@ struct NotebookView: View {
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .animation(.easeInOut(duration: 0.2), value: selectedTab)
+        .safeAreaInset(edge: .bottom) {
+            Spacer().frame(height: bottomInset)
+        }
     }
 
     // MARK: - Tab: Case Summary
@@ -477,6 +490,24 @@ struct NotebookView: View {
         case "related": "関係者"
         case "innocent": "一般人"
         default: role
+        }
+    }
+
+    private func formatTime(_ seconds: Int) -> String {
+        let m = seconds / 60
+        let s = seconds % 60
+        return String(format: "%d:%02d", m, s)
+    }
+
+    private func phaseDisplayName(_ type: String) -> String {
+        switch type {
+        case "storytelling": "読み合わせ"
+        case "opening": "オープニング"
+        case "planning": "作戦会議"
+        case "investigation": "調査"
+        case "discussion": "議論"
+        case "voting": "投票"
+        default: type
         }
     }
 }

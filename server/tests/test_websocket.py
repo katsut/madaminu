@@ -52,6 +52,7 @@ def _client(session_factory) -> TestClient:
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.state.session_factory = session_factory
     return TestClient(app)
 
 

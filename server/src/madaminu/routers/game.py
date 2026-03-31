@@ -15,8 +15,7 @@ from madaminu.schemas.game import build_game_state
 from madaminu.services.ai_player import fill_ai_players
 from madaminu.services.errors import InvalidTransition
 from madaminu.services.scenario_engine import generate_scenario
-from madaminu.ws.handler import manager as ws_manager
-from madaminu.ws.messages import WSMessage
+from madaminu.ws.handler_v3 import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +111,13 @@ async def _generate_images(game_id: str, room_code: str, session_factory):
         await db.commit()
 
 
-async def _generate_scenario_background(game_id: str, room_code: str, session_factory, phase_manager):
+async def _generate_scenario_background(game_id: str, room_code: str, session_factory):
+    from madaminu.services.game_service import GameService
+
     try:
-        await ws_manager.broadcast(
-            room_code,
-            WSMessage(type="progress", data={"step": "scenario", "status": "in_progress"}),
-        )
+        await ws_manager.broadcast(room_code, {
+            "type": "progress", "data": {"step": "scenario", "status": "in_progress"},
+        })
 
         for attempt in range(3):
             try:
@@ -136,51 +136,48 @@ async def _generate_scenario_background(game_id: str, room_code: str, session_fa
                 if attempt == 2:
                     raise
 
-        await ws_manager.broadcast(room_code, WSMessage(type="progress", data={"step": "scenario", "status": "done"}))
+        await ws_manager.broadcast(room_code, {
+            "type": "progress", "data": {"step": "scenario", "status": "done"},
+        })
 
-        if phase_manager:
-            await phase_manager.start_first_phase(game_id, room_code)
-
-        # Send game state to each player
-        async with session_factory() as db:
-            game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
-            game = game_result.scalar_one_or_none()
-            if game:
-                for player in game.players:
-                    state = await build_game_state(db, game, player.id)
-                    await ws_manager.send_to_player(room_code, player.id, WSMessage(type="game.state", data=state))
-
-        # Generate images
-        await ws_manager.broadcast(
-            room_code,
-            WSMessage(type="progress", data={"step": "scene_image", "status": "in_progress"}),
-        )
-        await ws_manager.broadcast(
-            room_code,
-            WSMessage(type="progress", data={"step": "portraits", "status": "in_progress"}),
-        )
+        # Generate images first
+        await ws_manager.broadcast(room_code, {
+            "type": "progress", "data": {"step": "scene_image", "status": "in_progress"},
+        })
+        await ws_manager.broadcast(room_code, {
+            "type": "progress", "data": {"step": "portraits", "status": "in_progress"},
+        })
 
         await _generate_images(game_id, room_code, session_factory)
 
-        await ws_manager.broadcast(
-            room_code,
-            WSMessage(type="progress", data={"step": "scene_image", "status": "done"}),
-        )
-        await ws_manager.broadcast(
-            room_code,
-            WSMessage(type="progress", data={"step": "portraits", "status": "done"}),
-        )
+        await ws_manager.broadcast(room_code, {
+            "type": "progress", "data": {"step": "scene_image", "status": "done"},
+        })
+        await ws_manager.broadcast(room_code, {
+            "type": "progress", "data": {"step": "portraits", "status": "done"},
+        })
 
-        # Send updated game state with image URLs
-        async with session_factory() as db:
-            game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
-            game = game_result.scalar_one_or_none()
-            if game:
-                for player in game.players:
-                    state = await build_game_state(db, game, player.id)
-                    await ws_manager.send_to_player(room_code, player.id, WSMessage(type="game.state", data=state))
+        # Start first phase after images are ready
+        from madaminu.services.discovery_service import DiscoveryService
+        from madaminu.ws.actions import _finalize_phase_start
 
-        await ws_manager.broadcast(room_code, WSMessage(type="game.ready", data={"room_code": room_code}))
+        game_service = GameService(session_factory)
+        discovery_service = DiscoveryService(session_factory)
+        result = await game_service.advance_phase(game_id, force=True)
+
+        # 1st game.state: phase preparing (includes image URLs)
+        await ws_manager.broadcast_game_state(room_code, game_id, game_service)
+
+        # Finalize: wait 3s → ready → 2nd game.state → schedule timer
+        if result.phase:
+            asyncio.create_task(
+                _finalize_phase_start(
+                    game_id, room_code, result.phase,
+                    discovery_service, game_service, ws_manager,
+                )
+            )
+
+        await ws_manager.broadcast(room_code, {"type": "game.ready", "data": {"room_code": room_code}})
 
     except Exception:
         logger.exception("Background scenario generation failed for game %s", game_id)
@@ -193,7 +190,7 @@ async def _generate_scenario_background(game_id: str, room_code: str, session_fa
                     await db.commit()
         except Exception:
             logger.exception("Failed to reset game status for %s", game_id)
-        await ws_manager.broadcast(room_code, WSMessage(type="game.generation_failed", data={"room_code": room_code}))
+        await ws_manager.broadcast(room_code, {"type": "game.generation_failed", "data": {"room_code": room_code}})
 
 
 @router.post("/{room_code}/start", response_model=StartGameResponse)
@@ -240,17 +237,15 @@ async def start_game(
     game.status = GameStatus.generating
     await db.commit()
 
-    pm = getattr(request.app.state, "phase_manager", None)
     session_factory = getattr(request.app.state, "_session_factory", None) or async_session
 
-    await ws_manager.broadcast(room_code, WSMessage(type="game.generating", data={"room_code": room_code}))
+    await ws_manager.broadcast(room_code, {"type": "game.generating", "data": {"room_code": room_code}})
 
     asyncio.create_task(
         _generate_scenario_background(
             game_id=game.id,
             room_code=room_code,
             session_factory=session_factory,
-            phase_manager=pm,
         )
     )
 
@@ -297,22 +292,11 @@ async def keep_evidence_http(
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=400, detail="Already kept evidence this phase")
 
-    # Find discovery in PhaseManager memory or DB
-    pm = getattr(request.app.state, "phase_manager", None)
-    discovery = None
-    if pm:
-        discoveries = pm.get_discoveries(room_code, player.id)
-        discovery = next((d for d in discoveries if d["id"] == body.discovery_id), None)
-
-    if discovery is None:
-        # Fallback: find in DB
-        ev_result = await db.execute(select(Evidence).where(Evidence.id == body.discovery_id))
-        ev = ev_result.scalar_one_or_none()
-        if ev:
-            discovery = {"id": ev.id, "title": ev.title, "content": ev.content}
-
-    if discovery is None:
+    ev_result = await db.execute(select(Evidence).where(Evidence.id == body.discovery_id))
+    ev = ev_result.scalar_one_or_none()
+    if ev is None:
         raise HTTPException(status_code=404, detail="Discovery not found")
+    discovery = {"id": ev.id, "title": ev.title, "content": ev.content}
 
     evidence = await keep_evidence(db, game.id, player.id, discovery)
     return {"id": evidence.id, "title": evidence.title, "content": evidence.content}
@@ -337,14 +321,6 @@ async def get_discoveries(
     if player is None:
         raise HTTPException(status_code=403)
 
-    # Try PhaseManager memory first (has feature info)
-    pm = getattr(request.app.state, "phase_manager", None)
-    if pm:
-        mem_discoveries = pm.get_discoveries(room_code, player.id)
-        if mem_discoveries:
-            return {"discoveries": mem_discoveries}
-
-    # Fallback to DB
     ev_result = await db.execute(
         select(Evidence).where(
             Evidence.game_id == game.id,

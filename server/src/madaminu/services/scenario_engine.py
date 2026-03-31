@@ -116,7 +116,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     await db.flush()
 
     initial_phase_result = await db.execute(
-        select(Phase).where(Phase.game_id == game.id, Phase.phase_type == PhaseType.initial).limit(1)
+        select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order).limit(1)
     )
     initial_phase = initial_phase_result.scalar_one()
 
@@ -626,13 +626,13 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
     human_count = sum(1 for p in game.players if not p.is_ai)
     opening_duration = max(60, human_count * 60)
 
-    initial_phase = Phase(
+    storytelling_phase = Phase(
         game_id=game.id,
-        phase_type=PhaseType.initial,
+        phase_type=PhaseType.storytelling,
         phase_order=phase_order,
-        duration_sec=0,
+        duration_sec=180,
     )
-    db.add(initial_phase)
+    db.add(storytelling_phase)
     phase_order += 1
 
     opening_phase = Phase(

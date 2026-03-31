@@ -70,7 +70,7 @@ class SpeechManager:
             await db.commit()
 
     async def broadcast_speech_granted(self, room_code: str, player_id: str):
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         await manager.broadcast(
             room_code,
@@ -81,7 +81,7 @@ class SpeechManager:
         )
 
     async def broadcast_speech_released(self, room_code: str, player_id: str, transcript: str = ""):
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         character_name = ""
         if transcript:

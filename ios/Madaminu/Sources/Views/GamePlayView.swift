@@ -25,8 +25,23 @@ struct GamePlayView: View {
                         Divider().background(Color.mdSurface)
 
                         Group {
-                            if let phase = store.game.currentPhase {
+                            if store.game.discoveriesStatus != "ready", let phase = store.game.currentPhase {
+                                // Phase transitioning — show transition panel as main content
+                                PhaseTransitionOverlay(
+                                    phaseType: phase.phaseType,
+                                    turnNumber: phase.turnNumber,
+                                    totalTurns: phase.totalTurns,
+                                    durationSec: phase.durationSec,
+                                    sceneImageUrl: store.game.scenarioSetting.sceneImageUrl,
+                                    travelNarrative: store.game.travelNarrative
+                                )
+                            } else if let phase = store.game.currentPhase {
+                                // Phase ready — show phase content
                                 switch phase.phaseType {
+                                case "initial":
+                                    OpeningPhaseView(store: store)
+                                case "storytelling":
+                                    StorytellingPhaseView(store: store)
                                 case "opening":
                                     OpeningPhaseView(store: store)
                                 case "planning":
@@ -38,8 +53,10 @@ struct GamePlayView: View {
                                 case "voting":
                                     VotingPhaseView(store: store)
                                 default:
-                                    waitingView
+                                    OpeningPhaseView(store: store)
                                 }
+                            } else if store.game.isConnected {
+                                EmptyView()
                             } else {
                                 waitingView
                             }
@@ -48,21 +65,8 @@ struct GamePlayView: View {
 
                         bottomBar
                     }
-
-                    if store.game.showPhaseTransition {
-                        PhaseTransitionOverlay(
-                            phaseType: store.game.currentPhase?.phaseType ?? store.game.nextPhaseType ?? "",
-                            turnNumber: store.game.currentPhase?.turnNumber ?? store.game.lastTurnNumber,
-                            totalTurns: store.game.currentPhase?.totalTurns ?? store.game.lastTotalTurns,
-                            durationSec: store.game.currentPhase?.durationSec ?? 0,
-                            sceneImageUrl: store.game.scenarioSetting.sceneImageUrl,
-                            travelNarrative: store.game.travelNarrative
-                        )
-                        .transition(.opacity)
-                        .zIndex(100)
-                    }
                 }
-                .animation(.easeInOut(duration: 0.5), value: store.game.showPhaseTransition)
+                .animation(.easeInOut(duration: 0.5), value: store.game.discoveriesStatus)
             case .ended:
                 if endingRevealPhase < 3, let ending = store.game.ending {
                     EndingRevealView(
@@ -79,10 +83,15 @@ struct GamePlayView: View {
         }
         .overlay {
             if showNotebook {
+                let showSpeech = ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType)
                 ZStack(alignment: .bottom) {
-                    NotebookView(store: store, isPresented: $showNotebook)
+                    NotebookView(
+                        store: store,
+                        isPresented: $showNotebook,
+                        bottomInset: showSpeech ? 70 : 0
+                    )
 
-                    if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
+                    if showSpeech {
                         HStack(spacing: Spacing.md) {
                             SpeechButton(store: store)
                         }
@@ -108,20 +117,6 @@ struct GamePlayView: View {
                 guard let store else { return }
                 if store.game.localRemainingSec > 0 && !store.game.isPaused {
                     store.game.localRemainingSec -= 1
-                    if store.game.localRemainingSec <= 0 {
-                        // Nudge server to advance if timer expired
-                        store.sendWS(type: "phase.timer_expired")
-                        // HTTP fallback: poll game state until phase changes
-                        let currentPhaseId = store.game.currentPhase?.phaseId
-                        Task {
-                            for attempt in 1...6 {
-                                try? await Task.sleep(for: .seconds(5))
-                                guard store.game.currentPhase?.phaseId == currentPhaseId else { break }
-                                print("[GamePlayView] Polling state (attempt \(attempt))...")
-                                await store.pollGameState()
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -450,6 +445,7 @@ struct GamePlayView: View {
 
     private func phaseColor(_ type: String) -> Color {
         switch type {
+        case "initial", "storytelling": .mdTextMuted
         case "opening": .mdSuccess
         case "discussion": .mdPrimary
         case "planning": .mdWarning
@@ -461,6 +457,8 @@ struct GamePlayView: View {
 
     private func phaseDisplayName(_ type: String) -> String {
         switch type {
+        case "initial": "準備"
+        case "storytelling": "読み合わせ"
         case "opening": "自己紹介"
         case "discussion": "議論"
         case "planning": "調査計画"
@@ -503,24 +501,210 @@ struct SpeechButton: View {
 struct OpeningPhaseView: View {
     @ObservedObject var store: AppStore
 
+    private var me: PlayerInfo? {
+        store.room.players.first(where: { $0.id == store.room.playerId })
+    }
+
+    private var others: [PlayerInfo] {
+        store.room.players.filter { $0.id != store.room.playerId }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
                 GMGuideCard(
                     title: "自己紹介タイム",
-                    message: "発言ボタンを押して、自分のキャラクターを紹介してください。\nこの集まりでの立場や、他のキャラクターとの関係を共有しましょう。"
+                    message: "発言ボタンを押して、自分のキャラクターを紹介してください。"
                 )
 
-                if let speaker = store.game.currentSpeakerId {
-                    let name = store.room.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
+                // My profile
+                if let me {
                     MDCard {
-                        HStack {
-                            Image(systemName: "mic.fill")
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            HStack(spacing: Spacing.sm) {
+                                if let urlString = me.portraitUrl,
+                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Image(systemName: "person.fill")
+                                            .foregroundStyle(Color.mdTextMuted)
+                                            .frame(width: 50, height: 50)
+                                            .background(Color.mdSurface)
+                                    }
+                                    .frame(width: 50, height: 50)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    HStack(spacing: Spacing.xs) {
+                                        Text(me.characterName ?? me.displayName)
+                                            .font(.mdHeadline)
+                                            .foregroundStyle(Color.mdTextPrimary)
+                                        Text("あなた")
+                                            .font(.mdCaption2)
+                                            .foregroundStyle(Color.mdPrimary)
+                                            .padding(.horizontal, Spacing.xs)
+                                            .padding(.vertical, 1)
+                                            .background(Color.mdPrimary.opacity(0.15))
+                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                    }
+                                    HStack(spacing: Spacing.xs) {
+                                        if let occupation = me.characterOccupation, !occupation.isEmpty {
+                                            Text(occupation).font(.mdCaption).foregroundStyle(Color.mdTextMuted)
+                                        }
+                                    }
+                                }
+                            }
+                            if let publicInfo = me.publicInfo, !publicInfo.isEmpty {
+                                Text(publicInfo)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                            }
+                        }
+                    }
+                }
+
+                // Other players
+                if !others.isEmpty {
+                    HStack {
+                        Text("他のプレイヤー")
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdTextMuted)
+                        Spacer()
+                    }
+
+                    ForEach(others) { player in
+                        MDCard {
+                            HStack(spacing: Spacing.sm) {
+                                if let urlString = player.portraitUrl,
+                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Image(systemName: "person.fill")
+                                            .foregroundStyle(Color.mdTextMuted)
+                                            .frame(width: 40, height: 40)
+                                            .background(Color.mdSurface)
+                                    }
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text(player.characterName ?? player.displayName)
+                                        .font(.mdCallout)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    if let occupation = player.characterOccupation, !occupation.isEmpty {
+                                        Text(occupation).font(.mdCaption2).foregroundStyle(Color.mdTextMuted)
+                                    }
+                                    if let publicInfo = player.publicInfo, !publicInfo.isEmpty {
+                                        Text(publicInfo)
+                                            .font(.mdCaption)
+                                            .foregroundStyle(Color.mdTextSecondary)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                Spacer()
+                                if player.isAI {
+                                    Text("AI")
+                                        .font(.mdCaption2)
+                                        .foregroundStyle(Color.mdTextMuted)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Speech
+                if store.game.isSpeaking {
+                    TranscriptView(store: store)
+                }
+
+                SpeechHistoryView(store: store)
+            }
+            .padding(Spacing.lg)
+        }
+    }
+}
+
+struct StorytellingPhaseView: View {
+    @ObservedObject var store: AppStore
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                GMGuideCard(
+                    title: "読み合わせ",
+                    message: "シナリオの舞台と事件の概要をみんなで確認しましょう。\n内容を読み上げて、物語の世界に入り込んでください。"
+                )
+
+                if let urlString = store.game.scenarioSetting.sceneImageUrl,
+                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=512") {
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        ProgressView()
+                    }
+                    .frame(height: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                if let location = store.game.scenarioSetting.location {
+                    MDCard {
+                        HStack(alignment: .top, spacing: Spacing.sm) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdPrimary)
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text("舞台")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextMuted)
+                                Text(location)
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+                    }
+                }
+
+                if let situation = store.game.scenarioSetting.situation {
+                    MDCard {
+                        HStack(alignment: .top, spacing: Spacing.sm) {
+                            Image(systemName: "book.fill")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdPrimary)
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text("あらすじ")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextMuted)
+                                Text(situation)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+                    }
+                }
+
+                if let name = store.game.scenarioSetting.victimName {
+                    MDCard {
+                        HStack(alignment: .top, spacing: Spacing.sm) {
+                            Image(systemName: "person.slash.fill")
+                                .font(.mdTitle2)
                                 .foregroundStyle(Color.mdAccent)
-                            Text("\(name) が発言中")
-                                .font(.mdCallout)
-                                .foregroundStyle(Color.mdTextPrimary)
-                            Spacer()
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text("被害者")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextMuted)
+                                Text(name)
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                if let desc = store.game.scenarioSetting.victimDescription {
+                                    Text(desc)
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                }
+                            }
                         }
                     }
                 }
@@ -581,13 +765,8 @@ struct PlanningPhaseView: View {
                         let isSelected = selectedLocationId == location.id
                         Button {
                             withAnimation(.easeInOut(duration: 0.15)) {
-                                if isSelected {
-                                    selectedLocationId = nil
-                                    store.dispatch(.selectInvestigation(locationId: nil))
-                                } else {
-                                    selectedLocationId = location.id
-                                    store.dispatch(.selectInvestigation(locationId: location.id))
-                                }
+                                selectedLocationId = location.id
+                                store.dispatch(.selectInvestigation(locationId: location.id))
                             }
                             Task { await loadMap() }
                         } label: {
@@ -694,13 +873,6 @@ struct InvestigationPhaseView: View {
                         .tint(Color.mdPrimary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(Spacing.xl)
-                        .task {
-                            for _ in 0..<10 {
-                                try? await Task.sleep(for: .seconds(3))
-                                if !store.game.discoveries.isEmpty { break }
-                                await fetchDiscoveriesHTTP()
-                            }
-                        }
                 } else {
                     // Feature list with tap-to-reveal
                     ForEach(store.game.discoveries) { discovery in
@@ -775,31 +947,6 @@ struct InvestigationPhaseView: View {
         }
     }
 
-    @MainActor
-    private func fetchDiscoveriesHTTP() async {
-        guard let token = store.room.sessionToken else { return }
-        let urlString = APIClient.defaultBaseURL + "/api/v1/rooms/\(store.room.roomCode)/discoveries"
-        guard let url = URL(string: urlString) else { return }
-        var request = URLRequest(url: url)
-        request.setValue(token, forHTTPHeaderField: "X-Session-Token")
-        do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let discs = json["discoveries"] as? [[String: Any]], !discs.isEmpty {
-                store.game.discoveries = discs.compactMap { d in
-                    guard let id = d["id"] as? String,
-                          let title = d["title"] as? String,
-                          let content = d["content"] as? String else { return nil }
-                    let canTamper = d["can_tamper"] as? Bool ?? false
-                    let feature = d["feature"] as? String ?? ""
-                    return DiscoveryItem(id: id, title: title, content: content, feature: feature, canTamper: canTamper)
-                }
-                print("[InvestigationPhaseView] HTTP fallback got \(store.game.discoveries.count) discoveries")
-            }
-        } catch {
-            print("[InvestigationPhaseView] HTTP fallback failed: \(error)")
-        }
-    }
 }
 
 struct ColocatedPlayersView: View {
@@ -998,8 +1145,8 @@ struct DiscussionTimelineView: View {
                                     .font(.mdCaption)
                                     .foregroundStyle(Color.mdPrimary)
                                 Text(s.transcript)
-                                    .font(.mdCaption)
-                                    .foregroundStyle(Color.mdTextSecondary)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
                             }
                         }
                     case .evidence(let e):
@@ -1051,8 +1198,8 @@ struct SpeechHistoryView: View {
                                 .font(.mdCaption)
                                 .foregroundStyle(Color.mdPrimary)
                             Text(entry.transcript)
-                                .font(.mdCaption)
-                                .foregroundStyle(Color.mdTextSecondary)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
                         }
                     }
                 }
@@ -1424,7 +1571,7 @@ struct SVGWebView: UIViewRepresentable {
             webView.isOpaque = false
             webView.backgroundColor = .clear
             webView.scrollView.backgroundColor = .clear
-            webView.scrollView.isScrollEnabled = false
+            webView.scrollView.isScrollEnabled = true
             loadSVG(initialSVG)
             lastSVG = initialSVG
         }
@@ -1529,6 +1676,8 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseTitle(_ type: String) -> String {
         switch type {
+        case "initial": "準備"
+        case "storytelling": "読み合わせ"
         case "opening": "自己紹介"
         case "discussion": "議論"
         case "planning": "調査計画"
@@ -1541,6 +1690,8 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseSubtitle(_ type: String) -> String {
         switch type {
+        case "initial": "ゲームの準備中です..."
+        case "storytelling": "シナリオを読み上げます"
         case "opening": "まずはお互いを知りましょう。自己紹介と状況の共有をしてください"
         case "discussion": "集めた情報をもとに推理を話し合いましょう"
         case "planning": "みんなで相談して、次に調べる場所を決めましょう"

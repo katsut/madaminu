@@ -81,7 +81,7 @@ async def test_timer_advances_after_broadcast_failure(pm_env):
         return None
 
     with (
-        patch("madaminu.ws.handler.manager.broadcast", broadcast_mock),
+        patch("madaminu.ws.handler_old.manager.broadcast", broadcast_mock),
         patch.object(pm, "advance_phase", mock_advance),
     ):
         pm._start_timer("g1", "TEST01", Phase(
@@ -128,7 +128,7 @@ async def test_voting_timer_auto_advances(pm_env):
         advance_called.set()
 
     with (
-        patch("madaminu.ws.handler.manager.broadcast", AsyncMock()),
+        patch("madaminu.ws.handler_old.manager.broadcast", AsyncMock()),
         patch.object(pm, "advance_phase", mock_advance),
     ):
         pm._start_timer("g1", "TEST01", voting)

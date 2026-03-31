@@ -109,7 +109,9 @@ Include these enhanced profiles in the player data output (as part of gm_notes).
   - "You owe a debt to Player W and cannot betray them"
 - Each player should have at least one ally and one adversary among the other players
 - The criminal's objective should include hiding their crime while achieving a personal goal
-- Non-criminal players should have objectives that may conflict with finding the truth
+- Non-criminal (innocent/witness/related) players' PRIMARY objective is always to identify the criminal. This is their core mission.
+  - However, if the criminal turns out to be a specific person, it would cause disadvantage to them (e.g. "もし犯人が○○だった場合、あなたの秘密も明るみに出る")
+  - Additionally, each non-criminal player should have a SECONDARY personal objective (e.g. protect someone, recover an item, hide a past mistake)
 - public_info is NOT a repeat of the character profile. It is situation-specific information that all players can see:
   - Why this character came to this gathering / event
   - Who they arrived with or who invited them

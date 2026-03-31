@@ -9,7 +9,7 @@ from madaminu.models import Game, Phase
 
 async def get_game_with_phases(db: AsyncSession, game_id: str) -> Game:
     result = await db.execute(
-        select(Game).options(selectinload(Game.phases)).where(Game.id == game_id)
+        select(Game).options(selectinload(Game.phases), selectinload(Game.players)).where(Game.id == game_id)
     )
     return result.scalar_one()
 
