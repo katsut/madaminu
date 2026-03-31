@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from madaminu.models.base import Base, UUIDPrimaryKeyMixin
@@ -14,10 +14,11 @@ if TYPE_CHECKING:
 
 class PhaseType(enum.StrEnum):
     initial = "initial"
+    storytelling = "storytelling"
     opening = "opening"
+    discussion = "discussion"
     planning = "planning"
     investigation = "investigation"
-    discussion = "discussion"
     voting = "voting"
 
 
@@ -33,5 +34,12 @@ class Phase(Base, UUIDPrimaryKeyMixin):
     started_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
     deadline_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
+    paused_remaining_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    current_speaker_id: Mapped[str | None] = mapped_column(
+        ForeignKey("players.id", use_alter=True), nullable=True
+    )
+    discoveries_status: Mapped[str] = mapped_column(
+        String(20), server_default="pending", nullable=False
+    )
 
     game: Mapped[Game] = relationship("Game", back_populates="phases", foreign_keys=[game_id])
