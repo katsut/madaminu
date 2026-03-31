@@ -2,6 +2,7 @@ from madaminu.models.base import Base
 from madaminu.models.evidence import Evidence, EvidenceSource
 from madaminu.models.game import Game, GameStatus
 from madaminu.models.game_ending import GameEnding
+from madaminu.models.investigation_selection import InvestigationSelection
 from madaminu.models.note import Note
 from madaminu.models.payment import Payment, PaymentStatus
 from madaminu.models.phase import Phase, PhaseType
@@ -17,6 +18,7 @@ __all__ = [
     "Game",
     "GameEnding",
     "GameStatus",
+    "InvestigationSelection",
     "Note",
     "Payment",
     "PaymentStatus",
