@@ -220,20 +220,28 @@ struct GamePlayView: View {
         ["storytelling", "opening"].contains(store.game.currentPhase?.phaseType)
     }
 
+    private var showBottomBar: Bool {
+        let phase = store.game.currentPhase?.phaseType ?? ""
+        return !preEventPhase || ["opening", "planning", "discussion", "voting"].contains(phase)
+    }
+
+    @ViewBuilder
     private var bottomBar: some View {
-        HStack(spacing: Spacing.md) {
-            if !preEventPhase {
-                MDButton("手帳", style: .secondary) {
-                    showNotebook = true
+        if showBottomBar {
+            HStack(spacing: Spacing.md) {
+                if !preEventPhase {
+                    MDButton("手帳", style: .secondary) {
+                        showNotebook = true
+                    }
+                }
+
+                if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
+                    SpeechButton(store: store)
                 }
             }
-
-            if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
-                SpeechButton(store: store)
-            }
+            .padding(Spacing.md)
+            .background(Color.mdBackgroundSecondary)
         }
-        .padding(Spacing.md)
-        .background(Color.mdBackgroundSecondary)
     }
 
     private var waitingView: some View {
@@ -530,18 +538,26 @@ struct OpeningPhaseView: View {
                             }
 
                             // Self-introduction speech
-                            if let intro = player.selfIntroduction, !intro.isEmpty {
-                                Text("「\(intro)」")
+                            let hasIntro = player.selfIntroduction != nil && !player.selfIntroduction!.isEmpty
+                            if hasIntro {
+                                Text("「\(player.selfIntroduction!)」")
                                     .font(.mdBody)
                                     .foregroundStyle(Color.mdTextPrimary)
                                     .italic()
+                                    .padding(.top, Spacing.xs)
+                            } else if let publicInfo = player.publicInfo, !publicInfo.isEmpty {
+                                Text(publicInfo)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextSecondary)
                                     .padding(.top, Spacing.xs)
                             }
 
                             if isMe {
                                 GMGuideCard(
                                     title: "あなたの番です",
-                                    message: "発言ボタンを押して、上のセリフを参考に自己紹介してください。"
+                                    message: hasIntro
+                                        ? "発言ボタンを押して、上のセリフを参考に自己紹介してください。"
+                                        : "発言ボタンを押して、キャラクターになりきって自己紹介してください。"
                                 )
                             }
                         }
