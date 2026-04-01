@@ -864,32 +864,29 @@ struct BriefingPhaseView: View {
                     }
                 }
 
-                // Evidence cards
+                // Cards by type
                 if !store.notebook.evidences.isEmpty {
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        Label("あなたの証拠カード (\(store.notebook.evidences.count)枚)", systemImage: "doc.text.magnifyingglass")
-                            .font(.mdHeadline)
-                            .foregroundStyle(Color.mdInfo)
+                    let evidenceCards = store.notebook.evidences.filter {
+                        !$0.title.contains("アリバイ") && !$0.title.contains("に関する情報")
+                    }
+                    let alibiCards = store.notebook.evidences.filter { $0.title.contains("アリバイ") }
+                    let rumorCards = store.notebook.evidences.filter { $0.title.contains("に関する情報") }
 
-                        ForEach(store.notebook.evidences) { ev in
-                            MDCard {
-                                VStack(alignment: .leading, spacing: Spacing.xs) {
-                                    Text(ev.title)
-                                        .font(.mdHeadline)
-                                        .foregroundStyle(Color.mdTextPrimary)
-                                    Text(ev.content)
-                                        .font(.mdBody)
-                                        .foregroundStyle(Color.mdTextSecondary)
-                                }
-                            }
-                        }
+                    if !evidenceCards.isEmpty {
+                        cardSection(title: "証拠", icon: "magnifyingglass", color: .mdAccent, cards: evidenceCards)
+                    }
+                    if !alibiCards.isEmpty {
+                        cardSection(title: "アリバイ", icon: "person.badge.clock", color: .mdInfo, cards: alibiCards)
+                    }
+                    if !rumorCards.isEmpty {
+                        cardSection(title: "情報", icon: "bubble.left.and.text.bubble.right", color: .mdWarning, cards: rumorCards)
                     }
                 } else {
                     MDCard {
                         HStack {
                             Image(systemName: "info.circle")
                                 .foregroundStyle(Color.mdTextMuted)
-                            Text("証拠カードはまだ配布されていません")
+                            Text("カードはまだ配布されていません")
                                 .font(.mdCaption)
                                 .foregroundStyle(Color.mdTextMuted)
                         }
@@ -937,6 +934,27 @@ struct BriefingPhaseView: View {
                 }
             }
             .padding(Spacing.lg)
+        }
+    }
+
+    private func cardSection(title: String, icon: String, color: Color, cards: [EvidenceItem]) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Label("\(title) (\(cards.count)枚)", systemImage: icon)
+                .font(.mdHeadline)
+                .foregroundStyle(color)
+
+            ForEach(cards) { card in
+                MDCard {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text(card.title)
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdTextPrimary)
+                        Text(card.content)
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextSecondary)
+                    }
+                }
+            }
         }
     }
 }

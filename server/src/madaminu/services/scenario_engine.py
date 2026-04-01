@@ -151,6 +151,19 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
                 )
             )
 
+        for rumor in sp.get("initial_rumors", []):
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game.id,
+                    player_id=player.id,
+                    phase_id=initial_phase.id,
+                    title=rumor.get("title", "情報"),
+                    content=rumor.get("content", ""),
+                    source=EvidenceSource.gm_push,
+                )
+            )
+
         # Backward compat: single initial_evidence/initial_alibi
         if "initial_evidence" in sp and "initial_evidences" not in sp:
             ev = sp["initial_evidence"]

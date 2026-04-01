@@ -58,13 +58,14 @@ Create a complete scenario with the following structure (respond in JSON):
       "alibi_room_id": "事件発生時にいた部屋のroom_id",
       "personal_room_id": "個室のroom_id（あればnull）",
       "initial_evidences": [
-        {"title": "証拠タイトル", "content": "事件発覚時に個人的に目撃・発見した情報（2〜3文）"},
-        {"title": "証拠タイトル", "content": "別の証拠（2〜3文）"}
+        {"title": "証拠タイトル", "content": "物的証拠の説明（2〜3文）。誰のものかは不明"}
       ],
       "initial_alibis": [
-        {"title": "アリバイ", "content": "自分のアリバイ（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"},
-        {"title": "目撃情報", "content": "他の誰かの行動の目撃（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"},
-        {"title": "情報", "content": "別の誰かに関する情報（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"}
+        {"title": "アリバイ", "content": "アリバイ内容（2〜3文）", "type": "self|self_and_other|other", "partner": "相手キャラ名", "room_id": "room_id"}
+      ],
+      "initial_rumors": [
+        {"title": "○○に関する情報", "content": "他人についての噂や目撃情報（2〜3文）", "about": "対象キャラ名"},
+        {"title": "○○に関する情報", "content": "別の他人についての情報（2〜3文。ミスリード可）", "about": "対象キャラ名"}
       ],
       "gm_notes": "GMメモ"
     }
@@ -130,21 +131,32 @@ These are DIFFERENT fields with different purposes:
   - However, if the criminal turns out to be a specific person, it causes disadvantage
   - SECONDARY personal objective also required (protect someone, recover item, hide past mistake)
 
-## Initial Evidence & Alibis (distributed at murder briefing)
+## Initial Cards (distributed at murder briefing)
 
-Each player receives **2 evidence cards** and **3 alibi cards**:
+Each player receives 3 types of cards:
 
-- **initial_evidences** (2 cards):
-  - 2枚とも「○○に関する情報」形式。タイトルは「○○（キャラ名）に関する情報」
-  - Card 1: **事件に関連する有用な情報** — 別のプレイヤーについての噂、目撃情報、背景に関する気になる話
-  - Card 2: **ミスリード** — 事件とは無関係だが怪しく見える情報（別のプレイヤーの過去のトラブル、誤解を招く行動など）
-  - **交差ルール**: AはBについて、BはCについて…と循環的に。自分自身についての情報は持たない
-- **initial_alibis** (3 cards):
-  - Card 1: 自分のアリバイ（partner + room_id）
-  - Card 2: 他の誰かの行動目撃
-  - Card 3: 別の誰かの行動・発言情報
-  - Alibi consistency: if A's partner is B, B's partner must be A with matching room_id
-  - Criminal's alibi is false
+### initial_evidences (1 card) — 物的証拠
+- 事件現場付近で発見した物的証拠（落ちていた物、匂い、傷跡など）
+- **誰のものかは不明**。持ち主を特定する情報は含まない
+- タイトル例:「壊れた懐中時計」「血痕のついたハンカチ」
+
+### initial_alibis (1 card) — アリバイ
+- type に応じた内容:
+  - `"self"`: 自分のアリバイ（自分がどこにいたか）
+  - `"self_and_other"`: 自分と他人が一緒にいたアリバイ（partner + room_id）
+  - `"other"`: 他人のアリバイを目撃（自分は関係ないが、誰かがどこにいたか見た）
+- **partner**: アリバイ相手のキャラ名
+- **room_id**: アリバイの場所のroom_id
+- Alibi consistency: AのpartnerがBなら、Bのアリバイでもpartnerが必ずAで同じroom_id
+- Criminal's alibi is false
+
+### initial_rumors (2 cards) — 情報
+- 他のプレイヤーについての噂や目撃情報
+- タイトルは「○○（キャラ名）に関する情報」形式
+- **about**: 対象キャラ名（自分自身についての情報は持たない）
+- Card 1: 事件に関連する有用な情報
+- Card 2: ミスリード（事件と無関係だが怪しく見える情報）
+- **交差ルール**: AはBについて、BはCについて…と循環的に配布
 
 ## Constraints
 
