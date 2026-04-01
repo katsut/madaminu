@@ -51,8 +51,8 @@ Create a complete scenario with the following structure (respond in JSON):
     {
       "character_name": "キャラクター名",
       "role": "criminal|witness|related|innocent",
-      "self_introduction": "一人称のセリフ調の自己紹介（2〜4文。「私は〜」「俺は〜」のようにキャラクターの口調で。名前、職業、この集まりに来た建前の理由を述べる。性格が伝わる話し方で）",
-      "public_info": "プロフィール情報（三人称。2〜3文。経歴、他キャラクターとの公の関係。手帳に記載される情報）",
+      "self_introduction": "一人称のセリフ調の自己紹介（2〜4文。キャラクターの口調で。名前と職業（建前）とこの集まりに来た理由を述べる。秘密がある人物は嘘の職業や建前の理由を堂々と名乗る。秘密や裏の動機は絶対に含めない）",
+      "public_info": "手帳に記載されるプロフィール（三人称。2〜3文。他キャラクターとの公の関係。職業は書かない — 自己紹介で本人が名乗るまで非公開）",
       "secret_info": "このキャラクターの秘密（事件後に意味を持つ。他プレイヤーには非公開）",
       "objective": "個人目的",
       "alibi_room_id": "事件発生時にいた部屋のroom_id",

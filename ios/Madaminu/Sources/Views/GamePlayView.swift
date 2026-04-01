@@ -542,9 +542,6 @@ struct OpeningPhaseView: View {
                                 Text(player.characterName ?? player.displayName)
                                     .font(.mdTitle2)
                                     .foregroundStyle(Color.mdTextPrimary)
-                                if let occupation = player.characterOccupation, !occupation.isEmpty {
-                                    Text(occupation).font(.mdCaption).foregroundStyle(Color.mdTextMuted)
-                                }
                             }
 
                             // Self-introduction speech
