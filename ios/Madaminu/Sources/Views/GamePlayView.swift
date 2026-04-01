@@ -525,15 +525,25 @@ struct OpeningPhaseView: View {
                                 }
                             }
 
-                            HStack(spacing: Spacing.sm) {
-                                PlayerAvatarView(playerId: player.id, players: store.room.players, size: 50)
-                                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                    Text(player.characterName ?? player.displayName)
-                                        .font(.mdHeadline)
-                                        .foregroundStyle(Color.mdTextPrimary)
-                                    if let occupation = player.characterOccupation, !occupation.isEmpty {
-                                        Text(occupation).font(.mdCaption).foregroundStyle(Color.mdTextMuted)
+                            VStack(spacing: Spacing.sm) {
+                                if let urlString = player.portraitUrl,
+                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=200") {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        PlayerAvatarView(playerId: player.id, players: store.room.players, size: 80)
                                     }
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                } else {
+                                    PlayerAvatarView(playerId: player.id, players: store.room.players, size: 80)
+                                }
+
+                                Text(player.characterName ?? player.displayName)
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                if let occupation = player.characterOccupation, !occupation.isEmpty {
+                                    Text(occupation).font(.mdCaption).foregroundStyle(Color.mdTextMuted)
                                 }
                             }
 
@@ -1880,11 +1890,21 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseGuide(_ type: String) -> [String] {
         switch type {
+        case "storytelling":
+            return [
+                "ホストが物語を読み上げます",
+                "舞台と登場人物を把握しましょう",
+            ]
         case "opening":
             return [
-                "発言ボタンを押して自己紹介をする",
-                "他のキャラクターの話を聞いて関係性を把握する",
-                "手帳で自分の情報を確認する",
+                "ホストの指示で順番に自己紹介します",
+                "キャラクターになりきって話しましょう",
+            ]
+        case "briefing":
+            return [
+                "事件の詳細を確認する",
+                "配られた証拠・アリバイを確認する",
+                "秘密の情報と個人目的を把握する",
             ]
         case "ending":
             return [
