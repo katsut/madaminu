@@ -58,14 +58,17 @@ Create a complete scenario with the following structure (respond in JSON):
       "alibi_room_id": "事件発生時にいた部屋のroom_id",
       "personal_room_id": "個室のroom_id（あればnull）",
       "initial_evidences": [
-        {"title": "証拠タイトル", "content": "物的証拠の説明（2〜3文）。誰のものかは不明"}
+        {"title": "証拠タイトル", "content": "物的証拠（2〜3文）。誰のものかは不明"},
+        {"title": "証拠タイトル", "content": "物的証拠（2〜3文）"},
+        {"title": "証拠タイトル", "content": "物的証拠（2〜3文）"}
       ],
       "initial_alibis": [
-        {"title": "アリバイ", "content": "アリバイ内容（2〜3文）", "type": "self|self_and_other|other", "partner": "相手キャラ名", "room_id": "room_id"}
+        {"title": "○○のアリバイ", "content": "アリバイ内容（2〜3文）", "type": "self|self_and_other|other", "partner": "相手キャラ名", "room_id": "room_id"},
+        "... プレイヤー人数分のアリバイカード"
       ],
       "initial_rumors": [
-        {"title": "○○に関する情報", "content": "他人についての噂や目撃情報（2〜3文）", "about": "対象キャラ名"},
-        {"title": "○○に関する情報", "content": "別の他人についての情報（2〜3文。ミスリード可）", "about": "対象キャラ名"}
+        {"title": "○○に関する情報", "content": "噂や目撃情報（2〜3文）", "about": "対象キャラ名"},
+        "... プレイヤー人数分の情報カード"
       ],
       "gm_notes": "GMメモ"
     }
@@ -133,30 +136,34 @@ These are DIFFERENT fields with different purposes:
 
 ## Initial Cards (distributed at murder briefing)
 
-Each player receives 3 types of cards:
+Each player receives 3 types of cards. The number of alibi and rumor cards equals the number of players.
 
-### initial_evidences (1 card) — 物的証拠
+### initial_evidences (3 cards) — 物的証拠
 - 事件現場付近で発見した物的証拠（落ちていた物、匂い、傷跡など）
 - **誰のものかは不明**。持ち主を特定する情報は含まない
-- タイトル例:「壊れた懐中時計」「血痕のついたハンカチ」
+- 各カードは異なる証拠であること
+- タイトル例:「壊れた懐中時計」「血痕のついたハンカチ」「焦げた紙片」
 
-### initial_alibis (1 card) — アリバイ
+### initial_alibis (プレイヤー人数分) — アリバイ
+- 各プレイヤーに対して1枚ずつ、全プレイヤー分のアリバイカードを配布する
 - type に応じた内容:
   - `"self"`: 自分のアリバイ（自分がどこにいたか）
   - `"self_and_other"`: 自分と他人が一緒にいたアリバイ（partner + room_id）
-  - `"other"`: 他人のアリバイを目撃（自分は関係ないが、誰かがどこにいたか見た）
+  - `"other"`: 他人のアリバイを目撃（誰かがどこにいたか見た）
 - **partner**: アリバイ相手のキャラ名
 - **room_id**: アリバイの場所のroom_id
 - Alibi consistency: AのpartnerがBなら、Bのアリバイでもpartnerが必ずAで同じroom_id
 - Criminal's alibi is false
+- 自分のアリバイ1枚 + 他人のアリバイ目撃で残り枚数を埋める
 
-### initial_rumors (2 cards) — 情報
-- 他のプレイヤーについての噂や目撃情報
+### initial_rumors (プレイヤー人数分) — 情報
+- 他のプレイヤーについての噂や目撃情報。全プレイヤー分のカードを配布
 - タイトルは「○○（キャラ名）に関する情報」形式
 - **about**: 対象キャラ名（自分自身についての情報は持たない）
-- Card 1: 事件に関連する有用な情報
-- Card 2: ミスリード（事件と無関係だが怪しく見える情報）
-- **交差ルール**: AはBについて、BはCについて…と循環的に配布
+- 半分は事件に関連する有用な情報、半分はミスリード
+- 重複する対象がいてもよい（同じ人物に関する異なる角度の情報）
+- 「○○と○○の関係」のように、2人の繋がりを示す情報カードも有効
+  - タイトル例:「○○と○○の関係」。about には主要な対象キャラ名を記載
 
 ## Constraints
 
