@@ -1774,34 +1774,37 @@ struct PhaseTransitionOverlay: View {
                 .opacity(0.3)
             }
 
-            VStack(spacing: Spacing.md) {
-                Text("ターン \(turnNumber) / \(totalTurns)")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.mdTextMuted)
-                    .tracking(4)
+            ScrollView {
+                VStack(spacing: Spacing.md) {
+                    Spacer().frame(height: Spacing.xl)
 
-                // Murder event on first discussion
-                if phaseType == "briefing", let murder = murderDiscovery {
-                    Text("事件発生")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundStyle(Color.mdAccent)
+                    Text("ターン \(turnNumber) / \(totalTurns)")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color.mdTextMuted)
+                        .tracking(4)
 
-                    Text(murder)
-                        .font(.mdBody)
-                        .foregroundStyle(Color.mdTextPrimary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Spacing.xl)
-                } else {
-                    Text(phaseTitle(phaseType))
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundStyle(Color.mdTextPrimary)
+                    // Murder event on briefing transition
+                    if phaseType == "briefing", let murder = murderDiscovery {
+                        Text("事件発生")
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundStyle(Color.mdAccent)
 
-                    Text(phaseSubtitle(phaseType))
-                        .font(.mdBody)
-                        .foregroundStyle(Color.mdTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Spacing.xl)
-                }
+                        Text(murder)
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextPrimary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, Spacing.xl)
+                    } else {
+                        Text(phaseTitle(phaseType))
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundStyle(Color.mdTextPrimary)
+
+                        Text(phaseSubtitle(phaseType))
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, Spacing.xl)
+                    }
 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     ForEach(phaseGuide(phaseType), id: \.self) { step in
@@ -1837,6 +1840,10 @@ struct PhaseTransitionOverlay: View {
                         .tint(Color.mdTextMuted)
                         .padding(.top, Spacing.xs)
                 }
+
+                    Spacer().frame(height: Spacing.xl)
+                }
+                .frame(maxWidth: .infinity)
             }
         }
     }
