@@ -802,12 +802,63 @@ struct BriefingPhaseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
+                // Victim info
+                MDCard {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Label("被害者", systemImage: "person.slash.fill")
+                            .font(.mdTitle2)
+                            .foregroundStyle(Color.mdAccent)
+
+                        HStack(spacing: Spacing.sm) {
+                            if let urlString = store.game.scenarioSetting.victimImageUrl,
+                               let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=200") {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Image(systemName: "person.fill")
+                                        .foregroundStyle(Color.mdTextMuted)
+                                        .frame(width: 60, height: 60)
+                                        .background(Color.mdSurface)
+                                }
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                if let name = store.game.scenarioSetting.victimName {
+                                    Text(name)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                }
+                                if let desc = store.game.scenarioSetting.victimDescription {
+                                    Text(desc)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Murder discovery
+                if let discovery = store.game.scenarioSetting.murderDiscovery {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("発見の状況", systemImage: "eye.fill")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdWarning)
+                            Text(discovery)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
                 // Murder detail
                 if let detail = store.game.scenarioSetting.murderDetail {
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
                             Label("事件の詳細", systemImage: "exclamationmark.triangle.fill")
-                                .font(.mdTitle2)
+                                .font(.mdHeadline)
                                 .foregroundStyle(Color.mdAccent)
                             Text(detail)
                                 .font(.mdBody)
@@ -819,7 +870,7 @@ struct BriefingPhaseView: View {
                 // Evidence cards
                 if !store.notebook.evidences.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.sm) {
-                        Label("証拠カード", systemImage: "doc.text.magnifyingglass")
+                        Label("あなたの証拠カード (\(store.notebook.evidences.count)枚)", systemImage: "doc.text.magnifyingglass")
                             .font(.mdHeadline)
                             .foregroundStyle(Color.mdInfo)
 
@@ -834,6 +885,16 @@ struct BriefingPhaseView: View {
                                         .foregroundStyle(Color.mdTextSecondary)
                                 }
                             }
+                        }
+                    }
+                } else {
+                    MDCard {
+                        HStack {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(Color.mdTextMuted)
+                            Text("証拠カードはまだ配布されていません")
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextMuted)
                         }
                     }
                 }
