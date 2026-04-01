@@ -162,6 +162,20 @@ async def handle_websocket_v3(
                     session_factory, ws_manager,
                 )
 
+            elif msg_type == "retry_generation":
+                from madaminu.repositories import phase_repo
+                from madaminu.ws.actions import _finalize_phase_start
+
+                async with session_factory() as db:
+                    phase = await phase_repo.get_current_phase(db, game_id)
+                if phase:
+                    asyncio.create_task(
+                        _finalize_phase_start(
+                            game_id, room_code, phase,
+                            discovery_service, game_service, ws_manager,
+                        )
+                    )
+
             elif msg_type in ("pong", "phase.timer", "phase.extend", "phase.pause", "phase.resume"):
                 pass
 

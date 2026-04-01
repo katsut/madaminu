@@ -318,12 +318,25 @@ async def _finalize_phase_start_inner(
     ws: WSManager,
 ):
     if phase.phase_type == PhaseType.investigation:
-        # Run discovery generation (takes longer than 3s typically)
-        # But ensure at least 3s for transition overlay
-        await asyncio.gather(
-            asyncio.sleep(PHASE_TRANSITION_SEC),
-            _generate_discoveries_background(game_id, room_code, phase.id, discovery_service, game_service, ws),
-        )
+        # Run discovery generation with retry (3 attempts)
+        last_error = None
+        for attempt in range(3):
+            try:
+                await asyncio.gather(
+                    asyncio.sleep(PHASE_TRANSITION_SEC),
+                    _generate_discoveries_background(
+                        game_id, room_code, phase.id, discovery_service, game_service, ws
+                    ),
+                )
+                last_error = None
+                break
+            except Exception as e:
+                last_error = e
+                logger.warning("Discovery generation attempt %d failed for %s: %s", attempt + 1, room_code, e)
+                if attempt < 2:
+                    await asyncio.sleep(3)
+        if last_error:
+            logger.error("Discovery generation failed after 3 attempts for %s", room_code)
         # AI players auto-keep one discovery each
         await _ai_auto_keep_evidence(game_id, phase.id, game_service)
     else:

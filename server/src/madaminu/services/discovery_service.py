@@ -101,8 +101,8 @@ class DiscoveryService:
         import json
 
         from madaminu.llm.client import LIGHT_MODEL, llm_client
-        from madaminu.services.scenario_engine import _parse_scenario_json
         from madaminu.llm.prompts import load_template, render_template
+        from madaminu.services.scenario_engine import _parse_scenario_json
 
         map_data = context["map_data"]
         location = None
@@ -122,12 +122,21 @@ class DiscoveryService:
         if not features:
             return player.id, []
 
+        # Compact context: only include relevant parts of scenario
+        skeleton = context["game"]["scenario_skeleton"] or {}
+        compact_skeleton = {
+            "setting": skeleton.get("setting", {}),
+            "victim": skeleton.get("victim", {}),
+        }
+        gm_state = context["game"]["gm_internal_state"] or {}
+        compact_gm = gm_state.get("gm_strategy", "") if isinstance(gm_state, dict) else str(gm_state)[:500]
+
         system_prompt = load_template("scenario_system")
         user_prompt = render_template(
             "investigation_batch",
-            scenario_skeleton=json.dumps(context["game"]["scenario_skeleton"] or {}, ensure_ascii=False, indent=2),
+            scenario_skeleton=json.dumps(compact_skeleton, ensure_ascii=False),
             route_text=context["game"]["route_text"],
-            gm_internal_state=json.dumps(context["game"]["gm_internal_state"] or {}, ensure_ascii=False, indent=2),
+            gm_internal_state=compact_gm if isinstance(compact_gm, str) else json.dumps(compact_gm, ensure_ascii=False),
             player_id=player.id,
             player_name=player.character_name or player.display_name,
             player_role=player.role or "unknown",

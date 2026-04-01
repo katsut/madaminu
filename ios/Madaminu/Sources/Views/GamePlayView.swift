@@ -198,7 +198,9 @@ struct GamePlayView: View {
                         Button("一時停止") { store.dispatch(.pausePhase) }
                     }
                     Button("フェーズを進める") { store.dispatch(.advancePhase) }
-                    Button("時間を延長") { store.dispatch(.extendPhase) }
+                    if store.game.discoveriesStatus != "ready" {
+                        Button("生成をリトライ") { store.sendWS(type: "retry_generation") }
+                    }
                     Button("デバッグ情報") { showDebug = true }
                 }
             } label: {
