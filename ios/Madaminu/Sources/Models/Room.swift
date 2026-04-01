@@ -34,6 +34,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
     let characterPersonality: String?
     let characterBackground: String?
     let publicInfo: String?
+    let selfIntroduction: String?
     let portraitUrl: String?
     let isHost: Bool
     let isAI: Bool
@@ -52,6 +53,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         case characterPersonality = "character_personality"
         case characterBackground = "character_background"
         case publicInfo = "public_info"
+        case selfIntroduction = "self_introduction"
         case portraitUrl = "portrait_url"
         case isHost = "is_host"
         case isAI = "is_ai"
@@ -59,7 +61,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         case connectionStatus = "connection_status"
     }
 
-    init(id: String, displayName: String, characterName: String? = nil, characterNameKana: String? = nil, characterGender: String? = nil, characterAge: String? = nil, characterOccupation: String? = nil, characterAppearance: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, publicInfo: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, isReady: Bool = false, connectionStatus: String = "offline") {
+    init(id: String, displayName: String, characterName: String? = nil, characterNameKana: String? = nil, characterGender: String? = nil, characterAge: String? = nil, characterOccupation: String? = nil, characterAppearance: String? = nil, characterPersonality: String? = nil, characterBackground: String? = nil, publicInfo: String? = nil, selfIntroduction: String? = nil, portraitUrl: String? = nil, isHost: Bool = false, isAI: Bool = false, isReady: Bool = false, connectionStatus: String = "offline") {
         self.id = id
         self.displayName = displayName
         self.characterName = characterName
@@ -71,6 +73,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         self.characterPersonality = characterPersonality
         self.characterBackground = characterBackground
         self.publicInfo = publicInfo
+        self.selfIntroduction = selfIntroduction
         self.portraitUrl = portraitUrl
         self.isHost = isHost
         self.isAI = isAI
@@ -91,6 +94,7 @@ struct PlayerInfo: Codable, Identifiable, Sendable {
         characterPersonality = try container.decodeIfPresent(String.self, forKey: .characterPersonality)
         characterBackground = try container.decodeIfPresent(String.self, forKey: .characterBackground)
         publicInfo = try container.decodeIfPresent(String.self, forKey: .publicInfo)
+        selfIntroduction = try container.decodeIfPresent(String.self, forKey: .selfIntroduction)
         portraitUrl = try container.decodeIfPresent(String.self, forKey: .portraitUrl)
         isHost = try container.decodeIfPresent(Bool.self, forKey: .isHost) ?? false
         isAI = try container.decodeIfPresent(Bool.self, forKey: .isAI) ?? false

@@ -6,10 +6,12 @@ The story starts BEFORE the murder. Players gather at a location, introduce them
 Then the murder occurs as a dramatic event. After that, investigation and discussion begin.
 
 Timeline:
-1. **Gathering** (storytelling + opening phases): Players arrive, meet each other. The victim is ALIVE and present as a host/organizer/important figure.
-2. **Murder Event** (transition screen): A scream, a discovery — the victim is found dead. This is shown as a dramatic cutscene between phases.
-3. **Investigation** (discussion + planning + investigation cycles): Players search for clues and discuss.
-4. **Voting**: Players vote on who they think the criminal is.
+1. Storytelling: Host reads the opening narrative aloud (victim is alive)
+2. Opening: Victim greets everyone, then each player introduces themselves
+3. Murder Event: Dramatic cutscene — victim is found dead
+4. Murder Briefing: Details of the crime are revealed, evidence/alibi cards are dealt
+5. Investigation cycles: discussion → planning → investigation (repeated N times)
+6. Voting: Final discussion and vote
 
 ## Players
 
@@ -21,52 +23,50 @@ Create a complete scenario with the following structure (respond in JSON):
 
 {
   "setting": {
-    "location": "場所の説明",
+    "location": "場所の名前（短く。例: 白波館、霧灯荘）",
     "era": "時代設定",
-    "gathering_reason": "なぜ全員がここに集まっているか（1文で簡潔に）",
-    "opening_narrative": "サウンドノベル風の冒頭テキスト（8〜12文）。以下の要素を一つの連続した物語として構成する：(1)場所と雰囲気の描写 (2)集まりの背景 (3)主催者/重要人物の登場描写（「被害者」とは書かない。名前と特徴で自然に紹介） (4)その人物が参加者に挨拶し、各自の自己紹介を促すセリフ。各文は「。」で区切る。",
-    "murder_discovery": "事件発覚の瞬間の描写（誰がどこで被害者を発見したか。2〜3文の演出テキスト）",
-    "meeting_room_id": "全員が集まる議論場所のroom_id（リビング、食堂等）"
+    "gathering_reason": "なぜ全員がここに集まっているか（1文）",
+    "opening_narrative": "サウンドノベル風の冒頭テキスト。8〜12文。(1)場所と雰囲気の描写 (2)集まりの背景 (3)主催者の登場描写（「被害者」とは書かない）。各文は「。」で区切る。最後の文で主催者が挨拶を始める導入で終わる。",
+    "murder_discovery": "事件発覚の瞬間の演出テキスト（3〜4文。悲鳴、発見、混乱の描写）",
+    "murder_detail": "事件の詳細説明（3〜5文。死因、発見場所の状況、凶器の有無、目立つ痕跡など。議論フェーズで全員に共有される情報）",
+    "meeting_room_id": "全員が集まる部屋のroom_id"
   },
   "victim": {
-    "name": "この人物の名前（この時点では被害者ではなく、集まりの主催者・重要人物）",
-    "description": "サウンドノベル風の登場描写。「被害者」という言葉は使わない。場面に溶け込む形で人物を紹介する。例:「窓際に一人の男性が立っている。相馬康一 ── 市立図書館の館長を務める68歳の紳士だ。銀縁の眼鏡の奥に穏やかな目を光らせ、集まった客人たちを見渡している。」（3〜5文）",
-    "greeting": "この人物の自己紹介と挨拶のセリフ（3〜5文。主催者/重要人物として、参加者に歓迎の言葉を述べ、集まりの目的を説明し、各自の自己紹介を促す内容）",
-    "crime_scene_room_id": "殺害が行われた部屋のroom_id（mapのroomsのidと一致させる）"
+    "name": "この人物の名前",
+    "description": "この人物のプロフィール（2〜3文。職業、年齢、性格、この集まりでの立場）",
+    "greeting": "この人物の挨拶セリフ（一人称で3〜5文。参加者を歓迎し、集まりの目的を説明し、各自の自己紹介を促す）",
+    "crime_scene_room_id": "殺害が行われた部屋のroom_id"
   },
   "map": {
     "areas": [
       {"id": "area_id", "name": "エリア名", "area_type": "indoor|outdoor|semi_outdoor", "floor_order": 0, "rooms": [
-        {"id": "room_id", "name": "部屋名", "size": 1, "features": ["特徴1", "特徴2", "特徴3"], "is_crime_scene": false}
+        {"id": "room_id", "name": "部屋名", "size": 1, "features": ["特徴1", "特徴2", "特徴3"]}
       ]}
     ]
   },
   "relationships": [
-    {
-      "player1": "プレイヤー名",
-      "player2": "プレイヤー名",
-      "relationship": "関係性の説明"
-    }
+    {"player1": "名前", "player2": "名前", "relationship": "関係性"}
   ],
   "players": [
     {
       "character_name": "キャラクター名",
       "role": "criminal|witness|related|innocent",
-      "public_info": "この集まりでの立場と経歴（事件発生前の公開情報。3〜5文）",
+      "self_introduction": "一人称のセリフ調の自己紹介（2〜4文。「私は〜」「俺は〜」のようにキャラクターの口調で。名前、職業、この集まりに来た建前の理由を述べる。性格が伝わる話し方で）",
+      "public_info": "プロフィール情報（三人称。2〜3文。経歴、他キャラクターとの公の関係。手帳に記載される情報）",
       "secret_info": "このキャラクターの秘密（事件後に意味を持つ。他プレイヤーには非公開）",
-      "objective": "このキャラクターの個人目的",
-      "alibi_room_id": "事件発生時にいた部屋のroom_id（mapのroomsのidと一致）",
-      "personal_room_id": "個室や仕事部屋のroom_id（あれば。なければnull）",
+      "objective": "個人目的",
+      "alibi_room_id": "事件発生時にいた部屋のroom_id",
+      "personal_room_id": "個室のroom_id（あればnull）",
       "initial_evidences": [
         {"title": "証拠タイトル", "content": "事件発覚時に個人的に目撃・発見した情報（2〜3文）"},
         {"title": "証拠タイトル", "content": "別の証拠（2〜3文）"}
       ],
       "initial_alibis": [
-        {"title": "アリバイタイトル", "content": "アリバイ内容（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"},
-        {"title": "アリバイタイトル", "content": "アリバイ内容（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"},
-        {"title": "アリバイタイトル", "content": "アリバイ内容（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"}
+        {"title": "アリバイ", "content": "自分のアリバイ（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"},
+        {"title": "目撃情報", "content": "他の誰かの行動の目撃（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"},
+        {"title": "情報", "content": "別の誰かに関する情報（2〜3文）", "partner": "相手キャラ名", "room_id": "room_id"}
       ],
-      "gm_notes": "GMがこの秘密を使ってシナリオを展開するためのメモ"
+      "gm_notes": "GMメモ"
     }
   ],
   "gm_strategy": "GMがゲーム全体をどう展開させるかの戦略メモ"
@@ -74,116 +74,81 @@ Create a complete scenario with the following structure (respond in JSON):
 
 ## Map Structure
 
-部屋の一覧のみ出力してください。廊下・階段・玄関・接続グラフはサーバーが自動生成します。
+部屋の一覧のみ出力。廊下・階段・玄関・接続グラフはサーバーが自動生成。
 
 ### Areas
 - 各エリアは建物のフロアやゾーン（1階、2階、中庭、離れ etc.）
 - area_type: "indoor"（建物内）, "outdoor"（屋外）, "semi_outdoor"（テラス等）
 - floor_order: フロア順番（0=1階, 1=2階, ...）。屋外は独立した番号
-- 例: 洋館なら「本館1階(0)」「本館2階(1)」「中庭(2)」「離れ(3)」
 
 ### Rooms
-- 調査対象の部屋のみ出力する。廊下・階段・玄関は出力しない
-- **size**: 1=小部屋, 2=中部屋, 3=大部屋
-- **features**: 部屋内の調査ポイント。size×3個を出力する
-  - size 1: features 3個（例: 机の引き出し、本棚、窓際）
-  - size 2: features 6個（例: 暖炉、ソファ、書類棚、デスク、窓、絵画）
-  - size 3: features 9個
-- **is_crime_scene**: 不要（victim.crime_scene_room_id から自動設定される）
+- 調査対象の部屋のみ出力。廊下・階段・玄関は出力しない
+- size: 1=小部屋(features 3個), 2=中部屋(features 6個), 3=大部屋(features 9個)
+- features: 部屋内の調査ポイント（机の引き出し、本棚、窓際など）
 
 ### Guidelines
-- 3〜5エリア、全体で調査可能な部屋を最低8個以上
-- 各エリアに最低2つの部屋を含める
-- 部屋名は舞台設定に合ったリアルな名前にする
-- 少なくとも1つの施錠可能・立入制限のある部屋を含める
-- 部屋のIDは英数字のスネークケース（例: study, master_bedroom, courtyard）
+- 3〜5エリア、調査可能な部屋を最低8個以上
+- 各エリアに最低2つの部屋
+- 少なくとも1つの施錠可能・立入制限のある部屋
 
 ## Character Profile Enhancement
 
-Before generating the scenario, review each player's profile. If any field is too short, vague, or implausible for a murder mystery setting, enhance it:
-
-- If a character is a non-human (animal, robot, etc.), add a plausible reason they can communicate (e.g., "人語を解する猫", "高度なAI搭載のロボット")
-- If personality is only a few words, expand it to 2-3 sentences
-- If background is too brief, add context that ties into the mystery setting
-- If appearance is empty, generate an appropriate appearance based on gender, age, and occupation
-- If occupation is empty, infer one from the background
+Before generating the scenario, review each player's profile:
+- Non-human characters (animal, robot): add plausible communication reason
+- Short personality/background: expand to 2-3 sentences
+- Empty appearance: generate based on gender, age, occupation
 
 ### CRITICAL: Profile Consistency Check
 
-シナリオ内の全テキスト（secret_info, objective, public_info, relationships）は、各キャラクターの性別・年齢・職業・経歴と矛盾しないこと:
+シナリオ内の全テキストは各キャラクターの性別・年齢・職業・経歴と矛盾しないこと:
+- 50代男性を「令嬢」と呼ばない
+- 20代に「30年前の事件」を経験させない
+- 性別に合った呼称（息子/娘、兄/姉）
+- キャラクター間の関係が年齢的に成立するか
 
-- 50代男性を「一人娘」「令嬢」と呼ばない
-- 20代のキャラクターに「30年前の事件」を経験させない
-- 性別に合った呼称を使う（息子/娘、兄/姉、夫/妻など）
-- 職業と行動の整合性（医者が法律の専門知識を持つなら理由が必要）
-- キャラクター間の関係性が年齢的に成立するか確認する
+## self_introduction vs public_info
 
-Include these enhanced profiles in the player data output (as part of gm_notes).
+These are DIFFERENT fields with different purposes:
+
+- **self_introduction**: 一人称のセリフ。声に出して読むもの。
+  - 例: 「どうも、白鳥麗子です。東都大学病院で心臓外科を担当しています。恒一さんとは大学時代からの付き合いで、今回のお招きに喜んで参りました。」
+  - キャラクターの口調・性格が伝わること
+  - 建前の来訪理由を含む
+- **public_info**: 三人称のプロフィール。手帳に記載される情報。
+  - 例: 「東都大学病院の心臓外科チーフ。被害者の大学時代の同期で、毎年この館に招かれている。佐伯涼子とは同業者として面識がある。」
+  - 客観的な事実情報
+  - 他キャラクターとの関係を含む
+  - Do NOT include: アリバイ、事件への言及、秘密のにおわせ
 
 ## Secrets, Objectives, and Relationships
 
 - Each player's secret_info and objective MUST involve relationships with other specific players
-- Examples of relationship-driven elements:
-  - "You must protect Player X because they know your alibi"
-  - "You need to frame Player Y to divert suspicion from yourself"
-  - "Player Z witnessed something that could expose your secret"
-  - "You owe a debt to Player W and cannot betray them"
-- Each player should have at least one ally and one adversary among the other players
-- The criminal's objective should include hiding their crime while achieving a personal goal
-- Non-criminal (innocent/witness/related) players' PRIMARY objective is always to identify the criminal. This is their core mission.
-  - However, if the criminal turns out to be a specific person, it would cause disadvantage to them (e.g. "もし犯人が○○だった場合、あなたの秘密も明るみに出る")
-  - Additionally, each non-criminal player should have a SECONDARY personal objective (e.g. protect someone, recover an item, hide a past mistake)
-- **public_info** is the character's "public face" at this gathering. It should focus on:
-  - 経歴と職業の簡単な紹介（「○○大学の教授で、美術品の鑑定が専門」）
-  - なぜこの集まりに来たか、建前の理由（「館主から新作コレクションの鑑定を依頼された」）
-  - 被害者（生きている）との公の関係（「館主とは10年来の友人」）
-  - 誰と一緒に来たか（「佐伯と同じ列車で到着した」）
-  - Do NOT include: アリバイ、事件への言及、秘密のにおわせ
-  - Example: "美術品の鑑定士として館主に招かれた。東都大学で美術史を教えており、館主の恒一とは学生時代からの旧友。佐伯涼子とは同業者で、互いの仕事ぶりをよく知っている。"
-  - Each public_info should mention at least one other character by name
-- **secret_info** is revealed only to this player. It should focus on:
-  - 本当の来訪目的（建前と異なる裏の動機）
-  - 被害者や他キャラクターとの隠された関係
-  - 事件後に疑われる可能性のある過去の出来事
-  - Do NOT include: アリバイの詳細（アリバイカードで別途配布）
+- Each player should have at least one ally and one adversary
+- The criminal's objective: hiding their crime + personal goal
+- Non-criminal PRIMARY objective: identify the criminal
+  - However, if the criminal turns out to be a specific person, it causes disadvantage
+  - SECONDARY personal objective also required (protect someone, recover item, hide past mistake)
 
-## Characters and Map
+## Initial Evidence & Alibis (distributed at murder briefing)
 
-- **alibi_room_id**: 事件発生時にキャラクターがいた部屋。mapのroomsのidと一致させること
-  - アリバイペア（AとB）は同じ部屋にいたことにする
-  - 犯人の alibi_room_id はアリバイ上の場所（実際は犯行現場にいた）
-- **personal_room_id**: キャラクターの個室や仕事部屋（ある場合のみ）
-  - 宿泊施設なら客室、研究施設なら研究室など
-  - 個室には個人的な手がかりが隠されている可能性がある
+Each player receives **2 evidence cards** and **3 alibi cards**:
 
-## Initial Evidence & Alibis (distributed at murder event)
-
-Each player receives exactly **2 evidence cards** and **3 alibi cards** when the murder is discovered:
-
-- **initial_evidences** (2 cards per player):
-  - 事件発覚時に個人的に目撃・発見した情報
-  - 1枚目: 事件に直接関わる手がかり（物的証拠、目撃情報など）
-  - 2枚目: 間接的だが重要な情報（不審な行動、会話の断片など）
-  - 犯人の証拠: 犯行と無関係に見えるがあとで重要になる曖昧な内容
-  - 各プレイヤーの証拠は互いに異なる情報であること
-- **initial_alibis** (3 cards per player):
-  - 事件発生前後の時間帯における他キャラクターの行動の証言
-  - 1枚目: 自分自身のアリバイ（partner=アリバイ相手、room_id=場所）
-  - 2枚目: 他の誰かの行動を目撃した証言
-  - 3枚目: 別の誰かの行動や発言に関する情報
-  - **partner** フィールドに相手のキャラクター名を記載
-  - **room_id** にその場所の room_id を記載
-  - **アリバイの整合性**: AのアリバイでpartnerがBなら、Bのアリバイでもpartnerが必ずAで、同じroom_idであること
-  - 犯人のアリバイは偽り（実際は犯行時間に不在だった）
-- **重複禁止**: evidence と alibi の内容は public_info と重複しないこと
+- **initial_evidences** (2 cards):
+  - Card 1: 直接的な手がかり（物的証拠、目撃情報）
+  - Card 2: 間接的な情報（不審な行動、会話の断片）
+  - Criminal's evidence: looks irrelevant but becomes important later
+- **initial_alibis** (3 cards):
+  - Card 1: 自分のアリバイ（partner + room_id）
+  - Card 2: 他の誰かの行動目撃
+  - Card 3: 別の誰かの行動・発言情報
+  - Alibi consistency: if A's partner is B, B's partner must be A with matching room_id
+  - Criminal's alibi is false
 
 ## Constraints
 
-- Exactly one player must be the criminal
-- The criminal must be one of the player characters
-- Each player must have a unique secret and objective
-- The mystery must be solvable through the clues provided
-- Do NOT include a "phases" field — phases are managed by the server
-- All text content must be in Japanese
-- The map layout must support the crime's logic (alibis, escape routes, evidence placement)
-- Alibi pairs MUST be consistent: if A's alibi partner is B, then B's alibi partner MUST be A with matching content
+- Exactly one criminal among player characters
+- Each player has unique secret and objective
+- Mystery must be solvable through clues
+- Do NOT include "phases" field
+- All text in Japanese
+- Map supports crime logic (alibis, escape routes, evidence placement)

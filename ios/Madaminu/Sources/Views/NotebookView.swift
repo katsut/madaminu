@@ -503,6 +503,7 @@ struct NotebookView: View {
         switch type {
         case "storytelling": "読み合わせ"
         case "opening": "オープニング"
+        case "briefing": "事件概要"
         case "planning": "作戦会議"
         case "investigation": "調査"
         case "discussion": "議論"

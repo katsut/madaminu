@@ -30,6 +30,15 @@ async def _get_current_phase_dict(db: AsyncSession, current_phase_id: str) -> di
 
 
 async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict:
+    # Build self_introduction lookup from scenario skeleton
+    intro_map: dict[str, str] = {}
+    if game.scenario_skeleton and "players" in game.scenario_skeleton:
+        for sp in game.scenario_skeleton["players"]:
+            name = sp.get("character_name", "")
+            intro = sp.get("self_introduction", "")
+            if name and intro:
+                intro_map[name] = intro
+
     players_public = [
         {
             "id": p.id,
@@ -43,6 +52,7 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
             "character_personality": p.character_personality,
             "character_background": p.character_background,
             "public_info": p.public_info,
+            "self_introduction": intro_map.get(p.character_name or "", ""),
             "is_host": p.is_host,
             "is_ai": p.is_ai,
             "connection_status": p.connection_status,

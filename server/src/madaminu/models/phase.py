@@ -16,6 +16,7 @@ class PhaseType(enum.StrEnum):
     initial = "initial"
     storytelling = "storytelling"
     opening = "opening"
+    briefing = "briefing"
     discussion = "discussion"
     planning = "planning"
     investigation = "investigation"

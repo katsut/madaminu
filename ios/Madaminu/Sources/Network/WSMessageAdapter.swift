@@ -126,6 +126,7 @@ struct WSMessageAdapter {
             store.game.scenarioSetting.situation = setting["situation"] as? String
             store.game.scenarioSetting.gatheringReason = setting["gathering_reason"] as? String
             store.game.scenarioSetting.murderDiscovery = setting["murder_discovery"] as? String
+            store.game.scenarioSetting.murderDetail = setting["murder_detail"] as? String
             store.game.scenarioSetting.openingNarrative = setting["opening_narrative"] as? String
         }
         if let sceneUrl = data["scene_image_url"] { store.game.scenarioSetting.sceneImageUrl = sceneUrl }
@@ -159,6 +160,7 @@ struct WSMessageAdapter {
                     characterPersonality: dict["character_personality"] as? String,
                     characterBackground: dict["character_background"] as? String,
                     publicInfo: dict["public_info"] as? String,
+                    selfIntroduction: dict["self_introduction"] as? String,
                     portraitUrl: dict["portrait_url"] as? String,
                     isHost: dict["is_host"] as? Bool ?? false,
                     isAI: dict["is_ai"] as? Bool ?? false,

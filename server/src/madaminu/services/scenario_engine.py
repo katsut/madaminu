@@ -649,9 +649,6 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
     turn_count = game.turn_count or 3
     phase_order = 0
 
-    human_count = sum(1 for p in game.players if not p.is_ai)
-    opening_duration = max(60, human_count * 60)
-
     storytelling_phase = Phase(
         game_id=game.id,
         phase_type=PhaseType.storytelling,
@@ -668,6 +665,15 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
         duration_sec=0,  # Manual advance by host after introductions
     )
     db.add(opening_phase)
+    phase_order += 1
+
+    briefing_phase = Phase(
+        game_id=game.id,
+        phase_type=PhaseType.briefing,
+        phase_order=phase_order,
+        duration_sec=0,  # Manual advance by host after reviewing cards
+    )
+    db.add(briefing_phase)
     phase_order += 1
 
     # Turn = discussion → planning → investigation

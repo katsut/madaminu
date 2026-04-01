@@ -45,6 +45,8 @@ struct GamePlayView: View {
                                     StorytellingPhaseView(store: store)
                                 case "opening":
                                     OpeningPhaseView(store: store)
+                                case "briefing":
+                                    BriefingPhaseView(store: store)
                                 case "planning":
                                     PlanningPhaseView(store: store)
                                 case "investigation":
@@ -214,10 +216,16 @@ struct GamePlayView: View {
         .background(Color.mdBackgroundSecondary)
     }
 
+    private var preEventPhase: Bool {
+        ["storytelling", "opening"].contains(store.game.currentPhase?.phaseType)
+    }
+
     private var bottomBar: some View {
         HStack(spacing: Spacing.md) {
-            MDButton("手帳", style: .secondary) {
-                showNotebook = true
+            if !preEventPhase {
+                MDButton("手帳", style: .secondary) {
+                    showNotebook = true
+                }
             }
 
             if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
@@ -460,7 +468,7 @@ struct GamePlayView: View {
 
     private func phaseColor(_ type: String) -> Color {
         switch type {
-        case "initial", "storytelling": .mdTextMuted
+        case "initial", "storytelling", "briefing": .mdTextMuted
         case "opening": .mdSuccess
         case "discussion": .mdPrimary
         case "planning": .mdWarning
@@ -475,6 +483,7 @@ struct GamePlayView: View {
         case "initial": "準備"
         case "storytelling": "読み合わせ"
         case "opening": "自己紹介"
+        case "briefing": "事件概要"
         case "discussion": "議論"
         case "planning": "調査計画"
         case "investigation": "調査"
@@ -515,175 +524,154 @@ struct SpeechButton: View {
 
 struct OpeningPhaseView: View {
     @ObservedObject var store: AppStore
+    @State private var currentIntroIndex = -1  // -1 = victim greeting, 0..N = players
 
-    private var me: PlayerInfo? {
-        store.room.players.first(where: { $0.id == store.room.playerId })
+    private var allPlayers: [PlayerInfo] {
+        // Self first, then others
+        let myId = store.room.playerId
+        return store.room.players.sorted { a, _ in a.id == myId }
     }
 
-    private var others: [PlayerInfo] {
-        store.room.players.filter { $0.id != store.room.playerId }
+    private var isMyTurn: Bool {
+        guard currentIntroIndex >= 0 && currentIntroIndex < allPlayers.count else { return false }
+        return allPlayers[currentIntroIndex].id == store.room.playerId
+    }
+
+    private var currentPlayer: PlayerInfo? {
+        guard currentIntroIndex >= 0 && currentIntroIndex < allPlayers.count else { return nil }
+        return allPlayers[currentIntroIndex]
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                // Victim's greeting
-                if let victimName = store.game.scenarioSetting.victimName {
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            HStack(spacing: Spacing.sm) {
-                                if let urlString = store.game.scenarioSetting.victimImageUrl,
-                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable().aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Image(systemName: "person.fill")
-                                            .foregroundStyle(Color.mdTextMuted)
-                                            .frame(width: 50, height: 50)
-                                            .background(Color.mdSurface)
+                // Victim greeting (index == -1)
+                if currentIntroIndex == -1 {
+                    if let victimName = store.game.scenarioSetting.victimName {
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.sm) {
+                                HStack(spacing: Spacing.sm) {
+                                    if let urlString = store.game.scenarioSetting.victimImageUrl,
+                                       let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
+                                        AsyncImage(url: url) { image in
+                                            image.resizable().aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Image(systemName: "person.fill")
+                                                .foregroundStyle(Color.mdTextMuted)
+                                                .frame(width: 50, height: 50)
+                                                .background(Color.mdSurface)
+                                        }
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
                                     }
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                }
-                                VStack(alignment: .leading, spacing: Spacing.xxs) {
                                     Text(victimName)
                                         .font(.mdHeadline)
                                         .foregroundStyle(Color.mdPrimary)
-                                    if let desc = store.game.scenarioSetting.victimDescription {
-                                        Text(desc)
-                                            .font(.mdCaption)
-                                            .foregroundStyle(Color.mdTextMuted)
+                                }
+                                if let greeting = store.game.scenarioSetting.victimGreeting {
+                                    Text("「\(greeting)」")
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                        .italic()
+                                }
+                            }
+                        }
+                    }
+
+                    if store.room.isHost {
+                        MDButton("自己紹介を始める") {
+                            withAnimation { currentIntroIndex = 0 }
+                        }
+                    } else {
+                        Text("ホストの進行を待っています...")
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdTextMuted)
+                    }
+                }
+
+                // Current player introduction
+                if let player = currentPlayer {
+                    let isMe = player.id == store.room.playerId
+
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            HStack {
+                                Text("\(currentIntroIndex + 1) / \(allPlayers.count)")
+                                    .font(.mdCaption2)
+                                    .foregroundStyle(Color.mdTextMuted)
+                                Spacer()
+                                if isMe {
+                                    Text("あなたの番")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdWarning)
+                                }
+                            }
+
+                            HStack(spacing: Spacing.sm) {
+                                PlayerAvatarView(playerId: player.id, players: store.room.players, size: 50)
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text(player.characterName ?? player.displayName)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    if let occupation = player.characterOccupation, !occupation.isEmpty {
+                                        Text(occupation).font(.mdCaption).foregroundStyle(Color.mdTextMuted)
                                     }
                                 }
                             }
-                            // Victim greeting parse from scenario
-                            if let victimJSON = store.game.scenarioSetting.victimGreeting {
-                                Text(victimJSON)
+
+                            // Self-introduction speech
+                            if let intro = player.selfIntroduction, !intro.isEmpty {
+                                Text("「\(intro)」")
                                     .font(.mdBody)
                                     .foregroundStyle(Color.mdTextPrimary)
                                     .italic()
+                                    .padding(.top, Spacing.xs)
+                            }
+
+                            if isMe {
+                                GMGuideCard(
+                                    title: "あなたの番です",
+                                    message: "発言ボタンを押して、上のセリフを参考に自己紹介してください。"
+                                )
+                            }
+                        }
+                    }
+
+                    // Speech area
+                    if store.game.isSpeaking {
+                        TranscriptView(store: store)
+                    }
+                    SpeechHistoryView(store: store)
+
+                    // Host: next player button
+                    if store.room.isHost {
+                        if currentIntroIndex < allPlayers.count - 1 {
+                            MDButton("次の人 →") {
+                                withAnimation { currentIntroIndex += 1 }
+                            }
+                        } else {
+                            MDButton("自己紹介完了 → 次へ") {
+                                store.dispatch(.advancePhase)
                             }
                         }
                     }
                 }
 
-                GMGuideCard(
-                    title: "自己紹介タイム",
-                    message: "発言ボタンを押して、自分のキャラクターを紹介してください。"
-                )
-
-                // My profile
-                if let me {
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                // Completed introductions (shown below current)
+                if currentIntroIndex > 0 {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text("自己紹介済み")
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdTextMuted)
+                        ForEach(Array(allPlayers.prefix(currentIntroIndex).enumerated()), id: \.element.id) { _, player in
                             HStack(spacing: Spacing.sm) {
-                                if let urlString = me.portraitUrl,
-                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable().aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Image(systemName: "person.fill")
-                                            .foregroundStyle(Color.mdTextMuted)
-                                            .frame(width: 50, height: 50)
-                                            .background(Color.mdSurface)
-                                    }
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                }
-
-                                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                    HStack(spacing: Spacing.xs) {
-                                        Text(me.characterName ?? me.displayName)
-                                            .font(.mdHeadline)
-                                            .foregroundStyle(Color.mdTextPrimary)
-                                        Text("あなた")
-                                            .font(.mdCaption2)
-                                            .foregroundStyle(Color.mdPrimary)
-                                            .padding(.horizontal, Spacing.xs)
-                                            .padding(.vertical, 1)
-                                            .background(Color.mdPrimary.opacity(0.15))
-                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                                    }
-                                    HStack(spacing: Spacing.xs) {
-                                        if let occupation = me.characterOccupation, !occupation.isEmpty {
-                                            Text(occupation).font(.mdCaption).foregroundStyle(Color.mdTextMuted)
-                                        }
-                                    }
-                                }
-                            }
-                            if let publicInfo = me.publicInfo, !publicInfo.isEmpty {
-                                Text(publicInfo)
-                                    .font(.mdBody)
+                                PlayerAvatarView(playerId: player.id, players: store.room.players, size: 28)
+                                Text(player.characterName ?? player.displayName)
+                                    .font(.mdCaption)
                                     .foregroundStyle(Color.mdTextSecondary)
                             }
                         }
                     }
-                }
-
-                // Other players
-                if !others.isEmpty {
-                    HStack {
-                        Text("他のプレイヤー")
-                            .font(.mdCaption)
-                            .foregroundStyle(Color.mdTextMuted)
-                        Spacer()
-                    }
-
-                    ForEach(others) { player in
-                        MDCard {
-                            HStack(spacing: Spacing.sm) {
-                                if let urlString = player.portraitUrl,
-                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable().aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Image(systemName: "person.fill")
-                                            .foregroundStyle(Color.mdTextMuted)
-                                            .frame(width: 40, height: 40)
-                                            .background(Color.mdSurface)
-                                    }
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                }
-
-                                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                    Text(player.characterName ?? player.displayName)
-                                        .font(.mdCallout)
-                                        .foregroundStyle(Color.mdTextPrimary)
-                                    if let occupation = player.characterOccupation, !occupation.isEmpty {
-                                        Text(occupation).font(.mdCaption2).foregroundStyle(Color.mdTextMuted)
-                                    }
-                                    if let publicInfo = player.publicInfo, !publicInfo.isEmpty {
-                                        Text(publicInfo)
-                                            .font(.mdCaption)
-                                            .foregroundStyle(Color.mdTextSecondary)
-                                            .lineLimit(2)
-                                    }
-                                }
-                                Spacer()
-                                if player.isAI {
-                                    Text("AI")
-                                        .font(.mdCaption2)
-                                        .foregroundStyle(Color.mdTextMuted)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Speech
-                if store.game.isSpeaking {
-                    TranscriptView(store: store)
-                }
-
-                SpeechHistoryView(store: store)
-
-                // Host advance button
-                if store.room.isHost && store.game.currentPhase?.durationSec == 0 {
-                    MDButton("自己紹介完了 → 次へ") {
-                        store.dispatch(.advancePhase)
-                    }
-                    .padding(.top, Spacing.md)
                 }
             }
             .padding(Spacing.lg)
@@ -852,6 +840,93 @@ struct StorytellingPhaseView: View {
                         store.dispatch(.advancePhase)
                     }
                     .padding(.top, Spacing.md)
+                }
+            }
+            .padding(Spacing.lg)
+        }
+    }
+}
+
+struct BriefingPhaseView: View {
+    @ObservedObject var store: AppStore
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                // Murder detail
+                if let detail = store.game.scenarioSetting.murderDetail {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("事件の詳細", systemImage: "exclamationmark.triangle.fill")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdAccent)
+                            Text(detail)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                // Evidence cards
+                if !store.notebook.evidences.isEmpty {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Label("証拠カード", systemImage: "doc.text.magnifyingglass")
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdInfo)
+
+                        ForEach(store.notebook.evidences) { ev in
+                            MDCard {
+                                VStack(alignment: .leading, spacing: Spacing.xs) {
+                                    Text(ev.title)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    Text(ev.content)
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Secret info
+                if let secret = store.game.mySecretInfo {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("あなたの秘密", systemImage: "lock.fill")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdWarning)
+                            Text(secret)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                // Objective
+                if let objective = store.game.myObjective {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("あなたの目的", systemImage: "target")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdWarning)
+                            Text(objective)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                GMGuideCard(
+                    title: "確認できましたか？",
+                    message: "証拠とアリバイを確認したら、議論フェーズに進みます。情報は手帳からいつでも確認できます。"
+                )
+
+                // Host advance
+                if store.room.isHost {
+                    MDButton("確認完了 → 議論開始") {
+                        store.dispatch(.advancePhase)
+                    }
                 }
             }
             .padding(Spacing.lg)
@@ -1767,7 +1842,7 @@ struct PhaseTransitionOverlay: View {
                     .tracking(4)
 
                 // Murder event on first discussion
-                if phaseType == "discussion" && turnNumber == 1, let murder = murderDiscovery {
+                if phaseType == "briefing", let murder = murderDiscovery {
                     Text("事件発生")
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(Color.mdAccent)
@@ -1832,6 +1907,7 @@ struct PhaseTransitionOverlay: View {
         case "initial": "準備"
         case "storytelling": "読み合わせ"
         case "opening": "自己紹介"
+        case "briefing": "事件概要"
         case "discussion": "議論"
         case "planning": "調査計画"
         case "investigation": "調査"
@@ -1846,6 +1922,7 @@ struct PhaseTransitionOverlay: View {
         case "initial": "ゲームの準備中です..."
         case "storytelling": "シナリオを読み上げます"
         case "opening": "まずはお互いを知りましょう。自己紹介と状況の共有をしてください"
+        case "briefing": "事件の詳細を確認し、手持ちの証拠とアリバイを確認してください"
         case "discussion": "集めた情報をもとに推理を話し合いましょう"
         case "planning": "みんなで相談して、次に調べる場所を決めましょう"
         case "investigation": "選んだ場所で手がかりを探しましょう"
