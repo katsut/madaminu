@@ -337,16 +337,25 @@ struct GamePlayView: View {
 
                         // Criminal Epilogue (novel-style)
                         if let epilogue = ending.criminalEpilogue, !epilogue.isEmpty {
-                            // Host read-aloud
-                            if store.room.isHost {
-                                MDCard {
-                                    HStack(spacing: Spacing.sm) {
-                                        Image(systemName: "speaker.wave.2.fill")
-                                            .font(.mdTitle2)
-                                            .foregroundStyle(Color.mdWarning)
-                                        Text("真相を読み上げてください")
-                                            .font(.mdHeadline)
-                                            .foregroundStyle(Color.mdWarning)
+                            // Criminal reads their confession
+                            let criminalName = store.room.players.first(where: { $0.id == ending.trueCriminalId })?.characterName
+                            let iAmCriminal = store.room.playerId == ending.trueCriminalId
+
+                            MDCard {
+                                HStack(spacing: Spacing.sm) {
+                                    Image(systemName: iAmCriminal ? "speaker.wave.2.fill" : "ear.fill")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(iAmCriminal ? Color.mdWarning : Color.mdInfo)
+                                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                        if iAmCriminal {
+                                            Text("あなたが犯人です。真相を読み上げてください")
+                                                .font(.mdHeadline)
+                                                .foregroundStyle(Color.mdWarning)
+                                        } else {
+                                            Text("\(criminalName ?? "犯人")の告白を聞きましょう")
+                                                .font(.mdCallout)
+                                                .foregroundStyle(Color.mdTextPrimary)
+                                        }
                                     }
                                 }
                             }
