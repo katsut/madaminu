@@ -478,7 +478,7 @@ struct SpeechButton: View {
 
 struct OpeningPhaseView: View {
     @ObservedObject var store: AppStore
-    @State private var currentIntroIndex = -1  // -1 = victim greeting, 0..N = players
+    @State private var currentIntroIndex = 0
 
     private var allPlayers: [PlayerInfo] {
         // Self first, then others
@@ -499,50 +499,6 @@ struct OpeningPhaseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                // Victim greeting (index == -1)
-                if currentIntroIndex == -1 {
-                    if let victimName = store.game.scenarioSetting.victimName {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.sm) {
-                                HStack(spacing: Spacing.sm) {
-                                    if let urlString = store.game.scenarioSetting.victimImageUrl,
-                                       let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
-                                        AsyncImage(url: url) { image in
-                                            image.resizable().aspectRatio(contentMode: .fill)
-                                        } placeholder: {
-                                            Image(systemName: "person.fill")
-                                                .foregroundStyle(Color.mdTextMuted)
-                                                .frame(width: 50, height: 50)
-                                                .background(Color.mdSurface)
-                                        }
-                                        .frame(width: 50, height: 50)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    Text(victimName)
-                                        .font(.mdHeadline)
-                                        .foregroundStyle(Color.mdPrimary)
-                                }
-                                if let greeting = store.game.scenarioSetting.victimGreeting {
-                                    Text("「\(greeting)」")
-                                        .font(.mdBody)
-                                        .foregroundStyle(Color.mdTextPrimary)
-                                        .italic()
-                                }
-                            }
-                        }
-                    }
-
-                    if store.room.isHost {
-                        MDButton("自己紹介を始める") {
-                            withAnimation { currentIntroIndex = 0 }
-                        }
-                    } else {
-                        Text("ホストの進行を待っています...")
-                            .font(.mdCaption)
-                            .foregroundStyle(Color.mdTextMuted)
-                    }
-                }
-
                 // Current player introduction
                 if let player = currentPlayer {
                     let isMe = player.id == store.room.playerId
@@ -636,6 +592,7 @@ struct OpeningPhaseView: View {
 struct NovelTextView: View {
     let segments: [NovelSegment]
     let interval: TimeInterval
+    @Binding var isComplete: Bool
 
     @State private var visibleCount = 0
 
@@ -647,9 +604,10 @@ struct NovelTextView: View {
         enum Style { case heading, body, accent, caption }
     }
 
-    init(_ segments: [NovelSegment], interval: TimeInterval = 2.0) {
+    init(_ segments: [NovelSegment], interval: TimeInterval = 2.0, isComplete: Binding<Bool> = .constant(true)) {
         self.segments = segments
         self.interval = interval
+        self._isComplete = isComplete
     }
 
     var body: some View {
@@ -668,6 +626,7 @@ struct NovelTextView: View {
 
     private func startRevealing() {
         visibleCount = 0
+        isComplete = false
         Task { @MainActor in
             for i in 1...segments.count {
                 if i == 1 {
@@ -679,6 +638,7 @@ struct NovelTextView: View {
                 }
                 visibleCount = i
             }
+            isComplete = true
         }
     }
 
@@ -712,25 +672,40 @@ struct StorytellingPhaseView: View {
         store.room.players.first(where: { $0.isHost })?.characterName
     }
 
+    @State private var narrativeComplete = false
+
     private var segments: [NovelTextView.NovelSegment] {
-        // Use opening_narrative as single continuous story
+        var segs: [NovelTextView.NovelSegment] = []
+
+        // Opening narrative
         if let narrative = store.game.scenarioSetting.openingNarrative {
-            return narrative.split(separator: "。")
+            let sentences = narrative.split(separator: "。")
                 .map { String($0).trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
-                .map { NovelTextView.NovelSegment(text: $0 + "。") }
-        }
-
-        // Fallback: build from individual fields
-        var segs: [NovelTextView.NovelSegment] = []
-        if let location = store.game.scenarioSetting.location {
-            segs.append(.init(text: location, style: .heading))
-        }
-        if let situation = store.game.scenarioSetting.situation {
-            for s in situation.split(separator: "。").map({ String($0) + "。" }) {
-                segs.append(.init(text: s))
+            for s in sentences {
+                segs.append(.init(text: s + "。"))
+            }
+        } else {
+            if let location = store.game.scenarioSetting.location {
+                segs.append(.init(text: location, style: .heading))
+            }
+            if let situation = store.game.scenarioSetting.situation {
+                for s in situation.split(separator: "。").map({ String($0) + "。" }) {
+                    segs.append(.init(text: s))
+                }
             }
         }
+
+        // Victim's greeting (promotes self-introductions)
+        if let greeting = store.game.scenarioSetting.victimGreeting {
+            let sentences = greeting.split(separator: "。")
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            for s in sentences {
+                segs.append(.init(text: "「\(s)。」", style: .accent))
+            }
+        }
+
         return segs
     }
 
@@ -780,17 +755,11 @@ struct StorytellingPhaseView: View {
                 }
 
                 // Novel-style text
-                NovelTextView(segments, interval: 2.5)
+                NovelTextView(segments, interval: 2.5, isComplete: $narrativeComplete)
 
-                // Speech
-                if store.game.isSpeaking {
-                    TranscriptView(store: store)
-                }
-                SpeechHistoryView(store: store)
-
-                // Host advance button (manual progression)
-                if isHost && store.game.currentPhase?.durationSec == 0 {
-                    MDButton("読み上げ完了 → 次へ") {
+                // Host advance button (only after text finishes)
+                if isHost && narrativeComplete {
+                    MDButton("読み上げ完了 → 自己紹介へ") {
                         store.dispatch(.advancePhase)
                     }
                     .padding(.top, Spacing.md)

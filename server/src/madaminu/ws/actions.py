@@ -363,8 +363,8 @@ async def _finalize_phase_start_inner(
     # Schedule phase timer (starts counting from now, after transition)
     schedule_phase_timer(game_id, room_code, phase.duration_sec, game_service, discovery_service, ws)
 
-    # Start AI speech for discussion/opening phases
-    if phase.phase_type in (PhaseType.discussion, PhaseType.opening):
+    # Start AI speech for discussion phases only (not manual-advance phases)
+    if phase.phase_type == PhaseType.discussion and phase.duration_sec > 0:
         asyncio.create_task(
             _ai_speech_background(game_id, room_code, phase.id, game_service, ws)
         )
