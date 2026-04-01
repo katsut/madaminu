@@ -24,10 +24,8 @@ struct RoomLobbyView: View {
     }
 
     private var allReady: Bool {
-        // Host must have character. All non-host must have character AND be ready.
         let hostHasCharacter = store.room.players.first(where: { $0.isHost })?.characterName != nil
-        let allNonHostReady = !nonHostPlayers.isEmpty
-            && nonHostPlayers.allSatisfy { $0.characterName != nil && $0.isReady }
+        let allNonHostReady = nonHostPlayers.allSatisfy { $0.characterName != nil && $0.isReady }
         return hostHasCharacter && allNonHostReady
     }
 
