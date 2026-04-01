@@ -152,8 +152,11 @@ struct RoomMessage: Identifiable, Sendable {
 struct ScenarioSettingData {
     var location: String?
     var situation: String?
+    var gatheringReason: String?
+    var murderDiscovery: String?
     var victimName: String?
     var victimDescription: String?
+    var victimGreeting: String?
     var sceneImageUrl: String?
     var victimImageUrl: String?
     var mapUrl: String?

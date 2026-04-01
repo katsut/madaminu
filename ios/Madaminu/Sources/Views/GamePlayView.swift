@@ -33,6 +33,7 @@ struct GamePlayView: View {
                                     totalTurns: phase.totalTurns,
                                     durationSec: phase.durationSec,
                                     sceneImageUrl: store.game.scenarioSetting.sceneImageUrl,
+                                    murderDiscovery: store.game.scenarioSetting.murderDiscovery,
                                     travelNarrative: store.game.travelNarrative
                                 )
                             } else if let phase = store.game.currentPhase {
@@ -264,20 +265,23 @@ struct GamePlayView: View {
                         }
                     }
 
-                    // 2. Epilogue
+                    // 2. Epilogue (novel-style)
                     MDCard {
                         VStack(alignment: .leading, spacing: Spacing.md) {
                             Label("エピローグ", systemImage: "book.fill")
                                 .font(.mdTitle2)
                                 .foregroundStyle(Color.mdPrimary)
 
-                            Text(ending.endingText)
-                                .font(.mdBody)
-                                .foregroundStyle(Color.mdTextPrimary)
+                            NovelTextView(
+                                ending.endingText.split(separator: "。").map { s in
+                                    NovelTextView.NovelSegment(text: String(s) + "。")
+                                },
+                                interval: 2.0
+                            )
                         }
                     }
 
-                    // 2.5. Criminal Epilogue
+                    // 2.5. Criminal Epilogue (novel-style)
                     if let epilogue = ending.criminalEpilogue, !epilogue.isEmpty {
                         MDCard {
                             VStack(alignment: .leading, spacing: Spacing.md) {
@@ -285,10 +289,12 @@ struct GamePlayView: View {
                                     .font(.mdTitle2)
                                     .foregroundStyle(Color.mdAccent)
 
-                                Text(epilogue)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                                    .italic()
+                                NovelTextView(
+                                    epilogue.split(separator: "。").map { s in
+                                        NovelTextView.NovelSegment(text: String(s) + "。", style: .accent)
+                                    },
+                                    interval: 2.0
+                                )
                             }
                         }
                     }
@@ -512,6 +518,46 @@ struct OpeningPhaseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
+                // Victim's greeting
+                if let victimName = store.game.scenarioSetting.victimName {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            HStack(spacing: Spacing.sm) {
+                                if let urlString = store.game.scenarioSetting.victimImageUrl,
+                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=100") {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Image(systemName: "person.fill")
+                                            .foregroundStyle(Color.mdTextMuted)
+                                            .frame(width: 50, height: 50)
+                                            .background(Color.mdSurface)
+                                    }
+                                    .frame(width: 50, height: 50)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text(victimName)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdPrimary)
+                                    if let desc = store.game.scenarioSetting.victimDescription {
+                                        Text(desc)
+                                            .font(.mdCaption)
+                                            .foregroundStyle(Color.mdTextMuted)
+                                    }
+                                }
+                            }
+                            // Victim greeting parse from scenario
+                            if let victimJSON = store.game.scenarioSetting.victimGreeting {
+                                Text(victimJSON)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                    .italic()
+                            }
+                        }
+                    }
+                }
+
                 GMGuideCard(
                     title: "自己紹介タイム",
                     message: "発言ボタンを押して、自分のキャラクターを紹介してください。"
@@ -628,91 +674,122 @@ struct OpeningPhaseView: View {
     }
 }
 
+struct NovelTextView: View {
+    let segments: [NovelSegment]
+    let interval: TimeInterval
+
+    @State private var visibleCount = 0
+
+    struct NovelSegment: Identifiable {
+        let id = UUID()
+        let text: String
+        var style: Style = .body
+
+        enum Style { case heading, body, accent, caption }
+    }
+
+    init(_ segments: [NovelSegment], interval: TimeInterval = 2.0) {
+        self.segments = segments
+        self.interval = interval
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            ForEach(Array(segments.prefix(visibleCount).enumerated()), id: \.element.id) { index, seg in
+                Text(seg.text)
+                    .font(fontFor(seg.style))
+                    .foregroundStyle(colorFor(seg.style))
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .id(seg.id)
+            }
+        }
+        .animation(.easeIn(duration: 0.6), value: visibleCount)
+        .onAppear { startRevealing() }
+    }
+
+    private func startRevealing() {
+        visibleCount = 0
+        Task { @MainActor in
+            for i in 1...segments.count {
+                if i == 1 {
+                    try? await Task.sleep(for: .seconds(0.3))
+                } else {
+                    let charCount = Double(segments[i - 2].text.count)
+                    let delay = max(interval, 1.5 + charCount * 0.08)
+                    try? await Task.sleep(for: .seconds(delay))
+                }
+                visibleCount = i
+            }
+        }
+    }
+
+    private func fontFor(_ style: NovelSegment.Style) -> Font {
+        switch style {
+        case .heading: .mdTitle2
+        case .body: .mdBody
+        case .accent: .mdHeadline
+        case .caption: .mdCaption
+        }
+    }
+
+    private func colorFor(_ style: NovelSegment.Style) -> Color {
+        switch style {
+        case .heading: Color.mdPrimary
+        case .body: Color.mdTextPrimary
+        case .accent: Color.mdAccent
+        case .caption: Color.mdTextSecondary
+        }
+    }
+}
+
 struct StorytellingPhaseView: View {
     @ObservedObject var store: AppStore
 
+    private var segments: [NovelTextView.NovelSegment] {
+        var segs: [NovelTextView.NovelSegment] = []
+
+        if let location = store.game.scenarioSetting.location {
+            segs.append(.init(text: location, style: .heading))
+        }
+        if let reason = store.game.scenarioSetting.gatheringReason {
+            segs.append(.init(text: reason))
+        }
+        if let situation = store.game.scenarioSetting.situation {
+            // Split by sentences for gradual reveal
+            let sentences = situation.split(separator: "。").map { String($0) + "。" }
+            for s in sentences {
+                segs.append(.init(text: s))
+            }
+        }
+        if let name = store.game.scenarioSetting.victimName,
+           let desc = store.game.scenarioSetting.victimDescription {
+            segs.append(.init(text: "\(name) ── \(desc)", style: .accent))
+        }
+        return segs
+    }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: Spacing.md) {
-                GMGuideCard(
-                    title: "読み合わせ",
-                    message: "シナリオの舞台と事件の概要をみんなで確認しましょう。\n内容を読み上げて、物語の世界に入り込んでください。"
-                )
-
+            VStack(spacing: Spacing.lg) {
+                // Scene image
                 if let urlString = store.game.scenarioSetting.sceneImageUrl,
                    let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=512") {
                     AsyncImage(url: url) { image in
                         image.resizable().aspectRatio(contentMode: .fill)
                     } placeholder: {
-                        ProgressView()
+                        Color.mdSurface.frame(height: 220)
                     }
-                    .frame(height: 200)
+                    .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
-                if let location = store.game.scenarioSetting.location {
-                    MDCard {
-                        HStack(alignment: .top, spacing: Spacing.sm) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.mdTitle2)
-                                .foregroundStyle(Color.mdPrimary)
-                            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                Text("舞台")
-                                    .font(.mdCaption)
-                                    .foregroundStyle(Color.mdTextMuted)
-                                Text(location)
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                            }
-                        }
-                    }
-                }
+                // Novel-style text
+                NovelTextView(segments, interval: 2.5)
 
-                if let situation = store.game.scenarioSetting.situation {
-                    MDCard {
-                        HStack(alignment: .top, spacing: Spacing.sm) {
-                            Image(systemName: "book.fill")
-                                .font(.mdTitle2)
-                                .foregroundStyle(Color.mdPrimary)
-                            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                Text("あらすじ")
-                                    .font(.mdCaption)
-                                    .foregroundStyle(Color.mdTextMuted)
-                                Text(situation)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                            }
-                        }
-                    }
-                }
-
-                if let name = store.game.scenarioSetting.victimName {
-                    MDCard {
-                        HStack(alignment: .top, spacing: Spacing.sm) {
-                            Image(systemName: "person.slash.fill")
-                                .font(.mdTitle2)
-                                .foregroundStyle(Color.mdAccent)
-                            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                Text("被害者")
-                                    .font(.mdCaption)
-                                    .foregroundStyle(Color.mdTextMuted)
-                                Text(name)
-                                    .font(.mdHeadline)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                                if let desc = store.game.scenarioSetting.victimDescription {
-                                    Text(desc)
-                                        .font(.mdBody)
-                                        .foregroundStyle(Color.mdTextSecondary)
-                                }
-                            }
-                        }
-                    }
-                }
-
+                // Speech
                 if store.game.isSpeaking {
                     TranscriptView(store: store)
                 }
-
                 SpeechHistoryView(store: store)
             }
             .padding(Spacing.lg)
@@ -1603,6 +1680,7 @@ struct PhaseTransitionOverlay: View {
     let totalTurns: Int
     let durationSec: Int
     let sceneImageUrl: String?
+    var murderDiscovery: String? = nil
     var travelNarrative: String? = nil
 
     var body: some View {
@@ -1626,15 +1704,28 @@ struct PhaseTransitionOverlay: View {
                     .foregroundStyle(Color.mdTextMuted)
                     .tracking(4)
 
-                Text(phaseTitle(phaseType))
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundStyle(Color.mdTextPrimary)
+                // Murder event on first discussion
+                if phaseType == "discussion" && turnNumber == 1, let murder = murderDiscovery {
+                    Text("事件発生")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(Color.mdAccent)
 
-                Text(phaseSubtitle(phaseType))
-                    .font(.mdBody)
-                    .foregroundStyle(Color.mdTextSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.xl)
+                    Text(murder)
+                        .font(.mdBody)
+                        .foregroundStyle(Color.mdTextPrimary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Spacing.xl)
+                } else {
+                    Text(phaseTitle(phaseType))
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(Color.mdTextPrimary)
+
+                    Text(phaseSubtitle(phaseType))
+                        .font(.mdBody)
+                        .foregroundStyle(Color.mdTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Spacing.xl)
+                }
 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     ForEach(phaseGuide(phaseType), id: \.self) { step in

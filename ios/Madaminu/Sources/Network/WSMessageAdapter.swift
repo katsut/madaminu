@@ -124,6 +124,8 @@ struct WSMessageAdapter {
            let setting = try? JSONSerialization.jsonObject(with: settingData) as? [String: Any] {
             store.game.scenarioSetting.location = setting["location"] as? String
             store.game.scenarioSetting.situation = setting["situation"] as? String
+            store.game.scenarioSetting.gatheringReason = setting["gathering_reason"] as? String
+            store.game.scenarioSetting.murderDiscovery = setting["murder_discovery"] as? String
         }
         if let sceneUrl = data["scene_image_url"] { store.game.scenarioSetting.sceneImageUrl = sceneUrl }
         if let victimUrl = data["victim_image_url"] { store.game.scenarioSetting.victimImageUrl = victimUrl }
@@ -134,6 +136,7 @@ struct WSMessageAdapter {
            let victim = try? JSONSerialization.jsonObject(with: victimData) as? [String: Any] {
             store.game.scenarioSetting.victimName = victim["name"] as? String
             store.game.scenarioSetting.victimDescription = victim["description"] as? String
+            store.game.scenarioSetting.victimGreeting = victim["greeting"] as? String
         }
 
         // Players

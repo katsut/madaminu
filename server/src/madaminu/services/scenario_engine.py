@@ -125,30 +125,56 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         if player is None:
             continue
 
-        initial_ev = sp.get("initial_evidence")
-        if initial_ev:
+        for ev in sp.get("initial_evidences", []):
             db.add(
                 Evidence(
                     id=str(uuid.uuid4()),
                     game_id=game.id,
                     player_id=player.id,
                     phase_id=initial_phase.id,
-                    title=initial_ev.get("title", "証拠"),
-                    content=initial_ev.get("content", ""),
+                    title=ev.get("title", "証拠"),
+                    content=ev.get("content", ""),
                     source=EvidenceSource.gm_push,
                 )
             )
 
-        initial_alibi = sp.get("initial_alibi")
-        if initial_alibi:
+        for alibi in sp.get("initial_alibis", []):
             db.add(
                 Evidence(
                     id=str(uuid.uuid4()),
                     game_id=game.id,
                     player_id=player.id,
                     phase_id=initial_phase.id,
-                    title=initial_alibi.get("title", "アリバイ"),
-                    content=initial_alibi.get("content", ""),
+                    title=alibi.get("title", "アリバイ"),
+                    content=alibi.get("content", ""),
+                    source=EvidenceSource.gm_push,
+                )
+            )
+
+        # Backward compat: single initial_evidence/initial_alibi
+        if "initial_evidence" in sp and "initial_evidences" not in sp:
+            ev = sp["initial_evidence"]
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game.id,
+                    player_id=player.id,
+                    phase_id=initial_phase.id,
+                    title=ev.get("title", "証拠"),
+                    content=ev.get("content", ""),
+                    source=EvidenceSource.gm_push,
+                )
+            )
+        if "initial_alibi" in sp and "initial_alibis" not in sp:
+            alibi = sp["initial_alibi"]
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game.id,
+                    player_id=player.id,
+                    phase_id=initial_phase.id,
+                    title=alibi.get("title", "アリバイ"),
+                    content=alibi.get("content", ""),
                     source=EvidenceSource.gm_push,
                 )
             )
