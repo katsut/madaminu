@@ -131,15 +131,13 @@ struct HomeScreen: View {
                                                 .foregroundStyle(Color.mdTextSecondary)
                                         }
                                         Spacer()
-                                        if myRoom.status != "ended" {
-                                            MDButton(myRoom.status == "waiting" ? "再接続" : "復帰", style: .secondary) {
-                                                store.dispatch(.rejoinRoom(
-                                                    sessionToken: myRoom.sessionToken,
-                                                    playerId: myRoom.playerId,
-                                                    roomCode: myRoom.roomCode,
-                                                    status: myRoom.status
-                                                ))
-                                            }
+                                        MDButton(rejoinLabel(myRoom.status), style: .secondary) {
+                                            store.dispatch(.rejoinRoom(
+                                                sessionToken: myRoom.sessionToken,
+                                                playerId: myRoom.playerId,
+                                                roomCode: myRoom.roomCode,
+                                                status: myRoom.status
+                                            ))
                                         }
                                         if myRoom.isHost {
                                             Button {
@@ -239,6 +237,14 @@ struct HomeScreen: View {
                 store.pendingJoinCode = nil
                 showJoinSheet = true
             }
+        }
+    }
+
+    private func rejoinLabel(_ status: String) -> String {
+        switch status {
+        case "waiting": "再接続"
+        case "ended": "リプレイ"
+        default: "復帰"
         }
     }
 

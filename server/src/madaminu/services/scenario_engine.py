@@ -656,7 +656,7 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
         game_id=game.id,
         phase_type=PhaseType.storytelling,
         phase_order=phase_order,
-        duration_sec=180,
+        duration_sec=0,  # Manual advance by host
     )
     db.add(storytelling_phase)
     phase_order += 1
@@ -665,7 +665,7 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
         game_id=game.id,
         phase_type=PhaseType.opening,
         phase_order=phase_order,
-        duration_sec=opening_duration,
+        duration_sec=0,  # Manual advance by host after introductions
     )
     db.add(opening_phase)
     phase_order += 1

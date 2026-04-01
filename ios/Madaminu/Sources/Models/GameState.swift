@@ -154,6 +154,7 @@ struct ScenarioSettingData {
     var situation: String?
     var gatheringReason: String?
     var murderDiscovery: String?
+    var openingNarrative: String?
     var victimName: String?
     var victimDescription: String?
     var victimGreeting: String?

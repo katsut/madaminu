@@ -32,10 +32,7 @@ def schedule_phase_timer(
     """Schedule auto-advance after duration_sec. Cancels any existing timer for this game."""
     cancel_phase_timer(game_id)
     if duration_sec <= 0:
-        logger.info("schedule_phase_timer: duration_sec=%d, auto-advancing immediately", duration_sec)
-        asyncio.create_task(
-            handle_advance(game_id, room_code, "__server__", {"force": True}, game_service, discovery_service, ws)
-        )
+        logger.info("schedule_phase_timer: duration_sec=%d, manual advance only", duration_sec)
         return
 
     logger.info("schedule_phase_timer: %s %ds", room_code, duration_sec)
@@ -296,7 +293,20 @@ async def _finalize_phase_start(
     try:
         await _finalize_phase_start_inner(game_id, room_code, phase, discovery_service, game_service, ws)
     except Exception:
-        logger.exception("_finalize_phase_start FAILED for %s", room_code)
+        logger.exception("_finalize_phase_start FAILED for %s, recovering", room_code)
+        # Recover: mark phase as ready so game can continue
+        async with game_service._sf() as db:
+            from sqlalchemy import select
+
+            phase_obj = await db.execute(select(Phase).where(Phase.id == phase.id))
+            p = phase_obj.scalar_one_or_none()
+            if p and p.discoveries_status != "ready":
+                p.discoveries_status = "ready"
+                p.started_at = datetime.utcnow()
+                p.deadline_at = datetime.utcnow() + timedelta(seconds=max(p.duration_sec, 60))
+                await db.commit()
+        await ws.broadcast_game_state(room_code, game_id, game_service)
+        schedule_phase_timer(game_id, room_code, max(phase.duration_sec, 60), game_service, discovery_service, ws)
 
 
 async def _finalize_phase_start_inner(

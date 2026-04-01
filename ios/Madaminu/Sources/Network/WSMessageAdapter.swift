@@ -126,6 +126,7 @@ struct WSMessageAdapter {
             store.game.scenarioSetting.situation = setting["situation"] as? String
             store.game.scenarioSetting.gatheringReason = setting["gathering_reason"] as? String
             store.game.scenarioSetting.murderDiscovery = setting["murder_discovery"] as? String
+            store.game.scenarioSetting.openingNarrative = setting["opening_narrative"] as? String
         }
         if let sceneUrl = data["scene_image_url"] { store.game.scenarioSetting.sceneImageUrl = sceneUrl }
         if let victimUrl = data["victim_image_url"] { store.game.scenarioSetting.victimImageUrl = victimUrl }
@@ -200,6 +201,7 @@ struct WSMessageAdapter {
             discStatus = phaseDict["discoveries_status"] as? String ?? "pending"
         }
 
+        let isFirstState = previousPhaseId == nil
         let phaseChanged = newPhase?.phaseId != previousPhaseId
         let becameReady = discStatus == "ready" && store.game.discoveriesStatus != "ready"
 
@@ -214,8 +216,10 @@ struct WSMessageAdapter {
                 )
             }
 
-            // 1st game.state: phase changed, show transition overlay
-            store.game.showPhaseTransition = true
+            // Show transition only for mid-game phase changes (not reconnection)
+            if !isFirstState && discStatus != "ready" {
+                store.game.showPhaseTransition = true
+            }
 
             // Clear phase-specific state (keep speech/evidence history across phases)
             store.game.discoveries = []
@@ -226,8 +230,7 @@ struct WSMessageAdapter {
             store.game.travelNarrative = nil
         }
 
-        if becameReady {
-            // 2nd game.state: phase ready, dismiss transition overlay, start timer
+        if becameReady || (isFirstState && discStatus == "ready") {
             store.game.showPhaseTransition = false
             if let phase = newPhase {
                 store.game.localRemainingSec = phase.remainingSec

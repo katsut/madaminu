@@ -62,12 +62,13 @@ struct GamePlayView: View {
                                 waitingView
                             }
                         }
-                        .frame(maxHeight: .infinity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
 
                         bottomBar
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .animation(.easeInOut(duration: 0.5), value: store.game.discoveriesStatus)
             case .ended:
                 if endingRevealPhase < 3, let ending = store.game.ending {
                     EndingRevealView(
@@ -168,9 +169,15 @@ struct GamePlayView: View {
 
                 Spacer()
 
-                Text(formatTime(store.game.localRemainingSec))
-                    .font(.system(size: 18, weight: .bold, design: .monospaced))
-                    .foregroundStyle(store.game.localRemainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
+                if store.game.currentPhase?.durationSec == 0 {
+                    Text("手動進行")
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdTextMuted)
+                } else {
+                    Text(formatTime(store.game.localRemainingSec))
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                        .foregroundStyle(store.game.localRemainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
+                }
             } else {
                 Text(store.screen == .ended ? "ゲーム終了" : "準備中...")
                     .font(.mdHeadline)
@@ -668,6 +675,14 @@ struct OpeningPhaseView: View {
                 }
 
                 SpeechHistoryView(store: store)
+
+                // Host advance button
+                if store.room.isHost && store.game.currentPhase?.durationSec == 0 {
+                    MDButton("自己紹介完了 → 次へ") {
+                        store.dispatch(.advancePhase)
+                    }
+                    .padding(.top, Spacing.md)
+                }
             }
             .padding(Spacing.lg)
         }
@@ -745,25 +760,32 @@ struct NovelTextView: View {
 struct StorytellingPhaseView: View {
     @ObservedObject var store: AppStore
 
-    private var segments: [NovelTextView.NovelSegment] {
-        var segs: [NovelTextView.NovelSegment] = []
+    private var isHost: Bool {
+        store.room.isHost
+    }
 
+    private var hostName: String? {
+        store.room.players.first(where: { $0.isHost })?.characterName
+    }
+
+    private var segments: [NovelTextView.NovelSegment] {
+        // Use opening_narrative as single continuous story
+        if let narrative = store.game.scenarioSetting.openingNarrative {
+            return narrative.split(separator: "。")
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .map { NovelTextView.NovelSegment(text: $0 + "。") }
+        }
+
+        // Fallback: build from individual fields
+        var segs: [NovelTextView.NovelSegment] = []
         if let location = store.game.scenarioSetting.location {
             segs.append(.init(text: location, style: .heading))
         }
-        if let reason = store.game.scenarioSetting.gatheringReason {
-            segs.append(.init(text: reason))
-        }
         if let situation = store.game.scenarioSetting.situation {
-            // Split by sentences for gradual reveal
-            let sentences = situation.split(separator: "。").map { String($0) + "。" }
-            for s in sentences {
+            for s in situation.split(separator: "。").map({ String($0) + "。" }) {
                 segs.append(.init(text: s))
             }
-        }
-        if let name = store.game.scenarioSetting.victimName,
-           let desc = store.game.scenarioSetting.victimDescription {
-            segs.append(.init(text: "\(name) ── \(desc)", style: .accent))
         }
         return segs
     }
@@ -771,6 +793,36 @@ struct StorytellingPhaseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
+                // Host navigation banner
+                if isHost {
+                    MDCard {
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdWarning)
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text("あなたが読み上げてください")
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdWarning)
+                                Text("以下の物語を声に出して、全員に聞こえるように読みましょう。")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                            }
+                        }
+                    }
+                } else if let host = hostName {
+                    MDCard {
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: "ear.fill")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdInfo)
+                            Text("\(host)さんの読み上げを聞きましょう")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
                 // Scene image
                 if let urlString = store.game.scenarioSetting.sceneImageUrl,
                    let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=512") {
@@ -791,6 +843,14 @@ struct StorytellingPhaseView: View {
                     TranscriptView(store: store)
                 }
                 SpeechHistoryView(store: store)
+
+                // Host advance button (manual progression)
+                if isHost && store.game.currentPhase?.durationSec == 0 {
+                    MDButton("読み上げ完了 → 次へ") {
+                        store.dispatch(.advancePhase)
+                    }
+                    .padding(.top, Spacing.md)
+                }
             }
             .padding(Spacing.lg)
         }
