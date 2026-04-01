@@ -72,7 +72,7 @@ struct GamePlayView: View {
                     .frame(maxWidth: .infinity)
                 }
             case .ended:
-                if endingRevealPhase < 3, let ending = store.game.ending {
+                if endingRevealPhase < 4, let ending = store.game.ending {
                     EndingRevealView(
                         ending: ending,
                         players: store.room.players,
@@ -2027,19 +2027,36 @@ struct EndingRevealView: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: Spacing.xl) {
-                if phase == 0 || phase == 1 {
-                    // Scene 1: "〇〇は・・・・"
+                if phase == 1 {
+                    // Scene 1: "私たちは○○を犯人として拘束しました"
+                    VStack(spacing: Spacing.lg) {
+                        Text("私たちは")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Color.mdTextSecondary)
+                        if let player = arrestedPlayer {
+                            PlayerAvatarView(playerId: player.id, players: players, size: 100)
+                        }
+                        Text("\(ending.arrestedName ?? "??")")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(Color.mdTextPrimary)
+                        Text("を犯人として拘束しました")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Color.mdTextSecondary)
+                    }
+                    .opacity(textOpacity)
+                } else if phase == 2 {
+                    // Scene 2: "○○は・・・・"
                     VStack(spacing: Spacing.lg) {
                         if let player = arrestedPlayer {
                             PlayerAvatarView(playerId: player.id, players: players, size: 100)
                         }
-                        Text("\(ending.arrestedName ?? "???") は・・・・")
+                        Text("\(ending.arrestedName ?? "??") は・・・・")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(Color.mdTextPrimary)
                     }
                     .opacity(textOpacity)
-                } else if phase == 2 {
-                    // Scene 2: verdict
+                } else if phase == 3 {
+                    // Scene 3: verdict
                     VStack(spacing: Spacing.lg) {
                         if let player = arrestedPlayer {
                             PlayerAvatarView(playerId: player.id, players: players, size: 100)
@@ -2047,7 +2064,7 @@ struct EndingRevealView: View {
                         Text(isTrueCriminal ? "犯人でした" : "冤罪でした")
                             .font(.system(size: 40, weight: .black))
                             .foregroundStyle(isTrueCriminal ? Color.mdAccent : Color.mdInfo)
-                        Text(isTrueCriminal ? "真犯人を見事に見抜きました" : "無実の人が監禁されてしまいました...")
+                        Text(isTrueCriminal ? "真犯人を見事に見抜きました！" : "無実の人を拘束してしまいました…")
                             .font(.mdBody)
                             .foregroundStyle(Color.mdTextSecondary)
                     }
@@ -2066,24 +2083,34 @@ struct EndingRevealView: View {
     private func startReveal() {
         revealTask?.cancel()
         revealTask = Task { @MainActor in
+            // Scene 1: 拘束発表
             phase = 1
-            withAnimation(.easeIn(duration: 1.5)) {
-                textOpacity = 1
-            }
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.5)) {
-                textOpacity = 0
-            }
-            try? await Task.sleep(for: .seconds(1))
-            guard !Task.isCancelled else { return }
-            phase = 2
-            withAnimation(.easeIn(duration: 1.0)) {
-                textOpacity = 1
-            }
+            withAnimation(.easeIn(duration: 1.5)) { textOpacity = 1 }
             try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled else { return }
+
+            // Fade out
+            withAnimation(.easeOut(duration: 0.5)) { textOpacity = 0 }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+
+            // Scene 2: ○○は・・・
+            phase = 2
+            withAnimation(.easeIn(duration: 1.5)) { textOpacity = 1 }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+
+            // Fade out
+            withAnimation(.easeOut(duration: 0.5)) { textOpacity = 0 }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+
+            // Scene 3: 判定
             phase = 3
+            withAnimation(.easeIn(duration: 1.0)) { textOpacity = 1 }
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            phase = 4
         }
     }
 }
