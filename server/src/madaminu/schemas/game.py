@@ -133,10 +133,19 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
             votes = votes_result.scalars().all()
             id_to_name = {p.id: p.character_name or p.display_name for p in game.players}
 
+            # Determine arrested player (most votes)
+            vote_counts: dict[str, int] = {}
+            for v in votes:
+                vote_counts[v.suspect_player_id] = vote_counts.get(v.suspect_player_id, 0) + 1
+            arrested_id = max(vote_counts, key=vote_counts.get) if vote_counts else None
+            arrested_name = id_to_name.get(arrested_id, "?") if arrested_id else None
+
             state["ending"] = {
                 "ending_text": ending.ending_text,
                 "criminal_epilogue": ending.criminal_epilogue,
                 "true_criminal_id": ending.true_criminal_id,
+                "arrested_name": arrested_name,
+                "vote_counts": {id_to_name.get(k, "?"): v for k, v in vote_counts.items()},
                 "objective_results": ending.objective_results,
                 "vote_details": [
                     {
