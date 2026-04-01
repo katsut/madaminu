@@ -376,117 +376,10 @@ struct GamePlayView: View {
                             }
                         }
 
-                        // Rankings
-                        if let rankings = ending.rankings, !rankings.isEmpty {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.sm) {
-                                Label("最終スコア", systemImage: "trophy.fill")
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(Color.mdWarning)
-
-                                ForEach(Array(rankings.enumerated()), id: \.element.id) { index, rank in
-                                    HStack(spacing: Spacing.sm) {
-                                        Text(rankEmoji(index))
-                                            .font(.system(size: 24))
-                                            .frame(width: 32)
-                                        PlayerAvatarView(playerId: rank.playerId, players: store.room.players, size: 36)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(rank.characterName)
-                                                .font(.mdHeadline)
-                                                .foregroundStyle(Color.mdTextPrimary)
-                                            Text("発言 \(rank.speechCount)回 / 証拠 \(rank.evidenceCount)件")
-                                                .font(.mdCaption2)
-                                                .foregroundStyle(Color.mdTextMuted)
-                                        }
-                                        Spacer()
-                                        Text("\(rank.score) pt")
-                                            .font(.system(size: 20, weight: .bold, design: .monospaced))
-                                            .foregroundStyle(index == 0 ? Color.mdWarning : Color.mdTextPrimary)
-                                    }
-                                    if index < rankings.count - 1 {
-                                        Divider()
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                        // Objective Results
-                        if let results = ending.objectiveResults, !results.isEmpty {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.sm) {
-                                Label("個人目的の達成状況", systemImage: "target")
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(Color.mdInfo)
-
-                                ForEach(Array(results.keys.sorted()), id: \.self) { playerId in
-                                    if let result = results[playerId] {
-                                        HStack(alignment: .top, spacing: Spacing.sm) {
-                                            PlayerAvatarView(playerId: playerId, players: store.room.players, size: 28)
-                                            Image(systemName: result.achieved ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                                .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
-                                            VStack(alignment: .leading) {
-                                                Text(playerName(playerId))
-                                                    .font(.mdCallout)
-                                                    .foregroundStyle(Color.mdTextPrimary)
-                                                Text(result.description)
-                                                    .font(.mdCaption)
-                                                    .foregroundStyle(Color.mdTextSecondary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                        // Character Reveals
-                        if let reveals = ending.characterReveals, !reveals.isEmpty {
-                            MDCard {
-                                VStack(alignment: .leading, spacing: Spacing.md) {
-                                    Label("ネタバラシ", systemImage: "theatermasks.fill")
-                                        .font(.mdTitle2)
-                                        .foregroundStyle(Color.mdPrimary)
-
-                                    ForEach(reveals) { reveal in
-                                        VStack(alignment: .leading, spacing: Spacing.xs) {
-                                            HStack(spacing: Spacing.sm) {
-                                                PlayerAvatarView(playerId: reveal.playerId, players: store.room.players, size: 32)
-                                                Text(reveal.characterName)
-                                                    .font(.mdHeadline)
-                                                    .foregroundStyle(Color.mdTextPrimary)
-                                                if let role = reveal.role {
-                                                    Text(roleLabel(role))
-                                                        .font(.mdCaption2)
-                                                        .padding(.horizontal, Spacing.xs)
-                                                        .padding(.vertical, 2)
-                                                        .background(roleColor(role).opacity(0.15))
-                                                        .foregroundStyle(roleColor(role))
-                                                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                                                }
-                                            }
-                                            if let secret = reveal.secretInfo {
-                                                Text(secret)
-                                                    .font(.mdCaption)
-                                                    .foregroundStyle(Color.mdTextSecondary)
-                                            }
-                                        }
-                                        .padding(.vertical, Spacing.xs)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Bottom buttons
-                        HStack(spacing: Spacing.md) {
-                            MDButton("エピローグに戻る", style: .secondary) {
-                                withAnimation { endingPage = 0 }
-                            }
-                            MDButton("ホームに戻る") {
-                                store.game.reset()
-                                store.screen = .home
-                            }
-                        }
+                        // One-by-one reveal (lowest score first)
+                        PlayerRevealSequence(ending: ending, store: store, onFinish: {
+                            withAnimation { endingPage = 0 }
+                        })
                     }
                 } else {
                     ProgressView("エンディングを生成中...")
@@ -2062,6 +1955,216 @@ struct GMGuideCard: View {
                         .foregroundStyle(Color.mdTextSecondary)
                 }
             }
+        }
+    }
+}
+
+struct PlayerRevealSequence: View {
+    let ending: EndingData
+    @ObservedObject var store: AppStore
+    let onFinish: () -> Void
+    @State private var currentIndex = 0
+
+    // Players ordered by score ascending (lowest first), using character reveals
+    private var orderedPlayers: [CharacterReveal] {
+        guard let reveals = ending.characterReveals else { return [] }
+        if let rankings = ending.rankings {
+            // Sort by score ascending
+            let rankOrder = Dictionary(uniqueKeysWithValues: rankings.enumerated().map { ($1.playerId, $0) })
+            return reveals.sorted { a, b in
+                let scoreA = rankings.first(where: { $0.playerId == a.playerId })?.score ?? 0
+                let scoreB = rankings.first(where: { $0.playerId == b.playerId })?.score ?? 0
+                return scoreA < scoreB
+            }
+        }
+        return reveals
+    }
+
+    private var isFinished: Bool {
+        currentIndex >= orderedPlayers.count
+    }
+
+    var body: some View {
+        VStack(spacing: Spacing.md) {
+            if isFinished {
+                // Final: Rankings + おつかれさま
+                if let rankings = ending.rankings, !rankings.isEmpty {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("最終ランキング", systemImage: "trophy.fill")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdWarning)
+
+                            ForEach(Array(rankings.sorted(by: { $0.score > $1.score }).enumerated()), id: \.element.id) { index, rank in
+                                HStack(spacing: Spacing.sm) {
+                                    Text(rankEmoji(index))
+                                        .font(.system(size: 24))
+                                        .frame(width: 32)
+                                    PlayerAvatarView(playerId: rank.playerId, players: store.room.players, size: 36)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(rank.characterName)
+                                            .font(.mdHeadline)
+                                            .foregroundStyle(Color.mdTextPrimary)
+                                        Text("発言 \(rank.speechCount)回 / 証拠 \(rank.evidenceCount)件")
+                                            .font(.mdCaption2)
+                                            .foregroundStyle(Color.mdTextMuted)
+                                    }
+                                    Spacer()
+                                    Text("\(rank.score) pt")
+                                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(index == 0 ? Color.mdWarning : Color.mdTextPrimary)
+                                }
+                                if index < rankings.count - 1 { Divider() }
+                            }
+                        }
+                    }
+                }
+
+                Text("お疲れ様でした！")
+                    .font(.mdLargeTitle)
+                    .foregroundStyle(Color.mdPrimary)
+                    .padding(.top, Spacing.lg)
+
+                MDButton("ホームに戻る") {
+                    store.game.reset()
+                    store.screen = .home
+                }
+                .padding(.top, Spacing.md)
+
+            } else {
+                let reveal = orderedPlayers[currentIndex]
+                let isMe = reveal.playerId == store.room.playerId
+                let objectiveResult = ending.objectiveResults?[reveal.playerId]
+                let ranking = ending.rankings?.first(where: { $0.playerId == reveal.playerId })
+
+                // Progress
+                Text("\(currentIndex + 1) / \(orderedPlayers.count)")
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdTextMuted)
+
+                // Who should read
+                MDCard {
+                    HStack(spacing: Spacing.sm) {
+                        Image(systemName: isMe ? "speaker.wave.2.fill" : "ear.fill")
+                            .font(.mdTitle2)
+                            .foregroundStyle(isMe ? Color.mdWarning : Color.mdInfo)
+                        if isMe {
+                            Text("あなたの番です。結果を読み上げてください")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdWarning)
+                        } else {
+                            Text("\(reveal.characterName)の結果発表")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                // Player card
+                MDCard {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        HStack(spacing: Spacing.sm) {
+                            PlayerAvatarView(playerId: reveal.playerId, players: store.room.players, size: 50)
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text(reveal.characterName)
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                if let role = reveal.role {
+                                    Text(roleLabel(role))
+                                        .font(.mdCaption)
+                                        .padding(.horizontal, Spacing.xs)
+                                        .padding(.vertical, 2)
+                                        .background(roleColor(role).opacity(0.15))
+                                        .foregroundStyle(roleColor(role))
+                                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                }
+                            }
+                        }
+
+                        // Score
+                        if let rank = ranking {
+                            HStack {
+                                Text("スコア")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextMuted)
+                                Spacer()
+                                Text("\(rank.score) pt")
+                                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(Color.mdWarning)
+                            }
+                        }
+
+                        Divider()
+
+                        // Objective
+                        if let result = objectiveResult {
+                            HStack(alignment: .top, spacing: Spacing.sm) {
+                                Image(systemName: result.achieved ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text("個人目的")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextMuted)
+                                    Text(result.description)
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                    Text(result.achieved ? "達成！" : "未達成")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
+                                }
+                            }
+                        }
+
+                        // Secret
+                        if let secret = reveal.secretInfo {
+                            Divider()
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text("秘密")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextMuted)
+                                Text(secret)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+                    }
+                }
+
+                // Next button
+                if store.room.isHost {
+                    MDButton(currentIndex < orderedPlayers.count - 1 ? "次の人 →" : "ランキングへ →") {
+                        withAnimation { currentIndex += 1 }
+                    }
+                }
+            }
+        }
+    }
+
+    private func rankEmoji(_ index: Int) -> String {
+        switch index {
+        case 0: "🥇"
+        case 1: "🥈"
+        case 2: "🥉"
+        default: "\(index + 1)"
+        }
+    }
+
+    private func roleLabel(_ role: String) -> String {
+        switch role {
+        case "criminal": "犯人"
+        case "witness": "目撃者"
+        case "related": "関係者"
+        case "innocent": "一般人"
+        default: role
+        }
+    }
+
+    private func roleColor(_ role: String) -> Color {
+        switch role {
+        case "criminal": .mdAccent
+        case "witness": .mdWarning
+        case "related": .mdInfo
+        default: .mdTextSecondary
         }
     }
 }
