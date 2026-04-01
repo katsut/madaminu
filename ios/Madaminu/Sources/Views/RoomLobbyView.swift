@@ -19,14 +19,16 @@ struct RoomLobbyView: View {
         playersWithCharacter.count
     }
 
-    private var nonHostWithCharacter: [PlayerInfo] {
-        playersWithCharacter.filter { !$0.isHost }
+    private var nonHostPlayers: [PlayerInfo] {
+        store.room.players.filter { !$0.isHost }
     }
 
     private var allReady: Bool {
-        // Host doesn't need to be ready. All non-host players with characters must be ready.
-        let nonHostReady = nonHostWithCharacter.allSatisfy(\.isReady)
-        return totalWithCharacter > 0 && (nonHostWithCharacter.isEmpty || nonHostReady)
+        // Host must have character. All non-host must have character AND be ready.
+        let hostHasCharacter = store.room.players.first(where: { $0.isHost })?.characterName != nil
+        let allNonHostReady = !nonHostPlayers.isEmpty
+            && nonHostPlayers.allSatisfy { $0.characterName != nil && $0.isReady }
+        return hostHasCharacter && allNonHostReady
     }
 
     var body: some View {
