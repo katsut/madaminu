@@ -545,26 +545,18 @@ struct OpeningPhaseView: View {
                             }
 
                             // Self-introduction speech
-                            let hasIntro = player.selfIntroduction != nil && !player.selfIntroduction!.isEmpty
-                            if hasIntro {
-                                Text("「\(player.selfIntroduction!)」")
+                            if let intro = player.selfIntroduction, !intro.isEmpty {
+                                Text("「\(intro)」")
                                     .font(.mdBody)
                                     .foregroundStyle(Color.mdTextPrimary)
                                     .italic()
-                                    .padding(.top, Spacing.xs)
-                            } else if let publicInfo = player.publicInfo, !publicInfo.isEmpty {
-                                Text(publicInfo)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextSecondary)
                                     .padding(.top, Spacing.xs)
                             }
 
                             if isMe {
                                 GMGuideCard(
                                     title: "あなたの番です",
-                                    message: hasIntro
-                                        ? "発言ボタンを押して、上のセリフを参考に自己紹介してください。"
-                                        : "発言ボタンを押して、キャラクターになりきって自己紹介してください。"
+                                    message: "発言ボタンを押して、上のセリフを参考に自己紹介してください。"
                                 )
                             }
                         }
