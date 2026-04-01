@@ -110,10 +110,11 @@ Before generating the scenario, review each player's profile:
 
 These are DIFFERENT fields with different purposes:
 
-- **self_introduction**: 一人称のセリフ。声に出して読むもの。
+- **self_introduction**: 一人称のセリフ。声に出して読むもの。全プレイヤーに聞こえる。
   - 例: 「どうも、白鳥麗子です。東都大学病院で心臓外科を担当しています。恒一さんとは大学時代からの付き合いで、今回のお招きに喜んで参りました。」
   - キャラクターの口調・性格が伝わること
   - 建前の来訪理由を含む
+  - **CRITICAL: 秘密・裏の動機・事件に関わる情報は絶対に含めない。あくまで表向きの自己紹介のみ**
 - **public_info**: 三人称のプロフィール。手帳に記載される情報。
   - 例: 「東都大学病院の心臓外科チーフ。被害者の大学時代の同期で、毎年この館に招かれている。佐伯涼子とは同業者として面識がある。」
   - 客観的な事実情報
@@ -134,9 +135,10 @@ These are DIFFERENT fields with different purposes:
 Each player receives **2 evidence cards** and **3 alibi cards**:
 
 - **initial_evidences** (2 cards):
-  - Card 1: 直接的な手がかり（物的証拠、目撃情報）
-  - Card 2: 間接的な情報（不審な行動、会話の断片）
-  - Criminal's evidence: looks irrelevant but becomes important later
+  - Card 1: 「○○に関する情報」— **別のプレイヤーについての噂や目撃情報**。タイトルは「○○（キャラ名）に関する情報」形式。内容は直接的な暴露ではなく、そのキャラの行動や背景に関する気になる情報（目撃談、噂話、過去の出来事）
+  - Card 2: 事件に関わる間接的な情報（不審な行動、会話の断片、物の位置の変化）
+  - **交差ルール**: AはBの秘密の断片を持ち、BはCの秘密の断片を持ち…と循環的に交差させる。自分自身の秘密の断片は持たない
+  - Criminal's evidence card: 犯人に関する証拠カードは、一見無関係だが後で重要になる曖昧な内容にする
 - **initial_alibis** (3 cards):
   - Card 1: 自分のアリバイ（partner + room_id）
   - Card 2: 他の誰かの行動目撃
