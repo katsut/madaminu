@@ -356,6 +356,10 @@ async def _finalize_phase_start_inner(
     # 2nd broadcast: phase ready
     await ws.broadcast_game_state(room_code, game_id, game_service)
 
+    # Notify colocated players for investigation
+    if phase.phase_type == PhaseType.investigation:
+        await _notify_colocated_players(game_id, room_code, phase.id, game_service, ws)
+
     # Schedule phase timer (starts counting from now, after transition)
     schedule_phase_timer(game_id, room_code, phase.duration_sec, game_service, discovery_service, ws)
 
@@ -380,6 +384,52 @@ async def _generate_discoveries_background(
     logger.info("Starting discovery generation for %s", room_code)
     await discovery_service.generate_all(game_id, phase_id)
     logger.info("Discovery generation complete for %s", room_code)
+
+
+async def _notify_colocated_players(
+    game_id: str,
+    room_code: str,
+    phase_id: str,
+    game_service: GameService,
+    ws: WSManager,
+):
+    """Send colocated player lists to each player in investigation phase."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from madaminu.models import Game
+    from madaminu.models.investigation_selection import InvestigationSelection
+
+    async with game_service._sf() as db:
+        game_result = await db.execute(
+            select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
+        )
+        game = game_result.scalar_one()
+
+        sel_result = await db.execute(
+            select(InvestigationSelection).where(InvestigationSelection.phase_id == phase_id)
+        )
+        selections = sel_result.scalars().all()
+
+        # Group by location
+        location_players: dict[str, list[str]] = {}
+        for s in selections:
+            location_players.setdefault(s.location_id, []).append(s.player_id)
+
+        id_to_info = {
+            p.id: {"player_id": p.id, "character_name": p.character_name or p.display_name}
+            for p in game.players
+        }
+
+        for _location_id, player_ids in location_players.items():
+            if len(player_ids) < 2:
+                continue
+            for pid in player_ids:
+                others = [id_to_info[oid] for oid in player_ids if oid != pid and oid in id_to_info]
+                await ws.send_to(room_code, pid, {
+                    "type": "location.colocated",
+                    "data": {"players": others},
+                })
 
 
 async def _ai_auto_keep_evidence(game_id: str, phase_id: str, game_service: GameService):

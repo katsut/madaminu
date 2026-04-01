@@ -73,6 +73,18 @@ struct WSMessageAdapter {
             let text = data["text"] ?? ""
             store.game.roomMessages.append(RoomMessage(senderId: senderId, senderName: senderName, text: text))
 
+        // Colocated players
+        case "location.colocated":
+            if let playersJSON = data["players"],
+               let playersData = playersJSON.data(using: .utf8),
+               let playersArray = try? JSONSerialization.jsonObject(with: playersData) as? [[String: Any]] {
+                store.game.colocatedPlayers = playersArray.compactMap { dict in
+                    guard let id = dict["player_id"] as? String,
+                          let name = dict["character_name"] as? String else { return nil }
+                    return ColocatedPlayer(id: id, characterName: name, portraitUrl: nil)
+                }
+            }
+
         // Intro
         case "intro.ready.count":
             if let countStr = data["count"], let count = Int(countStr) {
