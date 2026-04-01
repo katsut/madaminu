@@ -2062,22 +2062,21 @@ struct PlayerRevealSequence: View {
 
                 // Player card
                 MDCard {
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        HStack(spacing: Spacing.sm) {
-                            PlayerAvatarView(playerId: reveal.playerId, players: store.room.players, size: 50)
-                            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                Text(reveal.characterName)
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                                if let role = reveal.role {
-                                    Text(roleLabel(role))
-                                        .font(.mdCaption)
-                                        .padding(.horizontal, Spacing.xs)
-                                        .padding(.vertical, 2)
-                                        .background(roleColor(role).opacity(0.15))
-                                        .foregroundStyle(roleColor(role))
-                                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                                }
+                    VStack(spacing: Spacing.md) {
+                        PlayerAvatarView(playerId: reveal.playerId, players: store.room.players, size: 100)
+
+                        VStack(spacing: Spacing.xxs) {
+                            Text(reveal.characterName)
+                                .font(.mdLargeTitle)
+                                .foregroundStyle(Color.mdTextPrimary)
+                            if let role = reveal.role {
+                                Text(roleLabel(role))
+                                    .font(.mdCaption)
+                                    .padding(.horizontal, Spacing.xs)
+                                    .padding(.vertical, 2)
+                                    .background(roleColor(role).opacity(0.15))
+                                    .foregroundStyle(roleColor(role))
+                                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                             }
                         }
 
@@ -2130,8 +2129,8 @@ struct PlayerRevealSequence: View {
                     }
                 }
 
-                // Next button
-                if store.room.isHost {
+                // Next button (reader or host can advance)
+                if isMe || store.room.isHost {
                     MDButton(currentIndex < orderedPlayers.count - 1 ? "次の人 →" : "ランキングへ →") {
                         withAnimation { currentIndex += 1 }
                     }
