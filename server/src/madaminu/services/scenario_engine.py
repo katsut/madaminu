@@ -85,6 +85,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         "map": complete_map,
         "route_text": route_text,
         "relationships": scenario["relationships"],
+        "players": scenario["players"],
     }
     game.gm_internal_state = {
         "gm_strategy": scenario.get("gm_strategy", ""),
