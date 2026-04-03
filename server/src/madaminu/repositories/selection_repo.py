@@ -7,9 +7,7 @@ from madaminu.models import InvestigationSelection
 
 
 async def get_selections(db: AsyncSession, phase_id: str) -> list[InvestigationSelection]:
-    result = await db.execute(
-        select(InvestigationSelection).where(InvestigationSelection.phase_id == phase_id)
-    )
+    result = await db.execute(select(InvestigationSelection).where(InvestigationSelection.phase_id == phase_id))
     return list(result.scalars().all())
 
 

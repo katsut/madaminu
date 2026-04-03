@@ -113,12 +113,22 @@ class TestBuildMapStructure:
         llm_map = {
             "areas": [
                 _make_area("f1", "1階", [_make_room("r1", "書斎"), _make_room("r2", "リビング")]),
-                _make_area("garden", "中庭", [_make_room("g1", "噴水"), _make_room("g2", "温室")], area_type="outdoor", floor_order=1),
+                _make_area(
+                    "garden",
+                    "中庭",
+                    [_make_room("g1", "噴水"), _make_room("g2", "温室")],
+                    area_type="outdoor",
+                    floor_order=1,
+                ),
             ]
         }
         result = build_map_structure(llm_map)
         door_conns = [c for c in result["connections"] if c["type"] == "door"]
-        cross_area = [c for c in door_conns if ("entrance" in c["from"] and c["to"] == "g1") or ("entrance" in c["to"] and c["from"] == "g1")]
+        cross_area = [
+            c
+            for c in door_conns
+            if ("entrance" in c["from"] and c["to"] == "g1") or ("entrance" in c["to"] and c["from"] == "g1")
+        ]
         assert len(cross_area) > 0
 
 

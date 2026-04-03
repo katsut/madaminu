@@ -363,7 +363,12 @@ class PhaseManager:
                     d["can_tamper"] = is_alone
                     self.add_discovery(room_code, player_id, d)
 
-                logger.info("Batch discoveries for %s: %d items (cost: $%.4f)", player_id, len(discoveries), usage.estimated_cost_usd if usage else 0)
+                logger.info(
+                    "Batch discoveries for %s: %d items (cost: $%.4f)",
+                    player_id,
+                    len(discoveries),
+                    usage.estimated_cost_usd if usage else 0,
+                )
 
                 if discoveries:
                     await manager.send_to_player(

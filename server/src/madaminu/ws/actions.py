@@ -68,10 +68,14 @@ async def handle_advance(
 
     if result.status == "not_expired":
         if player_id != "__server__":
-            await ws.send_to(room_code, player_id, {
-                "type": "error",
-                "data": {"code": "not_expired", "remaining_sec": result.remaining_sec},
-            })
+            await ws.send_to(
+                room_code,
+                player_id,
+                {
+                    "type": "error",
+                    "data": {"code": "not_expired", "remaining_sec": result.remaining_sec},
+                },
+            )
         return
 
     if result.status == "already_advanced":
@@ -89,9 +93,7 @@ async def handle_advance(
     await ws.broadcast_game_state(room_code, game_id, game_service)
 
     # Background: wait minimum 3s transition, then mark ready and send 2nd broadcast
-    asyncio.create_task(
-        _finalize_phase_start(game_id, room_code, phase, discovery_service, game_service, ws)
-    )
+    asyncio.create_task(_finalize_phase_start(game_id, room_code, phase, discovery_service, game_service, ws))
 
 
 async def handle_select_location(
@@ -104,10 +106,14 @@ async def handle_select_location(
 ):
     location_id = data.get("location_id", "")
     if not location_id:
-        await ws.send_to(room_code, player_id, {
-            "type": "error",
-            "data": {"code": "invalid", "message": "location_id is required"},
-        })
+        await ws.send_to(
+            room_code,
+            player_id,
+            {
+                "type": "error",
+                "data": {"code": "invalid", "message": "location_id is required"},
+            },
+        )
         return
     await game_service.select_location(game_id, player_id, location_id)
 
@@ -122,25 +128,37 @@ async def handle_keep_evidence(
 ):
     discovery_id = data.get("discovery_id", "")
     if not discovery_id:
-        await ws.send_to(room_code, player_id, {
-            "type": "error",
-            "data": {"code": "invalid", "message": "discovery_id is required"},
-        })
+        await ws.send_to(
+            room_code,
+            player_id,
+            {
+                "type": "error",
+                "data": {"code": "invalid", "message": "discovery_id is required"},
+            },
+        )
         return
 
     evidence = await game_service.keep_evidence(game_id, player_id, discovery_id)
     if evidence is None:
-        await ws.send_to(room_code, player_id, {
-            "type": "error",
-            "data": {"code": "already_kept", "message": "Already kept evidence this phase"},
-        })
+        await ws.send_to(
+            room_code,
+            player_id,
+            {
+                "type": "error",
+                "data": {"code": "already_kept", "message": "Already kept evidence this phase"},
+            },
+        )
         return
 
     # Update the player's state
-    await ws.send_to(room_code, player_id, {
-        "type": "game.state",
-        "data": await game_service.get_state(game_id, player_id),
-    })
+    await ws.send_to(
+        room_code,
+        player_id,
+        {
+            "type": "game.state",
+            "data": await game_service.get_state(game_id, player_id),
+        },
+    )
 
 
 async def handle_speech_request(
@@ -152,20 +170,30 @@ async def handle_speech_request(
 ):
     granted, prev_speaker = await speech_service.request_speech(game_id, player_id)
     if granted:
-        await ws.send_to(room_code, player_id, {
-            "type": "speech.granted",
-            "data": {"player_id": player_id},
-        })
-        await ws.broadcast(room_code, {
-            "type": "speech.active",
-            "data": {"player_id": player_id},
-        })
+        await ws.send_to(
+            room_code,
+            player_id,
+            {
+                "type": "speech.granted",
+                "data": {"player_id": player_id},
+            },
+        )
+        await ws.broadcast(
+            room_code,
+            {
+                "type": "speech.active",
+                "data": {"player_id": player_id},
+            },
+        )
         if prev_speaker:
             # Notify previous speaker they were preempted
-            await ws.broadcast(room_code, {
-                "type": "speech",
-                "data": {"player_id": prev_speaker, "character_name": "", "transcript": ""},
-            })
+            await ws.broadcast(
+                room_code,
+                {
+                    "type": "speech",
+                    "data": {"player_id": prev_speaker, "character_name": "", "transcript": ""},
+                },
+            )
 
 
 async def handle_speech_release(
@@ -181,10 +209,13 @@ async def handle_speech_release(
     released = await speech_service.release_speech(game_id, player_id, transcript)
     if released:
         char_name = players.get(player_id, "")
-        await ws.broadcast(room_code, {
-            "type": "speech",
-            "data": {"player_id": player_id, "character_name": char_name, "transcript": transcript},
-        })
+        await ws.broadcast(
+            room_code,
+            {
+                "type": "speech",
+                "data": {"player_id": player_id, "character_name": char_name, "transcript": transcript},
+            },
+        )
 
 
 async def handle_reveal_evidence(
@@ -211,15 +242,18 @@ async def handle_reveal_evidence(
             return
 
         char_name = players.get(player_id, "")
-        await ws.broadcast(room_code, {
-            "type": "evidence_revealed",
-            "data": {
-                "player_id": player_id,
-                "player_name": char_name,
-                "title": evidence.title,
-                "content": evidence.content,
+        await ws.broadcast(
+            room_code,
+            {
+                "type": "evidence_revealed",
+                "data": {
+                    "player_id": player_id,
+                    "player_name": char_name,
+                    "title": evidence.title,
+                    "content": evidence.content,
+                },
             },
-        })
+        )
 
 
 async def handle_vote(
@@ -233,24 +267,35 @@ async def handle_vote(
 ):
     suspect_id = data.get("suspect_player_id", "")
     if not suspect_id:
-        await ws.send_to(room_code, player_id, {
-            "type": "error",
-            "data": {"code": "invalid", "message": "suspect_player_id is required"},
-        })
+        await ws.send_to(
+            room_code,
+            player_id,
+            {
+                "type": "error",
+                "data": {"code": "invalid", "message": "suspect_player_id is required"},
+            },
+        )
         return
 
     result = await game_service.vote(game_id, player_id, suspect_id)
     if "error" in result:
-        await ws.send_to(room_code, player_id, {
-            "type": "error",
-            "data": {"code": result["error"]},
-        })
+        await ws.send_to(
+            room_code,
+            player_id,
+            {
+                "type": "error",
+                "data": {"code": result["error"]},
+            },
+        )
         return
 
-    await ws.broadcast(room_code, {
-        "type": "vote_cast",
-        "data": {"voted_count": result["voted_count"], "total_human": result["total_human"]},
-    })
+    await ws.broadcast(
+        room_code,
+        {
+            "type": "vote_cast",
+            "data": {"voted_count": result["voted_count"], "total_human": result["total_human"]},
+        },
+    )
 
     if result["all_voted"]:
         # Auto-advance from voting → ending
@@ -271,10 +316,13 @@ async def handle_room_message(
         return
     char_name = players.get(player_id, "")
     # TODO: send only to colocated players (need selection data)
-    await ws.broadcast(room_code, {
-        "type": "room_message",
-        "data": {"sender_id": player_id, "sender_name": char_name, "text": text},
-    })
+    await ws.broadcast(
+        room_code,
+        {
+            "type": "room_message",
+            "data": {"sender_id": player_id, "sender_name": char_name, "text": text},
+        },
+    )
 
 
 PHASE_TRANSITION_SEC = 3
@@ -324,9 +372,7 @@ async def _finalize_phase_start_inner(
             try:
                 await asyncio.gather(
                     asyncio.sleep(PHASE_TRANSITION_SEC),
-                    _generate_discoveries_background(
-                        game_id, room_code, phase.id, discovery_service, game_service, ws
-                    ),
+                    _generate_discoveries_background(game_id, room_code, phase.id, discovery_service, game_service, ws),
                 )
                 last_error = None
                 break
@@ -365,9 +411,7 @@ async def _finalize_phase_start_inner(
 
     # Start AI speech for discussion phases only (not manual-advance phases)
     if phase.phase_type == PhaseType.discussion and phase.duration_sec > 0:
-        asyncio.create_task(
-            _ai_speech_background(game_id, room_code, phase.id, game_service, ws)
-        )
+        asyncio.create_task(_ai_speech_background(game_id, room_code, phase.id, game_service, ws))
 
 
 # --- Background jobs ---
@@ -401,14 +445,10 @@ async def _notify_colocated_players(
     from madaminu.models.investigation_selection import InvestigationSelection
 
     async with game_service._sf() as db:
-        game_result = await db.execute(
-            select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-        )
+        game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
         game = game_result.scalar_one()
 
-        sel_result = await db.execute(
-            select(InvestigationSelection).where(InvestigationSelection.phase_id == phase_id)
-        )
+        sel_result = await db.execute(select(InvestigationSelection).where(InvestigationSelection.phase_id == phase_id))
         selections = sel_result.scalars().all()
 
         # Group by location
@@ -417,8 +457,7 @@ async def _notify_colocated_players(
             location_players.setdefault(s.location_id, []).append(s.player_id)
 
         id_to_info = {
-            p.id: {"player_id": p.id, "character_name": p.character_name or p.display_name}
-            for p in game.players
+            p.id: {"player_id": p.id, "character_name": p.character_name or p.display_name} for p in game.players
         }
 
         for _location_id, player_ids in location_players.items():
@@ -426,10 +465,14 @@ async def _notify_colocated_players(
                 continue
             for pid in player_ids:
                 others = [id_to_info[oid] for oid in player_ids if oid != pid and oid in id_to_info]
-                await ws.send_to(room_code, pid, {
-                    "type": "location.colocated",
-                    "data": {"players": others},
-                })
+                await ws.send_to(
+                    room_code,
+                    pid,
+                    {
+                        "type": "location.colocated",
+                        "data": {"players": others},
+                    },
+                )
 
 
 async def _ai_auto_keep_evidence(game_id: str, phase_id: str, game_service: GameService):
@@ -443,9 +486,7 @@ async def _ai_auto_keep_evidence(game_id: str, phase_id: str, game_service: Game
     from madaminu.models import Evidence, Game
 
     async with game_service._sf() as db:
-        game_result = await db.execute(
-            select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-        )
+        game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
         game = game_result.scalar_one()
 
         for player in game.players:
@@ -467,15 +508,17 @@ async def _ai_auto_keep_evidence(game_id: str, phase_id: str, game_service: Game
 
             # Pick one to keep
             chosen = random.choice(discoveries)
-            db.add(Evidence(
-                id=str(uuid.uuid4()),
-                game_id=game_id,
-                player_id=player.id,
-                phase_id=phase_id,
-                title=chosen.title,
-                content=chosen.content,
-                source="investigation",
-            ))
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game_id,
+                    player_id=player.id,
+                    phase_id=phase_id,
+                    title=chosen.title,
+                    content=chosen.content,
+                    source="investigation",
+                )
+            )
 
         await db.commit()
     logger.info("AI players auto-kept evidence for phase %s", phase_id)
@@ -500,9 +543,7 @@ async def _ai_speech_background(
 
     try:
         async with game_service._sf() as db:
-            game_result = await db.execute(
-                select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-            )
+            game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
             game = game_result.scalar_one()
             ai_players = [p for p in game.players if p.is_ai]
             if not ai_players:
@@ -557,13 +598,13 @@ async def _ai_speech_background(
             )
 
             prompt = f"""あなたは「{char_name}」というキャラクターです。
-公開情報: {player_info.get('public_info', 'なし')}
+公開情報: {player_info.get("public_info", "なし")}
 
 これまでに公開された証拠:
-{evidence_text or 'まだなし'}
+{evidence_text or "まだなし"}
 
 これまでの発言:
-{speech_text or 'まだなし'}
+{speech_text or "まだなし"}
 
 この情報に基づいて、議論に参加する短い発言を1つ生成してください。
 - 自分の公開情報に基づいた視点で発言
@@ -588,26 +629,29 @@ async def _ai_speech_background(
                 import uuid
 
                 async with game_service._sf() as db:
-                    db.add(SpeechLog(
-                        id=str(uuid.uuid4()),
-                        game_id=game_id,
-                        player_id=ai_player.id,
-                        phase_id=phase_id,
-                        transcript=transcript,
-                    ))
+                    db.add(
+                        SpeechLog(
+                            id=str(uuid.uuid4()),
+                            game_id=game_id,
+                            player_id=ai_player.id,
+                            phase_id=phase_id,
+                            transcript=transcript,
+                        )
+                    )
                     await db.commit()
 
-                await ws.broadcast(room_code, {
-                    "type": "speech",
-                    "data": {"player_id": ai_player.id, "character_name": char_name, "transcript": transcript},
-                })
+                await ws.broadcast(
+                    room_code,
+                    {
+                        "type": "speech",
+                        "data": {"player_id": ai_player.id, "character_name": char_name, "transcript": transcript},
+                    },
+                )
                 logger.info("AI speech: %s said '%s'", char_name, transcript[:50])
 
                 # 80% chance to reveal evidence after speaking
                 if random.random() < 0.8:
-                    revealed = await _ai_reveal_evidence(
-                        game_id, room_code, ai_player.id, char_name, game_service, ws
-                    )
+                    revealed = await _ai_reveal_evidence(game_id, room_code, ai_player.id, char_name, game_service, ws)
                     if revealed:
                         revealed_player_ids.add(ai_player.id)
 
@@ -621,9 +665,7 @@ async def _ai_speech_background(
                 fallback = random.choice(unrevealed)
                 fb_name = context["players"].get(fallback.id, {}).get("name", "")
                 await asyncio.sleep(random.randint(5, 15))
-                await _ai_reveal_evidence(
-                    game_id, room_code, fallback.id, fb_name, game_service, ws
-                )
+                await _ai_reveal_evidence(game_id, room_code, fallback.id, fb_name, game_service, ws)
 
     except Exception:
         logger.exception("AI speech background failed for %s", room_code)
@@ -657,15 +699,18 @@ async def _ai_reveal_evidence(
             return False
 
         ev = random.choice(evidences)
-        await ws.broadcast(room_code, {
-            "type": "evidence_revealed",
-            "data": {
-                "player_id": player_id,
-                "player_name": char_name,
-                "title": ev.title,
-                "content": ev.content,
+        await ws.broadcast(
+            room_code,
+            {
+                "type": "evidence_revealed",
+                "data": {
+                    "player_id": player_id,
+                    "player_name": char_name,
+                    "title": ev.title,
+                    "content": ev.content,
+                },
             },
-        })
+        )
         logger.info("AI revealed evidence: %s - %s", char_name, ev.title)
         return True
 

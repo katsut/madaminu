@@ -26,9 +26,7 @@ async def get_current_phase(db: AsyncSession, game_id: str) -> Phase | None:
 async def end_phase(db: AsyncSession, phase_id: str) -> bool:
     """End a phase atomically. Returns True if this call ended it, False if already ended."""
     result = await db.execute(
-        update(Phase)
-        .where(Phase.id == phase_id, Phase.ended_at.is_(None))
-        .values(ended_at=datetime.utcnow())
+        update(Phase).where(Phase.id == phase_id, Phase.ended_at.is_(None)).values(ended_at=datetime.utcnow())
     )
     return result.rowcount > 0
 

@@ -83,14 +83,18 @@ async def test_timer_advances_after_broadcast_failure(pm_env):
         patch("madaminu.ws.handler_old.manager.broadcast", broadcast_mock),
         patch.object(pm, "advance_phase", mock_advance),
     ):
-        pm._start_timer("g1", "TEST01", Phase(
-            id="ph1",
-            game_id="g1",
-            phase_type=PhaseType.planning,
-            phase_order=0,
-            duration_sec=1,
-            started_at=datetime.utcnow(),
-        ))
+        pm._start_timer(
+            "g1",
+            "TEST01",
+            Phase(
+                id="ph1",
+                game_id="g1",
+                phase_type=PhaseType.planning,
+                phase_order=0,
+                duration_sec=1,
+                started_at=datetime.utcnow(),
+            ),
+        )
 
         try:
             await asyncio.wait_for(advance_called.wait(), timeout=5)

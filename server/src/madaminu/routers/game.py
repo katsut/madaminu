@@ -115,9 +115,13 @@ async def _generate_scenario_background(game_id: str, room_code: str, session_fa
     from madaminu.services.game_service import GameService
 
     try:
-        await ws_manager.broadcast(room_code, {
-            "type": "progress", "data": {"step": "scenario", "status": "in_progress"},
-        })
+        await ws_manager.broadcast(
+            room_code,
+            {
+                "type": "progress",
+                "data": {"step": "scenario", "status": "in_progress"},
+            },
+        )
 
         for attempt in range(3):
             try:
@@ -136,26 +140,46 @@ async def _generate_scenario_background(game_id: str, room_code: str, session_fa
                 if attempt == 2:
                     raise
 
-        await ws_manager.broadcast(room_code, {
-            "type": "progress", "data": {"step": "scenario", "status": "done"},
-        })
+        await ws_manager.broadcast(
+            room_code,
+            {
+                "type": "progress",
+                "data": {"step": "scenario", "status": "done"},
+            },
+        )
 
         # Generate images first
-        await ws_manager.broadcast(room_code, {
-            "type": "progress", "data": {"step": "scene_image", "status": "in_progress"},
-        })
-        await ws_manager.broadcast(room_code, {
-            "type": "progress", "data": {"step": "portraits", "status": "in_progress"},
-        })
+        await ws_manager.broadcast(
+            room_code,
+            {
+                "type": "progress",
+                "data": {"step": "scene_image", "status": "in_progress"},
+            },
+        )
+        await ws_manager.broadcast(
+            room_code,
+            {
+                "type": "progress",
+                "data": {"step": "portraits", "status": "in_progress"},
+            },
+        )
 
         await _generate_images(game_id, room_code, session_factory)
 
-        await ws_manager.broadcast(room_code, {
-            "type": "progress", "data": {"step": "scene_image", "status": "done"},
-        })
-        await ws_manager.broadcast(room_code, {
-            "type": "progress", "data": {"step": "portraits", "status": "done"},
-        })
+        await ws_manager.broadcast(
+            room_code,
+            {
+                "type": "progress",
+                "data": {"step": "scene_image", "status": "done"},
+            },
+        )
+        await ws_manager.broadcast(
+            room_code,
+            {
+                "type": "progress",
+                "data": {"step": "portraits", "status": "done"},
+            },
+        )
 
         # Start first phase after images are ready
         from madaminu.services.discovery_service import DiscoveryService
@@ -172,8 +196,12 @@ async def _generate_scenario_background(game_id: str, room_code: str, session_fa
         if result.phase:
             asyncio.create_task(
                 _finalize_phase_start(
-                    game_id, room_code, result.phase,
-                    discovery_service, game_service, ws_manager,
+                    game_id,
+                    room_code,
+                    result.phase,
+                    discovery_service,
+                    game_service,
+                    ws_manager,
                 )
             )
 
@@ -332,8 +360,7 @@ async def get_discoveries(
     evidences = ev_result.scalars().all()
 
     discoveries = [
-        {"id": e.id, "title": e.title, "content": e.content, "feature": "", "can_tamper": False}
-        for e in evidences
+        {"id": e.id, "title": e.title, "content": e.content, "feature": "", "can_tamper": False} for e in evidences
     ]
     return {"discoveries": discoveries}
 

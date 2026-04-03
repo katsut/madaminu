@@ -138,9 +138,7 @@ class GameService:
 
         async with self._sf() as db:
             # Check not already voted
-            existing = await db.execute(
-                select(Vote).where(Vote.game_id == game_id, Vote.voter_player_id == player_id)
-            )
+            existing = await db.execute(select(Vote).where(Vote.game_id == game_id, Vote.voter_player_id == player_id))
             if existing.scalar_one_or_none():
                 return {"error": "already_voted"}
 
@@ -163,9 +161,7 @@ class GameService:
     async def get_state(self, game_id: str, player_id: str) -> dict:
         """Build full game state for a specific player."""
         async with self._sf() as db:
-            game = await db.execute(
-                select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-            )
+            game = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
             g = game.scalar_one()
             from madaminu.schemas.game import build_game_state
 

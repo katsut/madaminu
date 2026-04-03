@@ -1,6 +1,5 @@
 """Tests for speech manager preemption behavior."""
 
-
 from unittest.mock import AsyncMock, patch
 
 import pytest

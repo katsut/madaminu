@@ -96,18 +96,14 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
     # Discoveries for current investigation phase
     if game.current_phase_id:
         disc_result = await db.execute(
-            select(Evidence)
-            .where(
+            select(Evidence).where(
                 Evidence.game_id == game.id,
                 Evidence.player_id == player_id,
                 Evidence.phase_id == game.current_phase_id,
                 Evidence.source == "discovery",
             )
         )
-        state["my_discoveries"] = [
-            {"id": d.id, "title": d.title, "content": d.content}
-            for d in disc_result.scalars()
-        ]
+        state["my_discoveries"] = [{"id": d.id, "title": d.title, "content": d.content} for d in disc_result.scalars()]
 
     if game.current_phase_id:
         phase_info = await _get_current_phase_dict(db, game.current_phase_id)
@@ -124,9 +120,7 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
     if game.status == "ended":
         from madaminu.models import GameEnding, Vote
 
-        ending_result = await db.execute(
-            select(GameEnding).where(GameEnding.game_id == game.id)
-        )
+        ending_result = await db.execute(select(GameEnding).where(GameEnding.game_id == game.id))
         ending = ending_result.scalar_one_or_none()
         if ending:
             votes_result = await db.execute(select(Vote).where(Vote.game_id == game.id))

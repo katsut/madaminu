@@ -81,16 +81,18 @@ async def handle_websocket_v3(
     await websocket.send_json({"type": "game.state", "data": state})
 
     # Broadcast connection
-    await ws_manager.broadcast(room_code, {
-        "type": "player.connected",
-        "data": {"player_id": player_id, "display_name": display_name},
-    }, exclude=player_id)
+    await ws_manager.broadcast(
+        room_code,
+        {
+            "type": "player.connected",
+            "data": {"player_id": player_id, "display_name": display_name},
+        },
+        exclude=player_id,
+    )
 
     # Build players lookup (player_id -> character_name) for speech/evidence
     async with session_factory() as db:
-        game_result = await db.execute(
-            select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-        )
+        game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
         game = game_result.scalar_one()
         players = {p.id: p.character_name or p.display_name for p in game.players}
 
@@ -104,62 +106,102 @@ async def handle_websocket_v3(
             # v3 type + legacy iOS type aliases
             if msg_type in ("advance", "phase.advance", "phase.timer_expired"):
                 await handle_advance(
-                    game_id, room_code, player_id, data,
-                    game_service, discovery_service, ws_manager,
+                    game_id,
+                    room_code,
+                    player_id,
+                    data,
+                    game_service,
+                    discovery_service,
+                    ws_manager,
                 )
 
             elif msg_type in ("select_location", "investigate.select"):
                 await handle_select_location(
-                    game_id, room_code, player_id, data,
-                    game_service, ws_manager,
+                    game_id,
+                    room_code,
+                    player_id,
+                    data,
+                    game_service,
+                    ws_manager,
                 )
 
             elif msg_type in ("keep_evidence", "investigate.keep"):
                 await handle_keep_evidence(
-                    game_id, room_code, player_id, data,
-                    game_service, ws_manager,
+                    game_id,
+                    room_code,
+                    player_id,
+                    data,
+                    game_service,
+                    ws_manager,
                 )
 
             elif msg_type == "speech.request":
                 await handle_speech_request(
-                    game_id, room_code, player_id,
-                    speech_service, ws_manager,
+                    game_id,
+                    room_code,
+                    player_id,
+                    speech_service,
+                    ws_manager,
                 )
 
             elif msg_type == "speech.release":
                 await handle_speech_release(
-                    game_id, room_code, player_id, data,
-                    speech_service, ws_manager, players,
+                    game_id,
+                    room_code,
+                    player_id,
+                    data,
+                    speech_service,
+                    ws_manager,
+                    players,
                 )
 
             elif msg_type in ("reveal_evidence", "evidence.reveal"):
                 await handle_reveal_evidence(
-                    game_id, room_code, player_id, data,
-                    game_service, ws_manager, players,
+                    game_id,
+                    room_code,
+                    player_id,
+                    data,
+                    game_service,
+                    ws_manager,
+                    players,
                 )
 
             elif msg_type in ("vote", "vote.submit"):
                 await handle_vote(
-                    game_id, room_code, player_id, data,
-                    game_service, discovery_service, ws_manager,
+                    game_id,
+                    room_code,
+                    player_id,
+                    data,
+                    game_service,
+                    discovery_service,
+                    ws_manager,
                 )
 
             elif msg_type in ("room_message", "room_message.send"):
                 await handle_room_message(
-                    room_code, player_id, data,
-                    ws_manager, players,
+                    room_code,
+                    player_id,
+                    data,
+                    ws_manager,
+                    players,
                 )
 
             elif msg_type == "intro.ready":
                 await _handle_intro_ready(
-                    game_id, room_code, player_id,
-                    session_factory, ws_manager,
+                    game_id,
+                    room_code,
+                    player_id,
+                    session_factory,
+                    ws_manager,
                 )
 
             elif msg_type == "intro.unready":
                 await _handle_intro_unready(
-                    game_id, room_code, player_id,
-                    session_factory, ws_manager,
+                    game_id,
+                    room_code,
+                    player_id,
+                    session_factory,
+                    ws_manager,
                 )
 
             elif msg_type == "retry_generation":
@@ -171,8 +213,12 @@ async def handle_websocket_v3(
                 if phase:
                     asyncio.create_task(
                         _finalize_phase_start(
-                            game_id, room_code, phase,
-                            discovery_service, game_service, ws_manager,
+                            game_id,
+                            room_code,
+                            phase,
+                            discovery_service,
+                            game_service,
+                            ws_manager,
                         )
                     )
 
@@ -194,10 +240,13 @@ async def handle_websocket_v3(
                 p.connection_status = ConnectionStatus.offline
                 await db.commit()
 
-        await ws_manager.broadcast(room_code, {
-            "type": "player.disconnected",
-            "data": {"player_id": player_id},
-        })
+        await ws_manager.broadcast(
+            room_code,
+            {
+                "type": "player.disconnected",
+                "data": {"player_id": player_id},
+            },
+        )
 
 
 async def _handle_intro_ready(
@@ -213,17 +262,18 @@ async def _handle_intro_ready(
         player.is_intro_ready = True
         await db.commit()
 
-        game_result = await db.execute(
-            select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-        )
+        game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
         game = game_result.scalar_one()
         ready_count = sum(1 for p in game.players if p.is_intro_ready and not p.is_ai)
         human_count = sum(1 for p in game.players if not p.is_ai)
 
-    await ws.broadcast(room_code, {
-        "type": "intro.ready.count",
-        "data": {"count": ready_count},
-    })
+    await ws.broadcast(
+        room_code,
+        {
+            "type": "intro.ready.count",
+            "data": {"count": ready_count},
+        },
+    )
 
     if ready_count >= human_count:
         await ws.broadcast(room_code, {"type": "intro.all_ready", "data": {}})
@@ -242,13 +292,14 @@ async def _handle_intro_unready(
         player.is_intro_ready = False
         await db.commit()
 
-        game_result = await db.execute(
-            select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-        )
+        game_result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
         game = game_result.scalar_one()
         ready_count = sum(1 for p in game.players if p.is_intro_ready and not p.is_ai)
 
-    await ws.broadcast(room_code, {
-        "type": "intro.ready.count",
-        "data": {"count": ready_count},
-    })
+    await ws.broadcast(
+        room_code,
+        {
+            "type": "intro.ready.count",
+            "data": {"count": ready_count},
+        },
+    )

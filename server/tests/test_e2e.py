@@ -34,10 +34,20 @@ MOCK_SCENARIO = {
                 "name": "1階",
                 "area_type": "indoor",
                 "rooms": [
-                    {"id": "study", "name": "書斎", "size": 2, "features": ["本棚", "机", "窓", "椅子", "ランプ", "絨毯"]},
+                    {
+                        "id": "study",
+                        "name": "書斎",
+                        "size": 2,
+                        "features": ["本棚", "机", "窓", "椅子", "ランプ", "絨毯"],
+                    },
                     {"id": "garden", "name": "庭園", "size": 1, "features": ["噴水", "花壇", "ベンチ"]},
                     {"id": "kitchen", "name": "厨房", "size": 1, "features": ["調理台", "冷蔵庫", "食器棚"]},
-                    {"id": "dining", "name": "食堂", "size": 2, "features": ["テーブル", "シャンデリア", "窓", "食器棚", "暖炉", "絵画"]},
+                    {
+                        "id": "dining",
+                        "name": "食堂",
+                        "size": 2,
+                        "features": ["テーブル", "シャンデリア", "窓", "食器棚", "暖炉", "絵画"],
+                    },
                 ],
             },
             {
@@ -45,7 +55,12 @@ MOCK_SCENARIO = {
                 "name": "2階",
                 "area_type": "indoor",
                 "rooms": [
-                    {"id": "master_bedroom", "name": "主寝室", "size": 2, "features": ["ベッド", "クローゼット", "鏡台", "窓", "サイドテーブル", "絵画"]},
+                    {
+                        "id": "master_bedroom",
+                        "name": "主寝室",
+                        "size": 2,
+                        "features": ["ベッド", "クローゼット", "鏡台", "窓", "サイドテーブル", "絵画"],
+                    },
                     {"id": "guest_room", "name": "客室", "size": 1, "features": ["ベッド", "机", "窓"]},
                     {"id": "library", "name": "図書室", "size": 1, "features": ["本棚", "机", "ソファ"]},
                     {"id": "storage", "name": "物置", "size": 1, "features": ["棚", "箱", "古い家具"]},

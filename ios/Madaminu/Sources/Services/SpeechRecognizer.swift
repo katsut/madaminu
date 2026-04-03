@@ -105,7 +105,7 @@ final class SpeechRecognizer: @unchecked Sendable {
 
     func stopRecording() {
         audioEngine?.stop()
-        audioEngine?.inputNode.removeTap(onBus: 0)
+        audioEngine?.inputNode.removeTap(onBus: 0)  
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
 

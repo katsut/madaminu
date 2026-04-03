@@ -235,9 +235,7 @@ class TestVotingPhaseAdvanceBlocked:
             # but the handler blocks it before calling advance_phase
             # so we test that the timer also doesn't advance
             async with db_env() as db:
-                phase_result = await db.execute(
-                    select(Phase).where(Phase.id == voting_phase.id)
-                )
+                phase_result = await db.execute(select(Phase).where(Phase.id == voting_phase.id))
                 phase_result.scalar_one()
 
             # Verify voting phase timer doesn't auto-advance (tested in test_timer_resilience)

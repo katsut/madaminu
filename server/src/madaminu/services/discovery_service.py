@@ -25,9 +25,7 @@ class DiscoveryService:
         """
         # 1. Load context from DB → close session
         async with self._sf() as db:
-            game = await db.execute(
-                select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-            )
+            game = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
             g = game.scalar_one()
             map_data = (g.scenario_skeleton or {}).get("map", {})
             route_text = (g.scenario_skeleton or {}).get("route_text", "")
@@ -95,7 +93,11 @@ class DiscoveryService:
         logger.info("Discoveries generated for phase %s", phase_id)
 
     async def _generate_for_player(
-        self, context: dict, player: Player, location_id: str, all_selections: list,
+        self,
+        context: dict,
+        player: Player,
+        location_id: str,
+        all_selections: list,
     ) -> tuple[str, list[dict]]:
         """Generate discoveries for one player. No DB access."""
         import json
@@ -152,11 +154,13 @@ class DiscoveryService:
 
         discoveries = []
         for item in result.get("discoveries", [])[:3]:
-            discoveries.append({
-                "title": item.get("title", "調査結果"),
-                "content": item.get("content", ""),
-                "feature": item.get("feature", ""),
-            })
+            discoveries.append(
+                {
+                    "title": item.get("title", "調査結果"),
+                    "content": item.get("content", ""),
+                    "feature": item.get("feature", ""),
+                }
+            )
 
         logger.info("Generated %d discoveries for %s at %s", len(discoveries), player.id, location_id)
         return player.id, discoveries
@@ -172,7 +176,4 @@ class DiscoveryService:
                     Evidence.source == "discovery",
                 )
             )
-            return [
-                {"id": e.id, "title": e.title, "content": e.content, "feature": ""}
-                for e in result.scalars()
-            ]
+            return [{"id": e.id, "title": e.title, "content": e.content, "feature": ""} for e in result.scalars()]

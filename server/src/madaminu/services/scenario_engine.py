@@ -483,13 +483,15 @@ async def investigate_location_batch(
             source="discovery",
         )
         db.add(ev)
-        discoveries.append({
-            "id": ev_id,
-            "title": ev.title,
-            "content": ev.content,
-            "location_name": location.get("name", location_id),
-            "feature": item.get("feature", ""),
-        })
+        discoveries.append(
+            {
+                "id": ev_id,
+                "title": ev.title,
+                "content": ev.content,
+                "location_name": location.get("name", location_id),
+                "feature": item.get("feature", ""),
+            }
+        )
 
     game.total_llm_cost_usd += usage.estimated_cost_usd
     await db.commit()
