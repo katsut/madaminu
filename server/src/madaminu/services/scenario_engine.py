@@ -85,6 +85,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         "map": complete_map,
         "route_text": route_text,
         "relationships": scenario["relationships"],
+        "players": scenario["players"],
     }
     game.gm_internal_state = {
         "gm_strategy": scenario.get("gm_strategy", ""),
@@ -116,7 +117,7 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
     await db.flush()
 
     initial_phase_result = await db.execute(
-        select(Phase).where(Phase.game_id == game.id, Phase.phase_type == PhaseType.initial).limit(1)
+        select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order).limit(1)
     )
     initial_phase = initial_phase_result.scalar_one()
 
@@ -125,30 +126,69 @@ async def generate_scenario(db: AsyncSession, game_id: str) -> tuple[dict, list[
         if player is None:
             continue
 
-        initial_ev = sp.get("initial_evidence")
-        if initial_ev:
+        for ev in sp.get("initial_evidences", []):
             db.add(
                 Evidence(
                     id=str(uuid.uuid4()),
                     game_id=game.id,
                     player_id=player.id,
                     phase_id=initial_phase.id,
-                    title=initial_ev.get("title", "証拠"),
-                    content=initial_ev.get("content", ""),
+                    title=ev.get("title", "証拠"),
+                    content=ev.get("content", ""),
                     source=EvidenceSource.gm_push,
                 )
             )
 
-        initial_alibi = sp.get("initial_alibi")
-        if initial_alibi:
+        for alibi in sp.get("initial_alibis", []):
             db.add(
                 Evidence(
                     id=str(uuid.uuid4()),
                     game_id=game.id,
                     player_id=player.id,
                     phase_id=initial_phase.id,
-                    title=initial_alibi.get("title", "アリバイ"),
-                    content=initial_alibi.get("content", ""),
+                    title=alibi.get("title", "アリバイ"),
+                    content=alibi.get("content", ""),
+                    source=EvidenceSource.gm_push,
+                )
+            )
+
+        for rumor in sp.get("initial_rumors", []):
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game.id,
+                    player_id=player.id,
+                    phase_id=initial_phase.id,
+                    title=rumor.get("title", "情報"),
+                    content=rumor.get("content", ""),
+                    source=EvidenceSource.gm_push,
+                )
+            )
+
+        # Backward compat: single initial_evidence/initial_alibi
+        if "initial_evidence" in sp and "initial_evidences" not in sp:
+            ev = sp["initial_evidence"]
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game.id,
+                    player_id=player.id,
+                    phase_id=initial_phase.id,
+                    title=ev.get("title", "証拠"),
+                    content=ev.get("content", ""),
+                    source=EvidenceSource.gm_push,
+                )
+            )
+        if "initial_alibi" in sp and "initial_alibis" not in sp:
+            alibi = sp["initial_alibi"]
+            db.add(
+                Evidence(
+                    id=str(uuid.uuid4()),
+                    game_id=game.id,
+                    player_id=player.id,
+                    phase_id=initial_phase.id,
+                    title=alibi.get("title", "アリバイ"),
+                    content=alibi.get("content", ""),
                     source=EvidenceSource.gm_push,
                 )
             )
@@ -443,13 +483,15 @@ async def investigate_location_batch(
             source="discovery",
         )
         db.add(ev)
-        discoveries.append({
-            "id": ev_id,
-            "title": ev.title,
-            "content": ev.content,
-            "location_name": location.get("name", location_id),
-            "feature": item.get("feature", ""),
-        })
+        discoveries.append(
+            {
+                "id": ev_id,
+                "title": ev.title,
+                "content": ev.content,
+                "location_name": location.get("name", location_id),
+                "feature": item.get("feature", ""),
+            }
+        )
 
     game.total_llm_cost_usd += usage.estimated_cost_usd
     await db.commit()
@@ -623,25 +665,31 @@ def _create_cycle_phases(db, game: Game, all_locations: list[dict]):
     turn_count = game.turn_count or 3
     phase_order = 0
 
-    human_count = sum(1 for p in game.players if not p.is_ai)
-    opening_duration = max(60, human_count * 60)
-
-    initial_phase = Phase(
+    storytelling_phase = Phase(
         game_id=game.id,
-        phase_type=PhaseType.initial,
+        phase_type=PhaseType.storytelling,
         phase_order=phase_order,
-        duration_sec=0,
+        duration_sec=0,  # Manual advance by host
     )
-    db.add(initial_phase)
+    db.add(storytelling_phase)
     phase_order += 1
 
     opening_phase = Phase(
         game_id=game.id,
         phase_type=PhaseType.opening,
         phase_order=phase_order,
-        duration_sec=opening_duration,
+        duration_sec=0,  # Manual advance by host after introductions
     )
     db.add(opening_phase)
+    phase_order += 1
+
+    briefing_phase = Phase(
+        game_id=game.id,
+        phase_type=PhaseType.briefing,
+        phase_order=phase_order,
+        duration_sec=0,  # Manual advance by host after reviewing cards
+    )
+    db.add(briefing_phase)
     phase_order += 1
 
     # Turn = discussion → planning → investigation

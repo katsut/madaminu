@@ -13,4 +13,5 @@ ENV PORT=8000
 
 COPY server/scripts/ scripts/
 
-CMD uv run alembic upgrade head; uv run uvicorn madaminu.main:app --host 0.0.0.0 --port $PORT
+COPY server/scripts/start.sh ./
+CMD ["sh", "start.sh"]

@@ -18,19 +18,19 @@ public extension Color {
     static let mdTextMuted = Color(hex: "6B6B7B")
 
     // MARK: - Accent
-    static let mdAccent = Color(hex: "E94560")
-    static let mdAccentLight = Color(hex: "FF6B81")
+    static let mdAccent = Color(hex: "FF6B81")
+    static let mdAccentLight = Color(hex: "FF8FA0")
 
     // MARK: - Semantic
     static let mdSuccess = Color(hex: "4CAF50")
     static let mdWarning = Color(hex: "FFC107")
-    static let mdError = Color(hex: "E94560")
+    static let mdError = Color(hex: "FF6B81")
     static let mdInfo = Color(hex: "5DADE2")
 
     // MARK: - Game Phase
     static let mdInvestigation = Color(hex: "5DADE2")
     static let mdDiscussion = Color(hex: "C9A96E")
-    static let mdVoting = Color(hex: "E94560")
+    static let mdVoting = Color(hex: "FF6B81")
 }
 
 extension Color {

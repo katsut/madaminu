@@ -9,7 +9,7 @@ from madaminu.models import Game, Phase
 
 async def get_game_with_phases(db: AsyncSession, game_id: str) -> Game:
     result = await db.execute(
-        select(Game).options(selectinload(Game.phases)).where(Game.id == game_id)
+        select(Game).options(selectinload(Game.phases), selectinload(Game.players)).where(Game.id == game_id)
     )
     return result.scalar_one()
 
@@ -26,9 +26,7 @@ async def get_current_phase(db: AsyncSession, game_id: str) -> Phase | None:
 async def end_phase(db: AsyncSession, phase_id: str) -> bool:
     """End a phase atomically. Returns True if this call ended it, False if already ended."""
     result = await db.execute(
-        update(Phase)
-        .where(Phase.id == phase_id, Phase.ended_at.is_(None))
-        .values(ended_at=datetime.utcnow())
+        update(Phase).where(Phase.id == phase_id, Phase.ended_at.is_(None)).values(ended_at=datetime.utcnow())
     )
     return result.rowcount > 0
 

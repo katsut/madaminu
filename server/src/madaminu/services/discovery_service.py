@@ -25,9 +25,7 @@ class DiscoveryService:
         """
         # 1. Load context from DB → close session
         async with self._sf() as db:
-            game = await db.execute(
-                select(Game).options(selectinload(Game.players)).where(Game.id == game_id)
-            )
+            game = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
             g = game.scalar_one()
             map_data = (g.scenario_skeleton or {}).get("map", {})
             route_text = (g.scenario_skeleton or {}).get("route_text", "")
@@ -95,14 +93,18 @@ class DiscoveryService:
         logger.info("Discoveries generated for phase %s", phase_id)
 
     async def _generate_for_player(
-        self, context: dict, player: Player, location_id: str, all_selections: list,
+        self,
+        context: dict,
+        player: Player,
+        location_id: str,
+        all_selections: list,
     ) -> tuple[str, list[dict]]:
         """Generate discoveries for one player. No DB access."""
         import json
 
         from madaminu.llm.client import LIGHT_MODEL, llm_client
+        from madaminu.llm.prompts import load_template, render_template
         from madaminu.services.scenario_engine import _parse_scenario_json
-        from madaminu.services.template_loader import load_template, render_template
 
         map_data = context["map_data"]
         location = None
@@ -122,12 +124,21 @@ class DiscoveryService:
         if not features:
             return player.id, []
 
+        # Compact context: only include relevant parts of scenario
+        skeleton = context["game"]["scenario_skeleton"] or {}
+        compact_skeleton = {
+            "setting": skeleton.get("setting", {}),
+            "victim": skeleton.get("victim", {}),
+        }
+        gm_state = context["game"]["gm_internal_state"] or {}
+        compact_gm = gm_state.get("gm_strategy", "") if isinstance(gm_state, dict) else str(gm_state)[:500]
+
         system_prompt = load_template("scenario_system")
         user_prompt = render_template(
             "investigation_batch",
-            scenario_skeleton=json.dumps(context["game"]["scenario_skeleton"] or {}, ensure_ascii=False, indent=2),
+            scenario_skeleton=json.dumps(compact_skeleton, ensure_ascii=False),
             route_text=context["game"]["route_text"],
-            gm_internal_state=json.dumps(context["game"]["gm_internal_state"] or {}, ensure_ascii=False, indent=2),
+            gm_internal_state=compact_gm if isinstance(compact_gm, str) else json.dumps(compact_gm, ensure_ascii=False),
             player_id=player.id,
             player_name=player.character_name or player.display_name,
             player_role=player.role or "unknown",
@@ -142,12 +153,14 @@ class DiscoveryService:
         result = _parse_scenario_json(raw)
 
         discoveries = []
-        for item in result.get("discoveries", []):
-            discoveries.append({
-                "title": item.get("title", "調査結果"),
-                "content": item.get("content", ""),
-                "feature": item.get("feature", ""),
-            })
+        for item in result.get("discoveries", [])[:3]:
+            discoveries.append(
+                {
+                    "title": item.get("title", "調査結果"),
+                    "content": item.get("content", ""),
+                    "feature": item.get("feature", ""),
+                }
+            )
 
         logger.info("Generated %d discoveries for %s at %s", len(discoveries), player.id, location_id)
         return player.id, discoveries
@@ -163,7 +176,4 @@ class DiscoveryService:
                     Evidence.source == "discovery",
                 )
             )
-            return [
-                {"id": e.id, "title": e.title, "content": e.content, "feature": ""}
-                for e in result.scalars()
-            ]
+            return [{"id": e.id, "title": e.title, "content": e.content, "feature": ""} for e in result.scalars()]

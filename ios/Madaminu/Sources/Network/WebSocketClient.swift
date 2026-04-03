@@ -23,7 +23,7 @@ final class WebSocketClient: Sendable {
 
     init() {}
 
-    func connect(roomCode: String, token: String, baseURL: String = "wss://REDACTED.example.com") {
+    func connect(roomCode: String, token: String, baseURL: String = "ws://127.0.0.1:8000") {
         state.write {
             $0.roomCode = roomCode
             $0.token = token
@@ -62,6 +62,7 @@ final class WebSocketClient: Sendable {
         guard let jsonData = try? JSONSerialization.data(withJSONObject: message),
               let jsonString = String(data: jsonData, encoding: .utf8) else { return }
 
+        print("[WS] send: \(type)")
         let task = state.read { $0.webSocketTask }
 
         Task { [jsonString] in

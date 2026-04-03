@@ -23,6 +23,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
     @Published var selectedFeature: String?
     @Published var roomMessages: [RoomMessage] = []
     @Published var colocatedPlayers: [ColocatedPlayer] = []
+    @Published var discoveriesStatus: String = "pending"
     @Published var discoveries: [DiscoveryItem] = []
     @Published var keptDiscoveryId: String?
     @Published var revealedEvidences: [RevealedEvidence] = []
@@ -60,6 +61,7 @@ final class GamePlayStore: ObservableObject, @unchecked Sendable {
         selectedFeature = nil
         roomMessages = []
         colocatedPlayers = []
+        discoveriesStatus = "pending"
         discoveries = []
         keptDiscoveryId = nil
         revealedEvidences = []

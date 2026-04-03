@@ -19,8 +19,13 @@ struct RoomLobbyView: View {
         playersWithCharacter.count
     }
 
+    private var nonHostPlayers: [PlayerInfo] {
+        store.room.players.filter { !$0.isHost }
+    }
+
     private var allReady: Bool {
-        totalWithCharacter > 0 && readyCount == totalWithCharacter
+        // All players must have created their character
+        store.room.players.allSatisfy { $0.characterName != nil }
     }
 
     var body: some View {
@@ -55,7 +60,7 @@ struct RoomLobbyView: View {
                         }
                     }
 
-                    Text(copied ? "コピーしました" : "\(readyCount)/\(store.room.players.count) 人が準備完了")
+                    Text(copied ? "コピーしました" : "\(totalWithCharacter)/\(store.room.players.count) 人がキャラ作成済み")
                         .font(.mdCaption).foregroundStyle(copied ? Color.mdSuccess : Color.mdTextMuted)
 
                     Button { showInviteSheet = true } label: {
@@ -91,8 +96,8 @@ struct RoomLobbyView: View {
                                         .background(Color.mdInfo.opacity(0.15))
                                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                                 }
-                                Image(systemName: player.isReady ? "checkmark.circle.fill" : "circle.dashed")
-                                    .foregroundStyle(player.isReady ? Color.mdSuccess : Color.mdTextMuted)
+                                Image(systemName: player.characterName != nil ? "checkmark.circle.fill" : "circle.dashed")
+                                    .foregroundStyle(player.characterName != nil ? Color.mdSuccess : Color.mdTextMuted)
                             }
                         }
                     }
@@ -134,22 +139,19 @@ struct RoomLobbyView: View {
                 if !store.room.hasCreatedCharacter {
                     MDButton("キャラクターを作成") { store.dispatch(.showCharacterCreation) }
                 } else {
-                    HStack(spacing: Spacing.sm) {
-                        MDButton(meIsReady ? "準備取消" : "準備完了", style: meIsReady ? .secondary : .primary) {
-                            store.dispatch(.toggleReady)
+                    if store.room.isHost {
+                        MDButton("ゲーム開始", style: allReady ? .primary : .ghost, isLoading: store.isLoading) {
+                            store.dispatch(.startGame)
                         }
+                        .disabled(!allReady)
 
-                        if store.room.isHost {
-                            MDButton("ゲーム開始", style: allReady ? .primary : .ghost, isLoading: store.isLoading) {
-                                store.dispatch(.startGame)
-                            }
-                            .disabled(!allReady)
+                        if !allReady {
+                            Text("全員のキャラクター作成を待っています")
+                                .font(.mdCaption).foregroundStyle(Color.mdTextMuted)
                         }
-                    }
-
-                    if !allReady && store.room.isHost && store.room.hasCreatedCharacter {
-                        Text("全員が準備完了するとゲームを開始できます")
-                            .font(.mdCaption).foregroundStyle(Color.mdTextMuted)
+                    } else {
+                        Text("キャラクター作成完了 ✓")
+                            .font(.mdCallout).foregroundStyle(Color.mdSuccess)
                     }
 
                     let need = max(0, 4 - store.room.players.filter { $0.characterName != nil }.count)

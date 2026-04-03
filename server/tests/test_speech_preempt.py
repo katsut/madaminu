@@ -1,11 +1,10 @@
 """Tests for speech manager preemption behavior."""
 
-import asyncio
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
-from unittest.mock import AsyncMock, patch
 
 from madaminu.models import Base
 from madaminu.services.speech_manager import SpeechManager

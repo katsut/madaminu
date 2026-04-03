@@ -24,11 +24,21 @@ async def _get_current_phase_dict(db: AsyncSession, current_phase_id: str) -> di
         "phase_order": phase.phase_order,
         "duration_sec": phase.duration_sec,
         "remaining_sec": remaining,
+        "discoveries_status": phase.discoveries_status,
         "investigation_locations": phase.investigation_locations,
     }
 
 
 async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict:
+    # Build self_introduction lookup from scenario skeleton
+    intro_map: dict[str, str] = {}
+    if game.scenario_skeleton and "players" in game.scenario_skeleton:
+        for sp in game.scenario_skeleton["players"]:
+            name = sp.get("character_name", "")
+            intro = sp.get("self_introduction", "")
+            if name and intro:
+                intro_map[name] = intro
+
     players_public = [
         {
             "id": p.id,
@@ -42,6 +52,7 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
             "character_personality": p.character_personality,
             "character_background": p.character_background,
             "public_info": p.public_info,
+            "self_introduction": intro_map.get(p.character_name or "", ""),
             "is_host": p.is_host,
             "is_ai": p.is_ai,
             "connection_status": p.connection_status,
@@ -74,13 +85,25 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
 
     ev_result = await db.execute(
         select(Evidence)
-        .where(Evidence.game_id == game.id, Evidence.player_id == player_id)
+        .where(Evidence.game_id == game.id, Evidence.player_id == player_id, Evidence.source != "discovery")
         .order_by(Evidence.revealed_at)
     )
     my_evidences = ev_result.scalars().all()
     state["my_evidences"] = [
         {"evidence_id": e.id, "title": e.title, "content": e.content, "source": e.source} for e in my_evidences
     ]
+
+    # Discoveries for current investigation phase
+    if game.current_phase_id:
+        disc_result = await db.execute(
+            select(Evidence).where(
+                Evidence.game_id == game.id,
+                Evidence.player_id == player_id,
+                Evidence.phase_id == game.current_phase_id,
+                Evidence.source == "discovery",
+            )
+        )
+        state["my_discoveries"] = [{"id": d.id, "title": d.title, "content": d.content} for d in disc_result.scalars()]
 
     if game.current_phase_id:
         phase_info = await _get_current_phase_dict(db, game.current_phase_id)
@@ -92,5 +115,49 @@ async def build_game_state(db: AsyncSession, game: Game, player_id: str) -> dict
             state["current_phase"] = phase_info
 
     state["current_speaker_id"] = None
+
+    # Include ending data if game is ended
+    if game.status == "ended":
+        from madaminu.models import GameEnding, Vote
+
+        ending_result = await db.execute(select(GameEnding).where(GameEnding.game_id == game.id))
+        ending = ending_result.scalar_one_or_none()
+        if ending:
+            votes_result = await db.execute(select(Vote).where(Vote.game_id == game.id))
+            votes = votes_result.scalars().all()
+            id_to_name = {p.id: p.character_name or p.display_name for p in game.players}
+
+            # Determine arrested player (most votes)
+            vote_counts: dict[str, int] = {}
+            for v in votes:
+                vote_counts[v.suspect_player_id] = vote_counts.get(v.suspect_player_id, 0) + 1
+            arrested_id = max(vote_counts, key=vote_counts.get) if vote_counts else None
+            arrested_name = id_to_name.get(arrested_id, "?") if arrested_id else None
+
+            state["ending"] = {
+                "ending_text": ending.ending_text,
+                "criminal_epilogue": ending.criminal_epilogue,
+                "true_criminal_id": ending.true_criminal_id,
+                "arrested_name": arrested_name,
+                "vote_counts": {id_to_name.get(k, "?"): v for k, v in vote_counts.items()},
+                "objective_results": ending.objective_results,
+                "vote_details": [
+                    {
+                        "voter": id_to_name.get(v.voter_player_id, "?"),
+                        "suspect": id_to_name.get(v.suspect_player_id, "?"),
+                    }
+                    for v in votes
+                ],
+                "character_reveals": [
+                    {
+                        "player_id": p.id,
+                        "character_name": p.character_name or p.display_name,
+                        "role": p.role,
+                        "secret_info": p.secret_info,
+                        "objective": p.objective,
+                    }
+                    for p in game.players
+                ],
+            }
 
     return state

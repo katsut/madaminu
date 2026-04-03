@@ -16,6 +16,7 @@ class PhaseType(enum.StrEnum):
     initial = "initial"
     storytelling = "storytelling"
     opening = "opening"
+    briefing = "briefing"
     discussion = "discussion"
     planning = "planning"
     investigation = "investigation"
@@ -35,11 +36,7 @@ class Phase(Base, UUIDPrimaryKeyMixin):
     ended_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
     deadline_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
     paused_remaining_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    current_speaker_id: Mapped[str | None] = mapped_column(
-        ForeignKey("players.id", use_alter=True), nullable=True
-    )
-    discoveries_status: Mapped[str] = mapped_column(
-        String(20), server_default="pending", nullable=False
-    )
+    current_speaker_id: Mapped[str | None] = mapped_column(ForeignKey("players.id", use_alter=True), nullable=True)
+    discoveries_status: Mapped[str] = mapped_column(String(20), server_default="pending", nullable=False)
 
     game: Mapped[Game] = relationship("Game", back_populates="phases", foreign_keys=[game_id])

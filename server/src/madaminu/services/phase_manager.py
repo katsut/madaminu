@@ -151,7 +151,7 @@ class PhaseManager:
                     self._run_phase_adjustment(game_id, room_code, current_phase.id),
                     timeout=30.0,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Phase adjustment timed out for game %s", game_id)
 
         if next_phase.phase_type == PhaseType.investigation:
@@ -166,7 +166,7 @@ class PhaseManager:
                     timeout=60.0,
                 )
                 logger.info("Discovery generation completed for %s", room_code)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Discovery generation timed out for game %s", game_id)
             except Exception:
                 logger.exception("Discovery generation failed for game %s", game_id)
@@ -204,7 +204,7 @@ class PhaseManager:
 
         self._start_timer(game_id, room_code, phase)
 
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         await manager.broadcast(
             room_code,
@@ -216,7 +216,7 @@ class PhaseManager:
         return phase
 
     async def pause_phase(self, game_id: str, room_code: str):
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         self._cancel_timer(game_id)
 
@@ -236,7 +236,7 @@ class PhaseManager:
         )
 
     async def resume_phase(self, game_id: str, room_code: str):
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         remaining = self._paused.pop(game_id, None)
         if remaining is None:
@@ -281,7 +281,7 @@ class PhaseManager:
         duration_sec: int,
         started_at: datetime,
     ):
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         try:
             while True:
@@ -320,7 +320,7 @@ class PhaseManager:
         import random
 
         from madaminu.services.scenario_engine import investigate_location_batch
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         selections = self.get_investigation_selections(room_code)
 
@@ -363,7 +363,12 @@ class PhaseManager:
                     d["can_tamper"] = is_alone
                     self.add_discovery(room_code, player_id, d)
 
-                logger.info("Batch discoveries for %s: %d items (cost: $%.4f)", player_id, len(discoveries), usage.estimated_cost_usd if usage else 0)
+                logger.info(
+                    "Batch discoveries for %s: %d items (cost: $%.4f)",
+                    player_id,
+                    len(discoveries),
+                    usage.estimated_cost_usd if usage else 0,
+                )
 
                 if discoveries:
                     await manager.send_to_player(
@@ -390,7 +395,7 @@ class PhaseManager:
 
     async def _execute_investigation_selections(self, game_id: str, room_code: str):
         from madaminu.services.scenario_engine import investigate_location
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         selections = self.get_investigation_selections(room_code)
         self.clear_investigation_selections(room_code)
@@ -432,7 +437,7 @@ class PhaseManager:
             await asyncio.sleep(15)
 
             from madaminu.services.ai_player import generate_ai_speech
-            from madaminu.ws.handler import manager
+            from madaminu.ws.handler_old import manager
 
             async with self._session_factory() as db:
                 game_result = await db.execute(
@@ -468,7 +473,7 @@ class PhaseManager:
 
     async def _send_travel_narratives(self, game_id: str, room_code: str):
         from madaminu.services.map_builder import generate_travel_narrative
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         try:
             selections = self.get_investigation_selections(room_code)
@@ -500,7 +505,7 @@ class PhaseManager:
 
     async def _run_phase_adjustment(self, game_id: str, room_code: str, ended_phase_id: str):
         from madaminu.services.scenario_engine import adjust_phase
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         try:
             async with self._session_factory() as db:
@@ -521,7 +526,7 @@ class PhaseManager:
             logger.exception("Phase adjustment failed for game %s", game_id)
 
     async def _broadcast_phase_started(self, room_code: str, phase: Phase, total_phases: int | None = None):
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         total_turns = 3
         if total_phases is None:
@@ -560,7 +565,7 @@ class PhaseManager:
         )
 
     async def _broadcast_phase_ended(self, room_code: str, ended_phase: Phase, next_phase: Phase | None):
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         await manager.broadcast(
             room_code,
@@ -577,7 +582,7 @@ class PhaseManager:
     async def _generate_and_broadcast_ending(self, game_id: str, room_code: str):
         from madaminu.models import Evidence, SpeechLog, Vote
         from madaminu.services.scenario_engine import generate_ending
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
 
         try:
             async with self._session_factory() as db:

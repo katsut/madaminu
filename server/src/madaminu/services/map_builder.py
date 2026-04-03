@@ -144,7 +144,9 @@ def _build_indoor(area: dict, rooms: list[dict], add_stairs: bool) -> list[dict]
                 for offset in [1, -1]:
                     alt_idx = corridor_idx + offset
                     if 0 <= alt_idx < corridor_count:
-                        alt_count = sum(1 for c in connections if c["from"] == corridors[alt_idx]["id"] and c["type"] == "door")
+                        alt_count = sum(
+                            1 for c in connections if c["from"] == corridors[alt_idx]["id"] and c["type"] == "door"
+                        )
                         if alt_count < 2:
                             connections.append(
                                 {
