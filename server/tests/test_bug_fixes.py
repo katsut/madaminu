@@ -1,8 +1,6 @@
 """Tests for bugs found in code review. Each test reproduces a specific bug."""
 
-import asyncio
 import uuid
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -231,7 +229,7 @@ class TestVotingPhaseAdvanceBlocked:
 
         # _handle_host_command should reject phase.advance for voting
         # We verify by checking game status stays voting after advance attempt
-        pm = PhaseManager(db_env)
+        PhaseManager(db_env)
         with patch("madaminu.ws.handler_old.manager.broadcast", new_callable=AsyncMock):
             # advance_phase on voting (last phase) would set status=ended
             # but the handler blocks it before calling advance_phase
@@ -240,7 +238,7 @@ class TestVotingPhaseAdvanceBlocked:
                 phase_result = await db.execute(
                     select(Phase).where(Phase.id == voting_phase.id)
                 )
-                phase = phase_result.scalar_one()
+                phase_result.scalar_one()
 
             # Verify voting phase timer doesn't auto-advance (tested in test_timer_resilience)
             # Here we verify the game stays in voting status

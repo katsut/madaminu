@@ -151,7 +151,7 @@ class PhaseManager:
                     self._run_phase_adjustment(game_id, room_code, current_phase.id),
                     timeout=30.0,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Phase adjustment timed out for game %s", game_id)
 
         if next_phase.phase_type == PhaseType.investigation:
@@ -166,7 +166,7 @@ class PhaseManager:
                     timeout=60.0,
                 )
                 logger.info("Discovery generation completed for %s", room_code)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Discovery generation timed out for game %s", game_id)
             except Exception:
                 logger.exception("Discovery generation failed for game %s", game_id)

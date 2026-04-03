@@ -74,7 +74,6 @@ async def test_timer_advances_after_broadcast_failure(pm_env):
 
     broadcast_mock = AsyncMock(side_effect=Exception("WS broadcast failed"))
     advance_called = asyncio.Event()
-    original_advance = pm.advance_phase
 
     async def mock_advance(*args, **kwargs):
         advance_called.set()
@@ -95,7 +94,7 @@ async def test_timer_advances_after_broadcast_failure(pm_env):
 
         try:
             await asyncio.wait_for(advance_called.wait(), timeout=5)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pytest.fail("advance_phase was never called - timer died after broadcast failure")
 
     assert advance_called.is_set()
@@ -134,7 +133,7 @@ async def test_voting_timer_auto_advances(pm_env):
         pm._start_timer("g1", "TEST01", voting)
         try:
             await asyncio.wait_for(advance_called.wait(), timeout=5)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pytest.fail("advance_phase was never called for voting phase")
 
     assert advance_called.is_set()
