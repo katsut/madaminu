@@ -2175,35 +2175,73 @@ struct PlayerRevealSequence: View {
 
                         Divider()
 
-                        // Objective
+                        // Objective (what it was)
+                        if let objective = reveal.objective, !objective.isEmpty {
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Label("個人目的", systemImage: "target")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdWarning)
+                                Text(objective)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+
+                        // Objective result (achieved or not)
                         if let result = objectiveResult {
-                            HStack(alignment: .top, spacing: Spacing.sm) {
+                            HStack(spacing: Spacing.sm) {
                                 Image(systemName: result.achieved ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .font(.mdTitle2)
                                     .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
                                 VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                    Text("個人目的")
-                                        .font(.mdCaption)
-                                        .foregroundStyle(Color.mdTextMuted)
-                                    Text(result.description)
-                                        .font(.mdBody)
-                                        .foregroundStyle(Color.mdTextPrimary)
                                     Text(result.achieved ? "達成！" : "未達成")
-                                        .font(.mdCaption)
+                                        .font(.mdHeadline)
                                         .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
+                                    Text(result.description)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextSecondary)
                                 }
                             }
                         }
 
+                        Divider()
+
                         // Secret
-                        if let secret = reveal.secretInfo {
-                            Divider()
+                        if let secret = reveal.secretInfo, !secret.isEmpty {
                             VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                Text("秘密")
+                                Label("秘密", systemImage: "lock.fill")
                                     .font(.mdCaption)
-                                    .foregroundStyle(Color.mdTextMuted)
+                                    .foregroundStyle(Color.mdAccent)
                                 Text(secret)
                                     .font(.mdBody)
                                     .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+
+                        // Player info from store
+                        let playerInfo = store.room.players.first(where: { $0.id == reveal.playerId })
+                        if let info = playerInfo {
+                            if let occupation = info.characterOccupation, !occupation.isEmpty {
+                                Divider()
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text("本当の職業")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextMuted)
+                                    Text(occupation)
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                }
+                            }
+                            if let background = info.characterBackground, !background.isEmpty {
+                                Divider()
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text("経歴")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextMuted)
+                                    Text(background)
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                }
                             }
                         }
                     }
