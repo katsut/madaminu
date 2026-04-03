@@ -1,8 +1,6 @@
 """Tests for bugs found in code review. Each test reproduces a specific bug."""
 
-import asyncio
 import uuid
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -114,13 +112,13 @@ class TestInvestigationStartedAt:
         game, players, phases = await _create_game(db_env)
         pm = PhaseManager(db_env)
 
-        with patch("madaminu.ws.handler.manager.broadcast", new_callable=AsyncMock):
+        with patch("madaminu.ws.handler_old.manager.broadcast", new_callable=AsyncMock):
             await pm.start_first_phase(game.id, game.room_code)
 
         # After starting planning, advance to investigation
         with (
-            patch("madaminu.ws.handler.manager.broadcast", new_callable=AsyncMock),
-            patch("madaminu.ws.handler.manager.send_to_player", new_callable=AsyncMock),
+            patch("madaminu.ws.handler_old.manager.broadcast", new_callable=AsyncMock),
+            patch("madaminu.ws.handler_old.manager.send_to_player", new_callable=AsyncMock),
             patch("madaminu.services.phase_manager.PhaseManager._generate_room_discoveries", new_callable=AsyncMock),
             patch("madaminu.services.phase_manager.PhaseManager._send_travel_narratives", new_callable=AsyncMock),
         ):
@@ -231,16 +229,14 @@ class TestVotingPhaseAdvanceBlocked:
 
         # _handle_host_command should reject phase.advance for voting
         # We verify by checking game status stays voting after advance attempt
-        pm = PhaseManager(db_env)
-        with patch("madaminu.ws.handler.manager.broadcast", new_callable=AsyncMock):
+        PhaseManager(db_env)
+        with patch("madaminu.ws.handler_old.manager.broadcast", new_callable=AsyncMock):
             # advance_phase on voting (last phase) would set status=ended
             # but the handler blocks it before calling advance_phase
             # so we test that the timer also doesn't advance
             async with db_env() as db:
-                phase_result = await db.execute(
-                    select(Phase).where(Phase.id == voting_phase.id)
-                )
-                phase = phase_result.scalar_one()
+                phase_result = await db.execute(select(Phase).where(Phase.id == voting_phase.id))
+                phase_result.scalar_one()
 
             # Verify voting phase timer doesn't auto-advance (tested in test_timer_resilience)
             # Here we verify the game stays in voting status

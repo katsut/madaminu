@@ -2,7 +2,7 @@ import Foundation
 
 struct WSMessageAdapter {
     static func apply(type: String, data: [String: String], store: AppStore) {
-        print("[WSMessageAdapter] Received: \(type), screen=\(store.screen)")
+        print("[WS] recv: \(type)")
         switch type {
         case "game.state":
             applyGameState(data, store: store)
@@ -24,136 +24,28 @@ struct WSMessageAdapter {
             if store.screen == .generating {
                 store.screen = store.game.scenarioSetting.sceneImageUrl != nil ? .intro : .playing
             }
-        case "phase.started":
-            applyPhaseStarted(data, store: store)
-        case "phase.timer":
-            applyPhaseTimer(data, store: store)
-        case "phase.paused":
-            store.game.isPaused = true
-        case "phase.resumed":
-            store.game.isPaused = false
-            if let remainingStr = data["remaining_sec"], let remaining = Int(remainingStr) {
-                store.game.localRemainingSec = remaining
-            }
-        case "travel.narrative":
-            store.game.travelNarrative = data["text"]
-        case "phase.ended":
-            let endedType = data["phase_type"] ?? store.game.currentPhase?.phaseType ?? ""
-            if endedType == "discussion" {
-                store.notebook.addDiscussionLog(
-                    turnNumber: store.game.currentPhase?.turnNumber ?? 1,
-                    speeches: store.game.speechHistory,
-                    reveals: store.game.revealedEvidences
-                )
-            }
-            let nextType = data["next_phase_type"] ?? ""
-            if !nextType.isEmpty {
-                store.game.showPhaseTransition = true
-                store.game.nextPhaseType = nextType
-            } else if endedType == "voting" {
-                store.game.showPhaseTransition = true
-                store.game.nextPhaseType = "ending"
-            }
-            // Preserve turn info for transition overlay
-            if let phase = store.game.currentPhase {
-                store.game.lastTurnNumber = phase.turnNumber
-                store.game.lastTotalTurns = phase.totalTurns
-            }
-            store.game.currentPhase = nil
-            // Safety: dismiss transition overlay after 30s if phase.started never arrives
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
-                if store.game.showPhaseTransition && store.game.currentPhase == nil {
-                    print("[WSMessageAdapter] Force dismissing stale transition overlay")
-                    store.game.showPhaseTransition = false
-                    // Nudge server
-                    store.sendWS(type: "phase.timer_expired")
-                }
-            }
+        case "game.generation_failed":
+            store.setError("シナリオ生成に失敗しました。もう一度お試しください。", level: .transient)
+            store.game.reset()
+            store.screen = .lobby
+
+        // Speech
         case "speech.granted":
             store.game.isSpeaking = true
             store.startRecording()
-        case "speech.denied":
-            store.setError("他のプレイヤーが発言中です", level: .transient)
         case "speech.active":
             store.game.currentSpeakerId = data["player_id"]
-        case "speech.released", "speech.ai":
-            if type == "speech.released" {
-                store.game.currentSpeakerId = nil
-            }
+        case "speech":
+            store.game.currentSpeakerId = nil
             let playerId = data["player_id"]
             let characterName = data["character_name"] ?? ""
             let transcript = data["transcript"] ?? ""
             if !transcript.isEmpty {
                 store.game.speechHistory.append(SpeechEntry(playerId: playerId, characterName: characterName, transcript: transcript))
             }
-        case "investigate.discoveries":
-            print("[WSMessageAdapter] discoveries raw keys: \(data.keys.sorted())")
-            print("[WSMessageAdapter] discoveries value: \(data["discoveries"]?.prefix(200) ?? "nil")")
-            if let discJSON = data["discoveries"],
-               let discData = discJSON.data(using: .utf8),
-               let discArray = try? JSONSerialization.jsonObject(with: discData) as? [[String: Any]] {
-                print("[WSMessageAdapter] parsed \(discArray.count) discoveries")
-                store.game.discoveries = discArray.compactMap { d in
-                    guard let id = d["id"] as? String,
-                          let title = d["title"] as? String,
-                          let content = d["content"] as? String else {
-                        print("[WSMessageAdapter] discovery parse failed: \(d.keys)")
-                        return nil
-                    }
-                    let canTamper = d["can_tamper"] as? Bool ?? false
-                    let feature = d["feature"] as? String ?? ""
-                    return DiscoveryItem(id: id, title: title, content: content, feature: feature, canTamper: canTamper)
-                }
-                print("[WSMessageAdapter] final discoveries count: \(store.game.discoveries.count)")
-            }
-        case "investigate.discovery":
-            let id = data["id"] ?? UUID().uuidString
-            let title = data["title"] ?? "調査結果"
-            let content = data["content"] ?? ""
-            let canTamper = data["can_tamper"] == "1" || data["can_tamper"] == "true"
-            store.game.discoveries.append(DiscoveryItem(id: id, title: title, content: content, canTamper: canTamper))
-        case "investigate.kept":
-            let title = data["title"] ?? "調査結果"
-            let content = data["content"] ?? ""
-            store.notebook.evidences.append(EvidenceItem(title: title, content: content))
-            if let id = data["id"] { store.game.keptDiscoveryId = id }
-        case "investigate.tampered":
-            if let id = data["id"] {
-                if let idx = store.game.discoveries.firstIndex(where: { $0.id == id }) {
-                    store.game.discoveries[idx].content = data["content"] ?? store.game.discoveries[idx].content
-                    store.game.discoveries[idx].isTampered = true
-                }
-            }
-        case "investigate.result":
-            let title = data["title"] ?? "調査結果"
-            let content = data["content"] ?? ""
-            store.notebook.evidences.append(EvidenceItem(title: title, content: content))
-        case "investigate.denied":
-            store.setError("調査できません", level: .transient)
-        case "evidence.received":
-            let title = data["title"] ?? "新しい手がかり"
-            let content = data["content"] ?? ""
-            var item = EvidenceItem(title: title, content: content)
-            item.evidenceId = data["evidence_id"]
-            store.notebook.evidences.append(item)
-        case "location.colocated":
-            if let playersJSON = data["players"],
-               let playersData = playersJSON.data(using: .utf8),
-               let playersArray = try? JSONSerialization.jsonObject(with: playersData) as? [[String: Any]] {
-                store.game.colocatedPlayers = playersArray.compactMap { dict in
-                    guard let id = dict["player_id"] as? String,
-                          let name = dict["character_name"] as? String else { return nil }
-                    return ColocatedPlayer(id: id, characterName: name, portraitUrl: dict["portrait_url"] as? String)
-                }
-            } else {
-                store.game.colocatedPlayers = []
-            }
-        case "room_message.received":
-            let senderId = data["sender_id"] ?? ""
-            let senderName = data["sender_name"] ?? ""
-            let text = data["text"] ?? ""
-            store.game.roomMessages.append(RoomMessage(senderId: senderId, senderName: senderName, text: text))
-        case "evidence.revealed":
+
+        // Evidence
+        case "evidence_revealed":
             let playerId = data["player_id"] ?? ""
             let playerName = data["player_name"] ?? "不明"
             let title = data["title"] ?? ""
@@ -165,78 +57,103 @@ struct WSMessageAdapter {
             if playerId != store.room.playerId {
                 store.notebook.evidences.append(EvidenceItem(title: "[\(playerName)] \(title)", content: content))
             }
-        case "intro.ready.count":
-            if let countStr = data["count"], let count = Int(countStr) {
-                store.game.introReadyCount = count
-            }
-        case "intro.start_game":
-            if store.screen == .intro {
-                store.screen = .playing
-            }
-        case "vote.cast":
+
+        // Vote
+        case "vote_cast":
             if let votedStr = data["voted_count"], let totalStr = data["total_human"],
                let voted = Int(votedStr), let total = Int(totalStr) {
                 store.game.votedCount = voted
                 store.game.totalHumanPlayers = total
             }
-        case "game.generation_failed":
-            store.setError("シナリオ生成に失敗しました。もう一度お試しください。", level: .transient)
-            store.game.reset()
-            store.screen = .lobby
-        case "game.ending":
-            applyEnding(data, store: store)
+
+        // Room message
+        case "room_message":
+            let senderId = data["sender_id"] ?? ""
+            let senderName = data["sender_name"] ?? ""
+            let text = data["text"] ?? ""
+            store.game.roomMessages.append(RoomMessage(senderId: senderId, senderName: senderName, text: text))
+
+        // Colocated players
+        case "location.colocated":
+            if let playersJSON = data["players"],
+               let playersData = playersJSON.data(using: .utf8),
+               let playersArray = try? JSONSerialization.jsonObject(with: playersData) as? [[String: Any]] {
+                store.game.colocatedPlayers = playersArray.compactMap { dict in
+                    guard let id = dict["player_id"] as? String,
+                          let name = dict["character_name"] as? String else { return nil }
+                    return ColocatedPlayer(id: id, characterName: name, portraitUrl: nil)
+                }
+            }
+
+        // Intro
+        case "intro.ready.count":
+            if let countStr = data["count"], let count = Int(countStr) {
+                store.game.introReadyCount = count
+            }
+        case "intro.all_ready":
+            if store.screen == .intro {
+                store.screen = .playing
+            }
+        case "intro.start_game":
+            if store.screen == .intro {
+                store.screen = .playing
+            }
+
+        // Connection
+        case "player.connected", "player.disconnected":
+            break
+
+        // Error
         case "error":
-            if let msg = data["message"] {
-                print("[WSMessageAdapter] Error: \(msg)")
+            let code = data["code"] ?? ""
+            let msg = data["message"] ?? code
+            if !msg.isEmpty {
+                print("[WS] recv error: \(code) \(msg)")
                 store.setError(msg, level: .transient)
             }
+
+        case "ping":
+            store.sendWS(type: "pong")
+
         default:
-            break
+            print("[WS] Unknown: \(type)")
         }
     }
 
-    // MARK: - Private Helpers
+    // MARK: - game.state
 
     private static func applyGameState(_ data: [String: String], store: AppStore) {
         let status = data["status"] ?? ""
-        print("[WSMessageAdapter] applyGameState: status=\(status), keys=\(data.keys.sorted())")
-        print("[WSMessageAdapter] mySecretInfo=\(data["my_secret_info"] ?? "nil"), myObjective=\(data["my_objective"] ?? "nil"), myRole=\(data["my_role"] ?? "nil")")
 
-        if let secret = data["my_secret_info"] {
-            store.game.mySecretInfo = secret
-        }
-        if let objective = data["my_objective"] {
-            store.game.myObjective = objective
-        }
-        if let role = data["my_role"] {
-            store.game.myRole = role
-        }
-        store.game.currentSpeakerId = data["current_speaker_id"]
+        // Secret info
+        if let secret = data["my_secret_info"] { store.game.mySecretInfo = secret }
+        if let objective = data["my_objective"] { store.game.myObjective = objective }
+        if let role = data["my_role"] { store.game.myRole = role }
 
+        // Scenario
         if let settingJSON = data["scenario_setting"],
            let settingData = settingJSON.data(using: .utf8),
            let setting = try? JSONSerialization.jsonObject(with: settingData) as? [String: Any] {
             store.game.scenarioSetting.location = setting["location"] as? String
             store.game.scenarioSetting.situation = setting["situation"] as? String
+            store.game.scenarioSetting.gatheringReason = setting["gathering_reason"] as? String
+            store.game.scenarioSetting.murderDiscovery = setting["murder_discovery"] as? String
+            store.game.scenarioSetting.murderDetail = setting["murder_detail"] as? String
+            store.game.scenarioSetting.openingNarrative = setting["opening_narrative"] as? String
         }
-
-        if let sceneUrl = data["scene_image_url"] {
-            store.game.scenarioSetting.sceneImageUrl = sceneUrl
-        }
-        if let victimUrl = data["victim_image_url"] {
-            store.game.scenarioSetting.victimImageUrl = victimUrl
-        }
-        if let mapUrl = data["map_url"] {
-            store.game.scenarioSetting.mapUrl = mapUrl
-        }
+        if let sceneUrl = data["scene_image_url"] { store.game.scenarioSetting.sceneImageUrl = sceneUrl }
+        if let victimUrl = data["victim_image_url"] { store.game.scenarioSetting.victimImageUrl = victimUrl }
+        if let mapUrl = data["map_url"] { store.game.scenarioSetting.mapUrl = mapUrl }
 
         if let victimJSON = data["victim"],
            let victimData = victimJSON.data(using: .utf8),
            let victim = try? JSONSerialization.jsonObject(with: victimData) as? [String: Any] {
             store.game.scenarioSetting.victimName = victim["name"] as? String
             store.game.scenarioSetting.victimDescription = victim["description"] as? String
+            store.game.scenarioSetting.victimGreeting = victim["greeting"] as? String
         }
 
+        // Players
         if let playersJSON = data["players"],
            let playersData = playersJSON.data(using: .utf8),
            let playersArray = try? JSONSerialization.jsonObject(with: playersData) as? [[String: Any]] {
@@ -255,18 +172,19 @@ struct WSMessageAdapter {
                     characterPersonality: dict["character_personality"] as? String,
                     characterBackground: dict["character_background"] as? String,
                     publicInfo: dict["public_info"] as? String,
+                    selfIntroduction: dict["self_introduction"] as? String,
                     portraitUrl: dict["portrait_url"] as? String,
                     isHost: dict["is_host"] as? Bool ?? false,
                     isAI: dict["is_ai"] as? Bool ?? false,
                     connectionStatus: dict["connection_status"] as? String ?? "offline"
                 )
             }
-
             if let hostId = data["host_player_id"] {
                 store.room.isHost = (hostId == store.room.playerId)
             }
         }
 
+        // Evidences
         if let evJSON = data["my_evidences"],
            let evData = evJSON.data(using: .utf8),
            let evArray = try? JSONSerialization.jsonObject(with: evData) as? [[String: Any]] {
@@ -279,79 +197,100 @@ struct WSMessageAdapter {
             }
         }
 
+        // Phase — detect transition via phase_id comparison
+        let previousPhaseId = store.game.currentPhase?.phaseId
+        var newPhase: PhaseInfo?
+
         if let phaseJSON = data["current_phase"],
            let phaseData = phaseJSON.data(using: .utf8),
            let phaseDict = try? JSONSerialization.jsonObject(with: phaseData) as? [String: Any] {
-            let phase = parsePhaseInfo(phaseDict)
-            store.game.currentPhase = phase
-            if let remaining = phase?.remainingSec ?? phase?.durationSec {
-                store.game.localRemainingSec = remaining
+            newPhase = parsePhaseInfo(phaseDict)
+        }
+
+        // Parse discoveries_status from phase info
+        var discStatus = "pending"
+        if let phaseJSON = data["current_phase"],
+           let phaseData = phaseJSON.data(using: .utf8),
+           let phaseDict = try? JSONSerialization.jsonObject(with: phaseData) as? [String: Any] {
+            discStatus = phaseDict["discoveries_status"] as? String ?? "pending"
+        }
+
+        let isFirstState = previousPhaseId == nil
+        let phaseChanged = newPhase?.phaseId != previousPhaseId
+        let becameReady = discStatus == "ready" && store.game.discoveriesStatus != "ready"
+
+        if phaseChanged && newPhase != nil {
+            // Save discussion log before clearing
+            let prevType = store.game.currentPhase?.phaseType ?? ""
+            if prevType == "discussion" {
+                store.notebook.addDiscussionLog(
+                    turnNumber: store.game.currentPhase?.turnNumber ?? 1,
+                    speeches: store.game.speechHistory,
+                    reveals: store.game.revealedEvidences
+                )
+            }
+
+            // Show transition only for mid-game phase changes (not reconnection)
+            if !isFirstState && discStatus != "ready" {
+                store.game.showPhaseTransition = true
+            }
+
+            // Clear phase-specific state (keep speech/evidence history across phases)
+            store.game.discoveries = []
+            store.game.keptDiscoveryId = nil
+            store.game.hasRevealedEvidence = false
+            store.game.colocatedPlayers = []
+            store.game.roomMessages = []
+            store.game.travelNarrative = nil
+        }
+
+        if becameReady || (isFirstState && discStatus == "ready") {
+            store.game.showPhaseTransition = false
+            if let phase = newPhase {
+                store.game.localRemainingSec = phase.remainingSec
             }
         }
 
+        // Discoveries from game.state
+        if let discJSON = data["my_discoveries"],
+           let discData = discJSON.data(using: .utf8),
+           let discArray = try? JSONSerialization.jsonObject(with: discData) as? [[String: Any]] {
+            store.game.discoveries = discArray.compactMap { d in
+                guard let id = d["id"] as? String,
+                      let title = d["title"] as? String,
+                      let content = d["content"] as? String else { return nil }
+                return DiscoveryItem(id: id, title: title, content: content, canTamper: false)
+            }
+        }
+
+        // Update phase and status
+        store.game.currentPhase = newPhase
+        store.game.discoveriesStatus = discStatus
+
+        // Ending
+        if status == "ended" {
+            if let endingJSON = data["ending"],
+               let endingData = endingJSON.data(using: .utf8),
+               let endingObj = try? JSONDecoder().decode(EndingData.self, from: endingData) {
+                store.game.ending = endingObj
+            }
+            store.screen = .ended
+            return
+        }
+
+        // Screen transition
         if status == "playing" || status == "voting" {
             if store.screen == .generating || store.screen == .lobby || store.screen == .home {
-                if store.game.scenarioSetting.sceneImageUrl != nil {
+                // If game has a current phase, go straight to playing (rejoin case)
+                if newPhase != nil {
+                    store.screen = .playing
+                } else if store.game.scenarioSetting.sceneImageUrl != nil {
                     store.screen = .intro
                 } else {
                     store.screen = .playing
                 }
             }
-        } else if status == "ended" {
-            store.screen = .ended
         }
-    }
-
-    private static func applyPhaseStarted(_ data: [String: String], store: AppStore) {
-        let phase = parsePhaseInfo(stringDataToDict(data))
-        store.game.currentPhase = phase
-        store.game.localRemainingSec = phase?.remainingSec ?? phase?.durationSec ?? 0
-        store.game.discoveries = []
-        store.game.keptDiscoveryId = nil
-        store.game.hasRevealedEvidence = false
-        store.game.colocatedPlayers = []
-        store.game.roomMessages = []
-        store.game.travelNarrative = nil
-        if store.screen == .generating || store.screen == .lobby {
-            store.screen = .playing
-        }
-        if !store.game.showPhaseTransition {
-            store.game.showPhaseTransition = true
-        }
-        store.game.nextPhaseType = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            store.game.showPhaseTransition = false
-        }
-    }
-
-    private static func applyPhaseTimer(_ data: [String: String], store: AppStore) {
-        guard let remainingStr = data["remaining_sec"], let remaining = Int(remainingStr) else { return }
-        store.game.localRemainingSec = remaining
-        if let phase = store.game.currentPhase {
-            store.game.currentPhase = PhaseInfo(
-                phaseId: phase.phaseId,
-                phaseType: phase.phaseType,
-                phaseOrder: phase.phaseOrder,
-                totalPhases: phase.totalPhases,
-                durationSec: phase.durationSec,
-                remainingSec: remaining,
-                turnNumber: phase.turnNumber,
-                totalTurns: phase.totalTurns,
-                investigationLocations: phase.investigationLocations
-            )
-        }
-    }
-
-    private static func applyEnding(_ data: [String: String], store: AppStore) {
-        let dict = stringDataToDict(data)
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: dict),
-              let endingData = try? JSONDecoder().decode(EndingData.self, from: jsonData) else {
-            store.setError("エンディングデータの解析に失敗しました", level: .transient)
-            return
-        }
-        store.game.ending = endingData
-        store.game.showPhaseTransition = false
-        store.screen = .ended
     }
 
     private static func parsePhaseInfo(_ data: [String: Any]) -> PhaseInfo? {
@@ -380,20 +319,5 @@ struct WSMessageAdapter {
             totalTurns: data["total_turns"] as? Int ?? 3,
             investigationLocations: locations
         )
-    }
-
-    private static func stringDataToDict(_ data: [String: String]) -> [String: Any] {
-        var result: [String: Any] = [:]
-        for (key, value) in data {
-            if let intVal = Int(value) {
-                result[key] = intVal
-            } else if let d = value.data(using: .utf8),
-                      let json = try? JSONSerialization.jsonObject(with: d) {
-                result[key] = json
-            } else {
-                result[key] = value
-            }
-        }
-        return result
     }
 }

@@ -131,15 +131,13 @@ struct HomeScreen: View {
                                                 .foregroundStyle(Color.mdTextSecondary)
                                         }
                                         Spacer()
-                                        if myRoom.status != "ended" {
-                                            MDButton(myRoom.status == "waiting" ? "再接続" : "復帰", style: .secondary) {
-                                                store.dispatch(.rejoinRoom(
-                                                    sessionToken: myRoom.sessionToken,
-                                                    playerId: myRoom.playerId,
-                                                    roomCode: myRoom.roomCode,
-                                                    status: myRoom.status
-                                                ))
-                                            }
+                                        MDButton(rejoinLabel(myRoom.status), style: .secondary) {
+                                            store.dispatch(.rejoinRoom(
+                                                sessionToken: myRoom.sessionToken,
+                                                playerId: myRoom.playerId,
+                                                roomCode: myRoom.roomCode,
+                                                status: myRoom.status
+                                            ))
                                         }
                                         if myRoom.isHost {
                                             Button {
@@ -239,6 +237,14 @@ struct HomeScreen: View {
                 store.pendingJoinCode = nil
                 showJoinSheet = true
             }
+        }
+    }
+
+    private func rejoinLabel(_ status: String) -> String {
+        switch status {
+        case "waiting": "再接続"
+        case "ended": "リプレイ"
+        default: "復帰"
         }
     }
 
@@ -402,14 +408,14 @@ struct GeneratingView: View {
                 }
 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text("もうすぐストーリーが始まります")
+                    Text("もうすぐゲームが始まります")
                         .font(.mdHeadline)
                         .foregroundStyle(Color.mdTextPrimary)
 
-                    guideStep(1, "物語の設定と自分のプロフィール・目的を読む")
-                    guideStep(2, "他のプレイヤーのプロフィールを確認する")
-                    guideStep(3, "手帳に配られた証拠・アリバイを確認する")
-                    guideStep(4, "調査計画で最初に調べる場所をみんなで決める")
+                    guideStep(1, "ホストが物語を読み上げます")
+                    guideStep(2, "一人ずつ自己紹介をします")
+                    guideStep(3, "事件が発生！証拠とアリバイが配られます")
+                    guideStep(4, "議論・調査を繰り返して犯人を探します")
                 }
                 .padding(Spacing.lg)
                 .background(Color.mdSurface)
@@ -425,6 +431,7 @@ struct GeneratingView: View {
                 Spacer()
             }
             .padding(Spacing.lg)
+            .background(Color.mdBackground.ignoresSafeArea())
         }
         .task {
             await store.setupSpeech()

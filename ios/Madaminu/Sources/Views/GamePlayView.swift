@@ -25,10 +25,28 @@ struct GamePlayView: View {
                         Divider().background(Color.mdSurface)
 
                         Group {
-                            if let phase = store.game.currentPhase {
+                            if store.game.discoveriesStatus != "ready", let phase = store.game.currentPhase {
+                                // Phase transitioning — show transition panel as main content
+                                PhaseTransitionOverlay(
+                                    phaseType: phase.phaseType,
+                                    turnNumber: phase.turnNumber,
+                                    totalTurns: phase.totalTurns,
+                                    durationSec: phase.durationSec,
+                                    sceneImageUrl: store.game.scenarioSetting.sceneImageUrl,
+                                    murderDiscovery: store.game.scenarioSetting.murderDiscovery,
+                                    travelNarrative: store.game.travelNarrative
+                                )
+                            } else if let phase = store.game.currentPhase {
+                                // Phase ready — show phase content
                                 switch phase.phaseType {
+                                case "initial":
+                                    OpeningPhaseView(store: store)
+                                case "storytelling":
+                                    StorytellingPhaseView(store: store)
                                 case "opening":
                                     OpeningPhaseView(store: store)
+                                case "briefing":
+                                    BriefingPhaseView(store: store)
                                 case "planning":
                                     PlanningPhaseView(store: store)
                                 case "investigation":
@@ -38,33 +56,23 @@ struct GamePlayView: View {
                                 case "voting":
                                     VotingPhaseView(store: store)
                                 default:
-                                    waitingView
+                                    OpeningPhaseView(store: store)
                                 }
+                            } else if store.game.isConnected {
+                                EmptyView()
                             } else {
                                 waitingView
                             }
                         }
-                        .frame(maxHeight: .infinity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
 
                         bottomBar
                     }
-
-                    if store.game.showPhaseTransition {
-                        PhaseTransitionOverlay(
-                            phaseType: store.game.currentPhase?.phaseType ?? store.game.nextPhaseType ?? "",
-                            turnNumber: store.game.currentPhase?.turnNumber ?? store.game.lastTurnNumber,
-                            totalTurns: store.game.currentPhase?.totalTurns ?? store.game.lastTotalTurns,
-                            durationSec: store.game.currentPhase?.durationSec ?? 0,
-                            sceneImageUrl: store.game.scenarioSetting.sceneImageUrl,
-                            travelNarrative: store.game.travelNarrative
-                        )
-                        .transition(.opacity)
-                        .zIndex(100)
-                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .animation(.easeInOut(duration: 0.5), value: store.game.showPhaseTransition)
             case .ended:
-                if endingRevealPhase < 3, let ending = store.game.ending {
+                if endingRevealPhase < 4, let ending = store.game.ending {
                     EndingRevealView(
                         ending: ending,
                         players: store.room.players,
@@ -79,10 +87,15 @@ struct GamePlayView: View {
         }
         .overlay {
             if showNotebook {
+                let showSpeech = ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType)
                 ZStack(alignment: .bottom) {
-                    NotebookView(store: store, isPresented: $showNotebook)
+                    NotebookView(
+                        store: store,
+                        isPresented: $showNotebook,
+                        bottomInset: showSpeech ? 70 : 0
+                    )
 
-                    if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
+                    if showSpeech {
                         HStack(spacing: Spacing.md) {
                             SpeechButton(store: store)
                         }
@@ -108,20 +121,6 @@ struct GamePlayView: View {
                 guard let store else { return }
                 if store.game.localRemainingSec > 0 && !store.game.isPaused {
                     store.game.localRemainingSec -= 1
-                    if store.game.localRemainingSec <= 0 {
-                        // Nudge server to advance if timer expired
-                        store.sendWS(type: "phase.timer_expired")
-                        // HTTP fallback: poll game state until phase changes
-                        let currentPhaseId = store.game.currentPhase?.phaseId
-                        Task {
-                            for attempt in 1...6 {
-                                try? await Task.sleep(for: .seconds(5))
-                                guard store.game.currentPhase?.phaseId == currentPhaseId else { break }
-                                print("[GamePlayView] Polling state (attempt \(attempt))...")
-                                await store.pollGameState()
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -172,9 +171,15 @@ struct GamePlayView: View {
 
                 Spacer()
 
-                Text(formatTime(store.game.localRemainingSec))
-                    .font(.system(size: 18, weight: .bold, design: .monospaced))
-                    .foregroundStyle(store.game.localRemainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
+                if store.game.currentPhase?.durationSec == 0 {
+                    Text("手動進行")
+                        .font(.mdCaption)
+                        .foregroundStyle(Color.mdTextMuted)
+                } else {
+                    Text(formatTime(store.game.localRemainingSec))
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                        .foregroundStyle(store.game.localRemainingSec <= 30 ? Color.mdAccent : Color.mdTextPrimary)
+                }
             } else {
                 Text(store.screen == .ended ? "ゲーム終了" : "準備中...")
                     .font(.mdHeadline)
@@ -195,7 +200,9 @@ struct GamePlayView: View {
                         Button("一時停止") { store.dispatch(.pausePhase) }
                     }
                     Button("フェーズを進める") { store.dispatch(.advancePhase) }
-                    Button("時間を延長") { store.dispatch(.extendPhase) }
+                    if store.game.discoveriesStatus != "ready" {
+                        Button("生成をリトライ") { store.sendWS(type: "retry_generation") }
+                    }
                     Button("デバッグ情報") { showDebug = true }
                 }
             } label: {
@@ -209,18 +216,32 @@ struct GamePlayView: View {
         .background(Color.mdBackgroundSecondary)
     }
 
-    private var bottomBar: some View {
-        HStack(spacing: Spacing.md) {
-            MDButton("手帳", style: .secondary) {
-                showNotebook = true
-            }
+    private var preEventPhase: Bool {
+        ["storytelling", "opening"].contains(store.game.currentPhase?.phaseType)
+    }
 
-            if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
-                SpeechButton(store: store)
+    private var showBottomBar: Bool {
+        let phase = store.game.currentPhase?.phaseType ?? ""
+        return !preEventPhase || ["opening", "planning", "discussion", "voting"].contains(phase)
+    }
+
+    @ViewBuilder
+    private var bottomBar: some View {
+        if showBottomBar {
+            HStack(spacing: Spacing.md) {
+                if !preEventPhase {
+                    MDButton("手帳", style: .secondary) {
+                        showNotebook = true
+                    }
+                }
+
+                if ["opening", "planning", "discussion", "voting"].contains(store.game.currentPhase?.phaseType) {
+                    SpeechButton(store: store)
+                }
             }
+            .padding(Spacing.md)
+            .background(Color.mdBackgroundSecondary)
         }
-        .padding(Spacing.md)
-        .background(Color.mdBackgroundSecondary)
     }
 
     private var waitingView: some View {
@@ -235,179 +256,138 @@ struct GamePlayView: View {
         }
     }
 
+    @State private var endingPage = 0  // 0 = epilogue, 1 = truth
+
     private var endingView: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
                 if let ending = store.game.ending {
-                    // 1. Vote Results
-                    if let counts = ending.voteCounts, !counts.isEmpty {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.sm) {
-                                Label("投票結果", systemImage: "hand.raised.fill")
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(Color.mdAccent)
+                    if endingPage == 0 {
+                        // Page 1: Epilogue
 
-                                ForEach(counts.sorted(by: { $0.value > $1.value }), id: \.key) { name, count in
-                                    HStack {
-                                        Text(name)
+                        // Host read-aloud banner
+                        if store.room.isHost {
+                            MDCard {
+                                HStack(spacing: Spacing.sm) {
+                                    Image(systemName: "speaker.wave.2.fill")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(Color.mdWarning)
+                                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                        Text("エピローグを読み上げてください")
                                             .font(.mdHeadline)
-                                            .foregroundStyle(name == ending.arrestedName ? Color.mdAccent : Color.mdTextPrimary)
-                                        Spacer()
-                                        Text("\(count) 票")
-                                            .font(.mdCallout)
+                                            .foregroundStyle(Color.mdWarning)
+                                        Text("声に出して全員に聞こえるように読みましょう。")
+                                            .font(.mdCaption)
                                             .foregroundStyle(Color.mdTextSecondary)
-                                        if name == ending.arrestedName {
-                                            Image(systemName: "lock.circle.fill")
-                                                .foregroundStyle(Color.mdAccent)
-                                            Text("監禁")
-                                                .font(.mdCaption2)
-                                                .foregroundStyle(Color.mdAccent)
-                                        }
                                     }
                                 }
                             }
-                        }
-                    }
-
-                    // 2. Epilogue
-                    MDCard {
-                        VStack(alignment: .leading, spacing: Spacing.md) {
-                            Label("エピローグ", systemImage: "book.fill")
-                                .font(.mdTitle2)
-                                .foregroundStyle(Color.mdPrimary)
-
-                            Text(ending.endingText)
-                                .font(.mdBody)
-                                .foregroundStyle(Color.mdTextPrimary)
-                        }
-                    }
-
-                    // 2.5. Criminal Epilogue
-                    if let epilogue = ending.criminalEpilogue, !epilogue.isEmpty {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.md) {
-                                Label("真相 — 犯人の告白", systemImage: "eye.trianglebadge.exclamationmark")
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(Color.mdAccent)
-
-                                Text(epilogue)
-                                    .font(.mdBody)
-                                    .foregroundStyle(Color.mdTextPrimary)
-                                    .italic()
+                        } else {
+                            let hostName = store.room.players.first(where: { $0.isHost })?.characterName ?? "ホスト"
+                            MDCard {
+                                HStack(spacing: Spacing.sm) {
+                                    Image(systemName: "ear.fill")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(Color.mdInfo)
+                                    Text("\(hostName)さんの読み上げを聞きましょう")
+                                        .font(.mdCallout)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                }
                             }
                         }
-                    }
 
-                    // 3. Rankings
-                    if let rankings = ending.rankings, !rankings.isEmpty {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.sm) {
-                                Label("最終スコア", systemImage: "trophy.fill")
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(Color.mdWarning)
+                        // Vote Results
+                        if let counts = ending.voteCounts, !counts.isEmpty {
+                            MDCard {
+                                VStack(alignment: .leading, spacing: Spacing.sm) {
+                                    Label("投票結果", systemImage: "hand.raised.fill")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(Color.mdAccent)
 
-                                ForEach(Array(rankings.enumerated()), id: \.element.id) { index, rank in
-                                    HStack(spacing: Spacing.sm) {
-                                        Text(rankEmoji(index))
-                                            .font(.system(size: 24))
-                                            .frame(width: 32)
-                                        PlayerAvatarView(playerId: rank.playerId, players: store.room.players, size: 36)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(rank.characterName)
+                                    ForEach(counts.sorted(by: { $0.value > $1.value }), id: \.key) { name, count in
+                                        HStack {
+                                            Text(name)
                                                 .font(.mdHeadline)
-                                                .foregroundStyle(Color.mdTextPrimary)
-                                            Text("発言 \(rank.speechCount)回 / 証拠 \(rank.evidenceCount)件")
-                                                .font(.mdCaption2)
-                                                .foregroundStyle(Color.mdTextMuted)
-                                        }
-                                        Spacer()
-                                        Text("\(rank.score) pt")
-                                            .font(.system(size: 20, weight: .bold, design: .monospaced))
-                                            .foregroundStyle(index == 0 ? Color.mdWarning : Color.mdTextPrimary)
-                                    }
-                                    if index < rankings.count - 1 {
-                                        Divider()
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 4. Objective Results
-                    if let results = ending.objectiveResults, !results.isEmpty {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.sm) {
-                                Label("個人目的の達成状況", systemImage: "target")
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(Color.mdInfo)
-
-                                ForEach(Array(results.keys.sorted()), id: \.self) { playerId in
-                                    if let result = results[playerId] {
-                                        HStack(alignment: .top, spacing: Spacing.sm) {
-                                            PlayerAvatarView(playerId: playerId, players: store.room.players, size: 28)
-                                            Image(systemName: result.achieved ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                                .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
-                                            VStack(alignment: .leading) {
-                                                Text(playerName(playerId))
-                                                    .font(.mdCallout)
-                                                    .foregroundStyle(Color.mdTextPrimary)
-                                                Text(result.description)
-                                                    .font(.mdCaption)
-                                                    .foregroundStyle(Color.mdTextSecondary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 5. Character Reveals
-                    if let reveals = ending.characterReveals, !reveals.isEmpty {
-                        MDCard {
-                            VStack(alignment: .leading, spacing: Spacing.md) {
-                                Label("ネタバラシ", systemImage: "theatermasks.fill")
-                                    .font(.mdTitle2)
-                                    .foregroundStyle(Color.mdPrimary)
-
-                                ForEach(reveals) { reveal in
-                                    VStack(alignment: .leading, spacing: Spacing.xs) {
-                                        HStack(spacing: Spacing.sm) {
-                                            PlayerAvatarView(playerId: reveal.playerId, players: store.room.players, size: 32)
-                                            Text(reveal.characterName)
-                                                .font(.mdHeadline)
-                                                .foregroundStyle(Color.mdTextPrimary)
-                                            if let role = reveal.role {
-                                                Text(roleLabel(role))
-                                                    .font(.mdCaption2)
-                                                    .padding(.horizontal, Spacing.xs)
-                                                    .padding(.vertical, 2)
-                                                    .background(roleColor(role).opacity(0.15))
-                                                    .foregroundStyle(roleColor(role))
-                                                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                                            }
-                                        }
-                                        if let secret = reveal.secretInfo {
-                                            Text(secret)
-                                                .font(.mdCaption)
+                                                .foregroundStyle(name == ending.arrestedName ? Color.mdAccent : Color.mdTextPrimary)
+                                            Spacer()
+                                            Text("\(count) 票")
+                                                .font(.mdCallout)
                                                 .foregroundStyle(Color.mdTextSecondary)
                                         }
                                     }
-                                    .padding(.vertical, Spacing.xs)
                                 }
                             }
                         }
-                    }
 
-                    // Bottom buttons
-                    HStack(spacing: Spacing.md) {
-                        MDButton("もう一度見る", style: .secondary) {
-                            endingRevealPhase = 0
+                        // Epilogue (novel-style)
+                        MDCard {
+                            VStack(alignment: .leading, spacing: Spacing.md) {
+                                Label("エピローグ", systemImage: "book.fill")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdPrimary)
+
+                                NovelTextView(
+                                    ending.endingText.split(separator: "。").map { s in
+                                        NovelTextView.NovelSegment(text: String(s) + "。")
+                                    },
+                                    interval: 2.0
+                                )
+                            }
                         }
-                        MDButton("ホームに戻る") {
-                            store.game.reset()
-                            store.screen = .home
+
+                        MDButton("真相を見る →") {
+                            withAnimation { endingPage = 1 }
                         }
+                        .padding(.top, Spacing.md)
+
+                    } else {
+                        // Page 2: Truth
+
+                        // Criminal Epilogue (novel-style)
+                        if let epilogue = ending.criminalEpilogue, !epilogue.isEmpty {
+                            // Criminal reads their confession
+                            let criminalName = store.room.players.first(where: { $0.id == ending.trueCriminalId })?.characterName
+                            let iAmCriminal = store.room.playerId == ending.trueCriminalId
+
+                            MDCard {
+                                HStack(spacing: Spacing.sm) {
+                                    Image(systemName: iAmCriminal ? "speaker.wave.2.fill" : "ear.fill")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(iAmCriminal ? Color.mdWarning : Color.mdInfo)
+                                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                        if iAmCriminal {
+                                            Text("あなたが犯人です。真相を読み上げてください")
+                                                .font(.mdHeadline)
+                                                .foregroundStyle(Color.mdWarning)
+                                        } else {
+                                            Text("\(criminalName ?? "犯人")の告白を聞きましょう")
+                                                .font(.mdCallout)
+                                                .foregroundStyle(Color.mdTextPrimary)
+                                        }
+                                    }
+                                }
+                            }
+
+                            MDCard {
+                                VStack(alignment: .leading, spacing: Spacing.md) {
+                                    Label("真相 — 犯人の告白", systemImage: "eye.trianglebadge.exclamationmark")
+                                        .font(.mdTitle2)
+                                        .foregroundStyle(Color.mdAccent)
+
+                                    NovelTextView(
+                                        epilogue.split(separator: "。").map { s in
+                                            NovelTextView.NovelSegment(text: String(s) + "。", style: .accent)
+                                        },
+                                        interval: 2.0
+                                    )
+                                }
+                            }
+                        }
+
+                        // One-by-one reveal (lowest score first)
+                        PlayerRevealSequence(ending: ending, store: store, onFinish: {
+                            withAnimation { endingPage = 0 }
+                        })
                     }
                 } else {
                     ProgressView("エンディングを生成中...")
@@ -450,6 +430,7 @@ struct GamePlayView: View {
 
     private func phaseColor(_ type: String) -> Color {
         switch type {
+        case "initial", "storytelling", "briefing": .mdTextMuted
         case "opening": .mdSuccess
         case "discussion": .mdPrimary
         case "planning": .mdWarning
@@ -461,7 +442,10 @@ struct GamePlayView: View {
 
     private func phaseDisplayName(_ type: String) -> String {
         switch type {
+        case "initial": "準備"
+        case "storytelling": "読み合わせ"
         case "opening": "自己紹介"
+        case "briefing": "事件概要"
         case "discussion": "議論"
         case "planning": "調査計画"
         case "investigation": "調査"
@@ -502,36 +486,467 @@ struct SpeechButton: View {
 
 struct OpeningPhaseView: View {
     @ObservedObject var store: AppStore
+    @State private var currentIntroIndex = 0
+
+    private var allPlayers: [PlayerInfo] {
+        // Self first, then others
+        let myId = store.room.playerId
+        return store.room.players.sorted { a, _ in a.id == myId }
+    }
+
+    private var isMyTurn: Bool {
+        guard currentIntroIndex >= 0 && currentIntroIndex < allPlayers.count else { return false }
+        return allPlayers[currentIntroIndex].id == store.room.playerId
+    }
+
+    private var currentPlayer: PlayerInfo? {
+        guard currentIntroIndex >= 0 && currentIntroIndex < allPlayers.count else { return nil }
+        return allPlayers[currentIntroIndex]
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
-                GMGuideCard(
-                    title: "自己紹介タイム",
-                    message: "発言ボタンを押して、自分のキャラクターを紹介してください。\nこの集まりでの立場や、他のキャラクターとの関係を共有しましょう。"
-                )
+                // Current player introduction
+                if let player = currentPlayer {
+                    let isMe = player.id == store.room.playerId
 
-                if let speaker = store.game.currentSpeakerId {
-                    let name = store.room.players.first(where: { $0.id == speaker })?.characterName ?? "誰か"
                     MDCard {
-                        HStack {
-                            Image(systemName: "mic.fill")
-                                .foregroundStyle(Color.mdAccent)
-                            Text("\(name) が発言中")
-                                .font(.mdCallout)
-                                .foregroundStyle(Color.mdTextPrimary)
-                            Spacer()
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            HStack {
+                                Text("\(currentIntroIndex + 1) / \(allPlayers.count)")
+                                    .font(.mdCaption2)
+                                    .foregroundStyle(Color.mdTextMuted)
+                                Spacer()
+                                if isMe {
+                                    Text("あなたの番")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdWarning)
+                                }
+                            }
+
+                            VStack(spacing: Spacing.sm) {
+                                if let urlString = player.portraitUrl,
+                                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=200") {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        PlayerAvatarView(playerId: player.id, players: store.room.players, size: 80)
+                                    }
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                } else {
+                                    PlayerAvatarView(playerId: player.id, players: store.room.players, size: 80)
+                                }
+
+                                Text(player.characterName ?? player.displayName)
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+
+                            // Self-introduction speech
+                            if let intro = player.selfIntroduction, !intro.isEmpty {
+                                Text("「\(intro)」")
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                                    .italic()
+                                    .padding(.top, Spacing.xs)
+                            }
+
+                            if isMe {
+                                GMGuideCard(
+                                    title: "あなたの番です",
+                                    message: "発言ボタンを押して、上のセリフを参考に自己紹介してください。"
+                                )
+                            }
+                        }
+                    }
+
+                    // Speech area
+                    if store.game.isSpeaking {
+                        TranscriptView(store: store)
+                    }
+                    SpeechHistoryView(store: store)
+
+                    // Host: next player button
+                    if store.room.isHost {
+                        if currentIntroIndex < allPlayers.count - 1 {
+                            MDButton("次の人 →") {
+                                withAnimation { currentIntroIndex += 1 }
+                            }
+                        } else {
+                            MDButton("自己紹介完了 → 次へ") {
+                                store.dispatch(.advancePhase)
+                            }
                         }
                     }
                 }
 
-                if store.game.isSpeaking {
-                    TranscriptView(store: store)
+                // Completed introductions (shown below current)
+                if currentIntroIndex > 0 {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text("自己紹介済み")
+                            .font(.mdCaption)
+                            .foregroundStyle(Color.mdTextMuted)
+                        ForEach(Array(allPlayers.prefix(currentIntroIndex).enumerated()), id: \.element.id) { _, player in
+                            HStack(spacing: Spacing.sm) {
+                                PlayerAvatarView(playerId: player.id, players: store.room.players, size: 28)
+                                Text(player.characterName ?? player.displayName)
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                            }
+                        }
+                    }
                 }
-
-                SpeechHistoryView(store: store)
             }
             .padding(Spacing.lg)
+        }
+    }
+}
+
+struct NovelTextView: View {
+    let segments: [NovelSegment]
+    let interval: TimeInterval
+    @Binding var isComplete: Bool
+
+    @State private var visibleCount = 0
+
+    struct NovelSegment: Identifiable {
+        let id = UUID()
+        let text: String
+        var style: Style = .body
+
+        enum Style { case heading, body, accent, caption }
+    }
+
+    init(_ segments: [NovelSegment], interval: TimeInterval = 2.0, isComplete: Binding<Bool> = .constant(true)) {
+        self.segments = segments
+        self.interval = interval
+        self._isComplete = isComplete
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            ForEach(Array(segments.prefix(visibleCount).enumerated()), id: \.element.id) { index, seg in
+                Text(seg.text)
+                    .font(fontFor(seg.style))
+                    .foregroundStyle(colorFor(seg.style))
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .id(seg.id)
+            }
+        }
+        .animation(.easeIn(duration: 0.6), value: visibleCount)
+        .onAppear { startRevealing() }
+    }
+
+    private func startRevealing() {
+        visibleCount = 0
+        isComplete = false
+        Task { @MainActor in
+            for i in 1...segments.count {
+                if i == 1 {
+                    try? await Task.sleep(for: .seconds(0.3))
+                } else {
+                    let charCount = Double(segments[i - 2].text.count)
+                    let delay = max(interval, 1.5 + charCount * 0.08)
+                    try? await Task.sleep(for: .seconds(delay))
+                }
+                visibleCount = i
+            }
+            isComplete = true
+        }
+    }
+
+    private func fontFor(_ style: NovelSegment.Style) -> Font {
+        switch style {
+        case .heading: .mdTitle2
+        case .body: .mdBody
+        case .accent: .mdHeadline
+        case .caption: .mdCaption
+        }
+    }
+
+    private func colorFor(_ style: NovelSegment.Style) -> Color {
+        switch style {
+        case .heading: Color.mdPrimary
+        case .body: Color.mdTextPrimary
+        case .accent: Color.mdAccent
+        case .caption: Color.mdTextSecondary
+        }
+    }
+}
+
+struct StorytellingPhaseView: View {
+    @ObservedObject var store: AppStore
+
+    private var isHost: Bool {
+        store.room.isHost
+    }
+
+    private var hostName: String? {
+        store.room.players.first(where: { $0.isHost })?.characterName
+    }
+
+    @State private var narrativeComplete = false
+
+    private var segments: [NovelTextView.NovelSegment] {
+        var segs: [NovelTextView.NovelSegment] = []
+
+        // Opening narrative
+        if let narrative = store.game.scenarioSetting.openingNarrative {
+            let sentences = narrative.split(separator: "。")
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            for s in sentences {
+                segs.append(.init(text: s + "。"))
+            }
+        } else {
+            if let location = store.game.scenarioSetting.location {
+                segs.append(.init(text: location, style: .heading))
+            }
+            if let situation = store.game.scenarioSetting.situation {
+                for s in situation.split(separator: "。").map({ String($0) + "。" }) {
+                    segs.append(.init(text: s))
+                }
+            }
+        }
+
+        // Victim's greeting (promotes self-introductions)
+        if let greeting = store.game.scenarioSetting.victimGreeting {
+            let sentences = greeting.split(separator: "。")
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            for s in sentences {
+                segs.append(.init(text: "「\(s)。」", style: .accent))
+            }
+        }
+
+        return segs
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.lg) {
+                // Host navigation banner
+                if isHost {
+                    MDCard {
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdWarning)
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text("あなたが読み上げてください")
+                                    .font(.mdHeadline)
+                                    .foregroundStyle(Color.mdWarning)
+                                Text("以下の物語を声に出して、全員に聞こえるように読みましょう。")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextSecondary)
+                            }
+                        }
+                    }
+                } else if let host = hostName {
+                    MDCard {
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: "ear.fill")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdInfo)
+                            Text("\(host)さんの読み上げを聞きましょう")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                // Scene image
+                if let urlString = store.game.scenarioSetting.sceneImageUrl,
+                   let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=512") {
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Color.mdSurface.frame(height: 220)
+                    }
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                // Novel-style text
+                NovelTextView(segments, interval: 2.5, isComplete: $narrativeComplete)
+
+                // Host advance button (only after text finishes)
+                if isHost && narrativeComplete {
+                    MDButton("読み上げ完了 → 自己紹介へ") {
+                        store.dispatch(.advancePhase)
+                    }
+                    .padding(.top, Spacing.md)
+                }
+            }
+            .padding(Spacing.lg)
+        }
+    }
+}
+
+struct BriefingPhaseView: View {
+    @ObservedObject var store: AppStore
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                // Victim info
+                MDCard {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Label("被害者", systemImage: "person.slash.fill")
+                            .font(.mdTitle2)
+                            .foregroundStyle(Color.mdAccent)
+
+                        HStack(spacing: Spacing.sm) {
+                            if let urlString = store.game.scenarioSetting.victimImageUrl,
+                               let url = URL(string: APIClient.defaultBaseURL + urlString + "?size=200") {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Image(systemName: "person.fill")
+                                        .foregroundStyle(Color.mdTextMuted)
+                                        .frame(width: 60, height: 60)
+                                        .background(Color.mdSurface)
+                                }
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                if let name = store.game.scenarioSetting.victimName {
+                                    Text(name)
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                }
+                                if let desc = store.game.scenarioSetting.victimDescription {
+                                    Text(desc)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Murder discovery
+                if let discovery = store.game.scenarioSetting.murderDiscovery {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("発見の状況", systemImage: "eye.fill")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdWarning)
+                            Text(discovery)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                // Murder detail
+                if let detail = store.game.scenarioSetting.murderDetail {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("事件の詳細", systemImage: "exclamationmark.triangle.fill")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdAccent)
+                            Text(detail)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                // Cards by type
+                if !store.notebook.evidences.isEmpty {
+                    let evidenceCards = store.notebook.evidences.filter {
+                        !$0.title.contains("アリバイ") && !$0.title.contains("に関する情報")
+                    }
+                    let alibiCards = store.notebook.evidences.filter { $0.title.contains("アリバイ") }
+                    let rumorCards = store.notebook.evidences.filter { $0.title.contains("に関する情報") }
+
+                    if !evidenceCards.isEmpty {
+                        cardSection(title: "証拠", icon: "magnifyingglass", color: .mdAccent, cards: evidenceCards)
+                    }
+                    if !alibiCards.isEmpty {
+                        cardSection(title: "アリバイ", icon: "person.badge.clock", color: .mdInfo, cards: alibiCards)
+                    }
+                    if !rumorCards.isEmpty {
+                        cardSection(title: "情報", icon: "bubble.left.and.text.bubble.right", color: .mdWarning, cards: rumorCards)
+                    }
+                } else {
+                    MDCard {
+                        HStack {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(Color.mdTextMuted)
+                            Text("カードはまだ配布されていません")
+                                .font(.mdCaption)
+                                .foregroundStyle(Color.mdTextMuted)
+                        }
+                    }
+                }
+
+                // Secret info
+                if let secret = store.game.mySecretInfo {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("あなたの秘密", systemImage: "lock.fill")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdWarning)
+                            Text(secret)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                // Objective
+                if let objective = store.game.myObjective {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("あなたの目的", systemImage: "target")
+                                .font(.mdHeadline)
+                                .foregroundStyle(Color.mdWarning)
+                            Text(objective)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                GMGuideCard(
+                    title: "確認できましたか？",
+                    message: "証拠とアリバイを確認したら、議論フェーズに進みます。情報は手帳からいつでも確認できます。"
+                )
+
+                // Host advance
+                if store.room.isHost {
+                    MDButton("確認完了 → 議論開始") {
+                        store.dispatch(.advancePhase)
+                    }
+                }
+            }
+            .padding(Spacing.lg)
+        }
+    }
+
+    private func cardSection(title: String, icon: String, color: Color, cards: [EvidenceItem]) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Label("\(title) (\(cards.count)枚)", systemImage: icon)
+                .font(.mdHeadline)
+                .foregroundStyle(color)
+
+            ForEach(cards) { card in
+                MDCard {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text(card.title)
+                            .font(.mdHeadline)
+                            .foregroundStyle(Color.mdTextPrimary)
+                        Text(card.content)
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextSecondary)
+                    }
+                }
+            }
         }
     }
 }
@@ -581,13 +996,8 @@ struct PlanningPhaseView: View {
                         let isSelected = selectedLocationId == location.id
                         Button {
                             withAnimation(.easeInOut(duration: 0.15)) {
-                                if isSelected {
-                                    selectedLocationId = nil
-                                    store.dispatch(.selectInvestigation(locationId: nil))
-                                } else {
-                                    selectedLocationId = location.id
-                                    store.dispatch(.selectInvestigation(locationId: location.id))
-                                }
+                                selectedLocationId = location.id
+                                store.dispatch(.selectInvestigation(locationId: location.id))
                             }
                             Task { await loadMap() }
                         } label: {
@@ -694,13 +1104,6 @@ struct InvestigationPhaseView: View {
                         .tint(Color.mdPrimary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(Spacing.xl)
-                        .task {
-                            for _ in 0..<10 {
-                                try? await Task.sleep(for: .seconds(3))
-                                if !store.game.discoveries.isEmpty { break }
-                                await fetchDiscoveriesHTTP()
-                            }
-                        }
                 } else {
                     // Feature list with tap-to-reveal
                     ForEach(store.game.discoveries) { discovery in
@@ -775,31 +1178,6 @@ struct InvestigationPhaseView: View {
         }
     }
 
-    @MainActor
-    private func fetchDiscoveriesHTTP() async {
-        guard let token = store.room.sessionToken else { return }
-        let urlString = APIClient.defaultBaseURL + "/api/v1/rooms/\(store.room.roomCode)/discoveries"
-        guard let url = URL(string: urlString) else { return }
-        var request = URLRequest(url: url)
-        request.setValue(token, forHTTPHeaderField: "X-Session-Token")
-        do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let discs = json["discoveries"] as? [[String: Any]], !discs.isEmpty {
-                store.game.discoveries = discs.compactMap { d in
-                    guard let id = d["id"] as? String,
-                          let title = d["title"] as? String,
-                          let content = d["content"] as? String else { return nil }
-                    let canTamper = d["can_tamper"] as? Bool ?? false
-                    let feature = d["feature"] as? String ?? ""
-                    return DiscoveryItem(id: id, title: title, content: content, feature: feature, canTamper: canTamper)
-                }
-                print("[InvestigationPhaseView] HTTP fallback got \(store.game.discoveries.count) discoveries")
-            }
-        } catch {
-            print("[InvestigationPhaseView] HTTP fallback failed: \(error)")
-        }
-    }
 }
 
 struct ColocatedPlayersView: View {
@@ -998,8 +1376,8 @@ struct DiscussionTimelineView: View {
                                     .font(.mdCaption)
                                     .foregroundStyle(Color.mdPrimary)
                                 Text(s.transcript)
-                                    .font(.mdCaption)
-                                    .foregroundStyle(Color.mdTextSecondary)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
                             }
                         }
                     case .evidence(let e):
@@ -1051,8 +1429,8 @@ struct SpeechHistoryView: View {
                                 .font(.mdCaption)
                                 .foregroundStyle(Color.mdPrimary)
                             Text(entry.transcript)
-                                .font(.mdCaption)
-                                .foregroundStyle(Color.mdTextSecondary)
+                                .font(.mdBody)
+                                .foregroundStyle(Color.mdTextPrimary)
                         }
                     }
                 }
@@ -1424,7 +1802,7 @@ struct SVGWebView: UIViewRepresentable {
             webView.isOpaque = false
             webView.backgroundColor = .clear
             webView.scrollView.backgroundColor = .clear
-            webView.scrollView.isScrollEnabled = false
+            webView.scrollView.isScrollEnabled = true
             loadSVG(initialSVG)
             lastSVG = initialSVG
         }
@@ -1456,6 +1834,7 @@ struct PhaseTransitionOverlay: View {
     let totalTurns: Int
     let durationSec: Int
     let sceneImageUrl: String?
+    var murderDiscovery: String? = nil
     var travelNarrative: String? = nil
 
     var body: some View {
@@ -1473,21 +1852,37 @@ struct PhaseTransitionOverlay: View {
                 .opacity(0.3)
             }
 
-            VStack(spacing: Spacing.md) {
-                Text("ターン \(turnNumber) / \(totalTurns)")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.mdTextMuted)
-                    .tracking(4)
+            ScrollView {
+                VStack(spacing: Spacing.md) {
+                    Spacer().frame(height: Spacing.xl)
 
-                Text(phaseTitle(phaseType))
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundStyle(Color.mdTextPrimary)
+                    Text("ターン \(turnNumber) / \(totalTurns)")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color.mdTextMuted)
+                        .tracking(4)
 
-                Text(phaseSubtitle(phaseType))
-                    .font(.mdBody)
-                    .foregroundStyle(Color.mdTextSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.xl)
+                    // Murder event on briefing transition
+                    if phaseType == "briefing", let murder = murderDiscovery {
+                        Text("事件発生")
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundStyle(Color.mdAccent)
+
+                        Text(murder)
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextPrimary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, Spacing.xl)
+                    } else {
+                        Text(phaseTitle(phaseType))
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundStyle(Color.mdTextPrimary)
+
+                        Text(phaseSubtitle(phaseType))
+                            .font(.mdBody)
+                            .foregroundStyle(Color.mdTextSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, Spacing.xl)
+                    }
 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     ForEach(phaseGuide(phaseType), id: \.self) { step in
@@ -1523,13 +1918,20 @@ struct PhaseTransitionOverlay: View {
                         .tint(Color.mdTextMuted)
                         .padding(.top, Spacing.xs)
                 }
+
+                    Spacer().frame(height: Spacing.xl)
+                }
+                .frame(maxWidth: .infinity)
             }
         }
     }
 
     private func phaseTitle(_ type: String) -> String {
         switch type {
+        case "initial": "準備"
+        case "storytelling": "読み合わせ"
         case "opening": "自己紹介"
+        case "briefing": "事件概要"
         case "discussion": "議論"
         case "planning": "調査計画"
         case "investigation": "調査"
@@ -1541,7 +1943,10 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseSubtitle(_ type: String) -> String {
         switch type {
+        case "initial": "ゲームの準備中です..."
+        case "storytelling": "シナリオを読み上げます"
         case "opening": "まずはお互いを知りましょう。自己紹介と状況の共有をしてください"
+        case "briefing": "事件の詳細を確認し、手持ちの証拠とアリバイを確認してください"
         case "discussion": "集めた情報をもとに推理を話し合いましょう"
         case "planning": "みんなで相談して、次に調べる場所を決めましょう"
         case "investigation": "選んだ場所で手がかりを探しましょう"
@@ -1553,11 +1958,21 @@ struct PhaseTransitionOverlay: View {
 
     private func phaseGuide(_ type: String) -> [String] {
         switch type {
+        case "storytelling":
+            return [
+                "ホストが物語を読み上げます",
+                "舞台と登場人物を把握しましょう",
+            ]
         case "opening":
             return [
-                "発言ボタンを押して自己紹介をする",
-                "他のキャラクターの話を聞いて関係性を把握する",
-                "手帳で自分の情報を確認する",
+                "ホストの指示で順番に自己紹介します",
+                "キャラクターになりきって話しましょう",
+            ]
+        case "briefing":
+            return [
+                "事件の詳細を確認する",
+                "配られた証拠・アリバイを確認する",
+                "秘密の情報と個人目的を把握する",
             ]
         case "ending":
             return [
@@ -1624,6 +2039,253 @@ struct GMGuideCard: View {
     }
 }
 
+struct PlayerRevealSequence: View {
+    let ending: EndingData
+    @ObservedObject var store: AppStore
+    let onFinish: () -> Void
+    @State private var currentIndex = 0
+
+    // Players ordered by score ascending (lowest first), using character reveals
+    private var orderedPlayers: [CharacterReveal] {
+        guard let reveals = ending.characterReveals else { return [] }
+        if let rankings = ending.rankings {
+            // Sort by score ascending
+            let rankOrder = Dictionary(uniqueKeysWithValues: rankings.enumerated().map { ($1.playerId, $0) })
+            return reveals.sorted { a, b in
+                let scoreA = rankings.first(where: { $0.playerId == a.playerId })?.score ?? 0
+                let scoreB = rankings.first(where: { $0.playerId == b.playerId })?.score ?? 0
+                return scoreA < scoreB
+            }
+        }
+        return reveals
+    }
+
+    private var isFinished: Bool {
+        currentIndex >= orderedPlayers.count
+    }
+
+    var body: some View {
+        VStack(spacing: Spacing.md) {
+            if isFinished {
+                // Final: Rankings + おつかれさま
+                if let rankings = ending.rankings, !rankings.isEmpty {
+                    MDCard {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Label("最終ランキング", systemImage: "trophy.fill")
+                                .font(.mdTitle2)
+                                .foregroundStyle(Color.mdWarning)
+
+                            ForEach(Array(rankings.sorted(by: { $0.score > $1.score }).enumerated()), id: \.element.id) { index, rank in
+                                HStack(spacing: Spacing.sm) {
+                                    Text(rankEmoji(index))
+                                        .font(.system(size: 24))
+                                        .frame(width: 32)
+                                    PlayerAvatarView(playerId: rank.playerId, players: store.room.players, size: 36)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(rank.characterName)
+                                            .font(.mdHeadline)
+                                            .foregroundStyle(Color.mdTextPrimary)
+                                        Text("発言 \(rank.speechCount)回 / 証拠 \(rank.evidenceCount)件")
+                                            .font(.mdCaption2)
+                                            .foregroundStyle(Color.mdTextMuted)
+                                    }
+                                    Spacer()
+                                    Text("\(rank.score) pt")
+                                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(index == 0 ? Color.mdWarning : Color.mdTextPrimary)
+                                }
+                                if index < rankings.count - 1 { Divider() }
+                            }
+                        }
+                    }
+                }
+
+                Text("お疲れ様でした！")
+                    .font(.mdLargeTitle)
+                    .foregroundStyle(Color.mdPrimary)
+                    .padding(.top, Spacing.lg)
+
+                MDButton("ホームに戻る") {
+                    store.game.reset()
+                    store.screen = .home
+                }
+                .padding(.top, Spacing.md)
+
+            } else {
+                let reveal = orderedPlayers[currentIndex]
+                let isMe = reveal.playerId == store.room.playerId
+                let objectiveResult = ending.objectiveResults?[reveal.playerId]
+                let ranking = ending.rankings?.first(where: { $0.playerId == reveal.playerId })
+
+                // Progress
+                Text("\(currentIndex + 1) / \(orderedPlayers.count)")
+                    .font(.mdCaption)
+                    .foregroundStyle(Color.mdTextMuted)
+
+                // Who should read
+                MDCard {
+                    HStack(spacing: Spacing.sm) {
+                        Image(systemName: isMe ? "speaker.wave.2.fill" : "ear.fill")
+                            .font(.mdTitle2)
+                            .foregroundStyle(isMe ? Color.mdWarning : Color.mdInfo)
+                        if isMe {
+                            Text("あなたの番です。結果を読み上げてください")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdWarning)
+                        } else {
+                            Text("\(reveal.characterName)の結果発表")
+                                .font(.mdCallout)
+                                .foregroundStyle(Color.mdTextPrimary)
+                        }
+                    }
+                }
+
+                // Player card
+                MDCard {
+                    VStack(spacing: Spacing.md) {
+                        PlayerAvatarView(playerId: reveal.playerId, players: store.room.players, size: 100)
+
+                        VStack(spacing: Spacing.xxs) {
+                            Text(reveal.characterName)
+                                .font(.mdLargeTitle)
+                                .foregroundStyle(Color.mdTextPrimary)
+                            if let role = reveal.role {
+                                Text(roleLabel(role))
+                                    .font(.mdCaption)
+                                    .padding(.horizontal, Spacing.xs)
+                                    .padding(.vertical, 2)
+                                    .background(roleColor(role).opacity(0.15))
+                                    .foregroundStyle(roleColor(role))
+                                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                            }
+                        }
+
+                        // Score
+                        if let rank = ranking {
+                            HStack {
+                                Text("スコア")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdTextMuted)
+                                Spacer()
+                                Text("\(rank.score) pt")
+                                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(Color.mdWarning)
+                            }
+                        }
+
+                        Divider()
+
+                        // Objective (what it was)
+                        if let objective = reveal.objective, !objective.isEmpty {
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Label("個人目的", systemImage: "target")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdWarning)
+                                Text(objective)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+
+                        // Objective result (achieved or not)
+                        if let result = objectiveResult {
+                            HStack(spacing: Spacing.sm) {
+                                Image(systemName: result.achieved ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .font(.mdTitle2)
+                                    .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text(result.achieved ? "達成！" : "未達成")
+                                        .font(.mdHeadline)
+                                        .foregroundStyle(result.achieved ? Color.mdSuccess : Color.mdAccent)
+                                    Text(result.description)
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        // Secret
+                        if let secret = reveal.secretInfo, !secret.isEmpty {
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Label("秘密", systemImage: "lock.fill")
+                                    .font(.mdCaption)
+                                    .foregroundStyle(Color.mdAccent)
+                                Text(secret)
+                                    .font(.mdBody)
+                                    .foregroundStyle(Color.mdTextPrimary)
+                            }
+                        }
+
+                        // Player info from store
+                        let playerInfo = store.room.players.first(where: { $0.id == reveal.playerId })
+                        if let info = playerInfo {
+                            if let occupation = info.characterOccupation, !occupation.isEmpty {
+                                Divider()
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text("本当の職業")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextMuted)
+                                    Text(occupation)
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextPrimary)
+                                }
+                            }
+                            if let background = info.characterBackground, !background.isEmpty {
+                                Divider()
+                                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                    Text("経歴")
+                                        .font(.mdCaption)
+                                        .foregroundStyle(Color.mdTextMuted)
+                                    Text(background)
+                                        .font(.mdBody)
+                                        .foregroundStyle(Color.mdTextSecondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Next button (reader or host can advance)
+                if isMe || store.room.isHost {
+                    MDButton(currentIndex < orderedPlayers.count - 1 ? "次の人 →" : "ランキングへ →") {
+                        withAnimation { currentIndex += 1 }
+                    }
+                }
+            }
+        }
+    }
+
+    private func rankEmoji(_ index: Int) -> String {
+        switch index {
+        case 0: "🥇"
+        case 1: "🥈"
+        case 2: "🥉"
+        default: "\(index + 1)"
+        }
+    }
+
+    private func roleLabel(_ role: String) -> String {
+        switch role {
+        case "criminal": "犯人"
+        case "witness": "目撃者"
+        case "related": "関係者"
+        case "innocent": "一般人"
+        default: role
+        }
+    }
+
+    private func roleColor(_ role: String) -> Color {
+        switch role {
+        case "criminal": .mdAccent
+        case "witness": .mdWarning
+        case "related": .mdInfo
+        default: .mdTextSecondary
+        }
+    }
+}
+
 struct EndingRevealView: View {
     let ending: EndingData
     let players: [PlayerInfo]
@@ -1646,19 +2308,36 @@ struct EndingRevealView: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: Spacing.xl) {
-                if phase == 0 || phase == 1 {
-                    // Scene 1: "〇〇は・・・・"
+                if phase == 1 {
+                    // Scene 1: "私たちは○○を犯人として拘束しました"
+                    VStack(spacing: Spacing.lg) {
+                        Text("私たちは")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Color.mdTextSecondary)
+                        if let player = arrestedPlayer {
+                            PlayerAvatarView(playerId: player.id, players: players, size: 100)
+                        }
+                        Text("\(ending.arrestedName ?? "??")")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(Color.mdTextPrimary)
+                        Text("を犯人として拘束しました")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Color.mdTextSecondary)
+                    }
+                    .opacity(textOpacity)
+                } else if phase == 2 {
+                    // Scene 2: "○○は・・・・"
                     VStack(spacing: Spacing.lg) {
                         if let player = arrestedPlayer {
                             PlayerAvatarView(playerId: player.id, players: players, size: 100)
                         }
-                        Text("\(ending.arrestedName ?? "???") は・・・・")
+                        Text("\(ending.arrestedName ?? "??") は・・・・")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(Color.mdTextPrimary)
                     }
                     .opacity(textOpacity)
-                } else if phase == 2 {
-                    // Scene 2: verdict
+                } else if phase == 3 {
+                    // Scene 3: verdict
                     VStack(spacing: Spacing.lg) {
                         if let player = arrestedPlayer {
                             PlayerAvatarView(playerId: player.id, players: players, size: 100)
@@ -1666,7 +2345,7 @@ struct EndingRevealView: View {
                         Text(isTrueCriminal ? "犯人でした" : "冤罪でした")
                             .font(.system(size: 40, weight: .black))
                             .foregroundStyle(isTrueCriminal ? Color.mdAccent : Color.mdInfo)
-                        Text(isTrueCriminal ? "真犯人を見事に見抜きました" : "無実の人が監禁されてしまいました...")
+                        Text(isTrueCriminal ? "真犯人を見事に見抜きました！" : "無実の人を拘束してしまいました…")
                             .font(.mdBody)
                             .foregroundStyle(Color.mdTextSecondary)
                     }
@@ -1685,24 +2364,34 @@ struct EndingRevealView: View {
     private func startReveal() {
         revealTask?.cancel()
         revealTask = Task { @MainActor in
+            // Scene 1: 拘束発表
             phase = 1
-            withAnimation(.easeIn(duration: 1.5)) {
-                textOpacity = 1
-            }
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.5)) {
-                textOpacity = 0
-            }
-            try? await Task.sleep(for: .seconds(1))
-            guard !Task.isCancelled else { return }
-            phase = 2
-            withAnimation(.easeIn(duration: 1.0)) {
-                textOpacity = 1
-            }
+            withAnimation(.easeIn(duration: 1.5)) { textOpacity = 1 }
             try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled else { return }
+
+            // Fade out
+            withAnimation(.easeOut(duration: 0.5)) { textOpacity = 0 }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+
+            // Scene 2: ○○は・・・
+            phase = 2
+            withAnimation(.easeIn(duration: 1.5)) { textOpacity = 1 }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+
+            // Fade out
+            withAnimation(.easeOut(duration: 0.5)) { textOpacity = 0 }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+
+            // Scene 3: 判定
             phase = 3
+            withAnimation(.easeIn(duration: 1.0)) { textOpacity = 1 }
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            phase = 4
         }
     }
 }

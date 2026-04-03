@@ -146,7 +146,7 @@ async def test_extend_phase(session_factory, phase_manager):
 
 
 async def test_get_current_phase_dict(session_factory, phase_manager):
-    from madaminu.ws.handler import _get_current_phase_dict
+    from madaminu.ws.handler_old import _get_current_phase_dict
 
     game_id, room_code, phase_ids = await _create_game_with_phases(session_factory)
     await phase_manager.start_first_phase(game_id, room_code)
@@ -164,7 +164,7 @@ async def test_get_current_phase_dict(session_factory, phase_manager):
 
 
 async def test_get_current_phase_dict_not_found(session_factory):
-    from madaminu.ws.handler import _get_current_phase_dict
+    from madaminu.ws.handler_old import _get_current_phase_dict
 
     async with session_factory() as db:
         info = await _get_current_phase_dict(db, "nonexistent")

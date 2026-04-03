@@ -74,28 +74,31 @@ async def test_timer_advances_after_broadcast_failure(pm_env):
 
     broadcast_mock = AsyncMock(side_effect=Exception("WS broadcast failed"))
     advance_called = asyncio.Event()
-    original_advance = pm.advance_phase
 
     async def mock_advance(*args, **kwargs):
         advance_called.set()
         return None
 
     with (
-        patch("madaminu.ws.handler.manager.broadcast", broadcast_mock),
+        patch("madaminu.ws.handler_old.manager.broadcast", broadcast_mock),
         patch.object(pm, "advance_phase", mock_advance),
     ):
-        pm._start_timer("g1", "TEST01", Phase(
-            id="ph1",
-            game_id="g1",
-            phase_type=PhaseType.planning,
-            phase_order=0,
-            duration_sec=1,
-            started_at=datetime.utcnow(),
-        ))
+        pm._start_timer(
+            "g1",
+            "TEST01",
+            Phase(
+                id="ph1",
+                game_id="g1",
+                phase_type=PhaseType.planning,
+                phase_order=0,
+                duration_sec=1,
+                started_at=datetime.utcnow(),
+            ),
+        )
 
         try:
             await asyncio.wait_for(advance_called.wait(), timeout=5)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pytest.fail("advance_phase was never called - timer died after broadcast failure")
 
     assert advance_called.is_set()
@@ -128,13 +131,13 @@ async def test_voting_timer_auto_advances(pm_env):
         advance_called.set()
 
     with (
-        patch("madaminu.ws.handler.manager.broadcast", AsyncMock()),
+        patch("madaminu.ws.handler_old.manager.broadcast", AsyncMock()),
         patch.object(pm, "advance_phase", mock_advance),
     ):
         pm._start_timer("g1", "TEST01", voting)
         try:
             await asyncio.wait_for(advance_called.wait(), timeout=5)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pytest.fail("advance_phase was never called for voting phase")
 
     assert advance_called.is_set()

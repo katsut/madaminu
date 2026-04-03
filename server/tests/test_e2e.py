@@ -5,7 +5,6 @@ Uses starlette's sync TestClient for WebSocket support.
 """
 
 import json
-import os
 import uuid
 from unittest.mock import AsyncMock, patch
 
@@ -35,10 +34,20 @@ MOCK_SCENARIO = {
                 "name": "1階",
                 "area_type": "indoor",
                 "rooms": [
-                    {"id": "study", "name": "書斎", "size": 2, "features": ["本棚", "机", "窓", "椅子", "ランプ", "絨毯"]},
+                    {
+                        "id": "study",
+                        "name": "書斎",
+                        "size": 2,
+                        "features": ["本棚", "机", "窓", "椅子", "ランプ", "絨毯"],
+                    },
                     {"id": "garden", "name": "庭園", "size": 1, "features": ["噴水", "花壇", "ベンチ"]},
                     {"id": "kitchen", "name": "厨房", "size": 1, "features": ["調理台", "冷蔵庫", "食器棚"]},
-                    {"id": "dining", "name": "食堂", "size": 2, "features": ["テーブル", "シャンデリア", "窓", "食器棚", "暖炉", "絵画"]},
+                    {
+                        "id": "dining",
+                        "name": "食堂",
+                        "size": 2,
+                        "features": ["テーブル", "シャンデリア", "窓", "食器棚", "暖炉", "絵画"],
+                    },
                 ],
             },
             {
@@ -46,7 +55,12 @@ MOCK_SCENARIO = {
                 "name": "2階",
                 "area_type": "indoor",
                 "rooms": [
-                    {"id": "master_bedroom", "name": "主寝室", "size": 2, "features": ["ベッド", "クローゼット", "鏡台", "窓", "サイドテーブル", "絵画"]},
+                    {
+                        "id": "master_bedroom",
+                        "name": "主寝室",
+                        "size": 2,
+                        "features": ["ベッド", "クローゼット", "鏡台", "窓", "サイドテーブル", "絵画"],
+                    },
                     {"id": "guest_room", "name": "客室", "size": 1, "features": ["ベッド", "机", "窓"]},
                     {"id": "library", "name": "図書室", "size": 1, "features": ["本棚", "机", "ソファ"]},
                     {"id": "storage", "name": "物置", "size": 1, "features": ["棚", "箱", "古い家具"]},
@@ -204,7 +218,7 @@ class _NoOpPhaseManager:
 
     async def _generate_and_broadcast_ending(self, game_id, room_code):
         from madaminu.services.scenario_engine import generate_ending
-        from madaminu.ws.handler import manager
+        from madaminu.ws.handler_old import manager
         from madaminu.ws.messages import WSMessage
 
         async with self._session_factory() as db:
@@ -226,7 +240,7 @@ class _NoOpPhaseManager:
 @pytest.fixture()
 def e2e_client(e2e_session_factory):
     """TestClient with PhaseManager and SpeechManager wired up."""
-    from madaminu.ws.handler import manager as ws_manager
+    from madaminu.ws.handler_old import manager as ws_manager
 
     # Ensure clean state before setup
     app.dependency_overrides.clear()
@@ -262,7 +276,7 @@ def e2e_client(e2e_session_factory):
 @pytest.fixture()
 async def async_client(e2e_session_factory):
     """Async client for HTTP-only tests."""
-    from madaminu.ws.handler import manager as ws_manager
+    from madaminu.ws.handler_old import manager as ws_manager
 
     async def override_get_db():
         async with e2e_session_factory() as session:
@@ -858,14 +872,15 @@ async def test_room_state_after_game_start(async_client, e2e_session_factory):
 
         phases_result = await db.execute(select(Phase).where(Phase.game_id == game.id).order_by(Phase.phase_order))
         phases = phases_result.scalars().all()
-        # initial + opening + 3 turns * (discussion + planning + investigation) + voting = 12
-        assert len(phases) == 12
-        assert phases[0].phase_type == PhaseType.initial
+        # storytelling + opening + briefing + 3 turns * (discussion + planning + investigation) + voting = 13
+        assert len(phases) == 13
+        assert phases[0].phase_type == PhaseType.storytelling
         assert phases[1].phase_type == PhaseType.opening
-        assert phases[2].phase_type == PhaseType.discussion
-        assert phases[3].phase_type == PhaseType.planning
-        assert phases[4].phase_type == PhaseType.investigation
-        assert phases[11].phase_type == PhaseType.voting
+        assert phases[2].phase_type == PhaseType.briefing
+        assert phases[3].phase_type == PhaseType.discussion
+        assert phases[4].phase_type == PhaseType.planning
+        assert phases[5].phase_type == PhaseType.investigation
+        assert phases[12].phase_type == PhaseType.voting
 
         players_result = await db.execute(select(Player).where(Player.game_id == game.id))
         players = players_result.scalars().all()

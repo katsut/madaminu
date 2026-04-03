@@ -63,30 +63,31 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         case .selectInvestigation(let locationId):
             game.selectedLocationId = locationId
             game.selectedFeature = nil
-            ws.send(type: "investigate.select", data: ["location_id": locationId ?? ""])
+            ws.send(type: "select_location", data: ["location_id": locationId ?? ""])
         case .selectFeature(let feature):
             game.selectedFeature = feature
             if let locationId = game.selectedLocationId {
-                ws.send(type: "investigate.select", data: ["location_id": locationId, "feature": feature])
+                ws.send(type: "select_location", data: ["location_id": locationId, "feature": feature])
             }
         case .keepEvidence(let discoveryId):
-            Task { @MainActor in await performKeepEvidence(discoveryId: discoveryId) }
+            game.keptDiscoveryId = discoveryId
+            ws.send(type: "keep_evidence", data: ["discovery_id": discoveryId])
         case .tamperEvidence(let discoveryId):
-            ws.send(type: "investigate.tamper", data: ["discovery_id": discoveryId])
+            ws.send(type: "tamper_evidence", data: ["discovery_id": discoveryId])
         case .revealEvidence(let evidenceId):
-            ws.send(type: "evidence.reveal", data: ["evidence_id": evidenceId])
+            ws.send(type: "reveal_evidence", data: ["evidence_id": evidenceId])
         case .sendRoomMessage(let text):
-            ws.send(type: "room_message.send", data: ["text": text])
+            ws.send(type: "room_message", data: ["text": text])
         case .vote(let suspectId):
-            ws.send(type: "vote.submit", data: ["suspect_player_id": suspectId])
+            ws.send(type: "vote", data: ["suspect_player_id": suspectId])
         case .advancePhase:
-            ws.send(type: "phase.advance")
+            ws.send(type: "advance", data: ["force": "true"])
         case .extendPhase:
-            ws.send(type: "phase.extend")
+            ws.send(type: "advance", data: ["force": "true"])
         case .pausePhase:
-            ws.send(type: "phase.pause")
+            break
         case .resumePhase:
-            ws.send(type: "phase.resume")
+            break
         case .fetchRooms:
             Task { @MainActor in await performFetchRooms() }
         case .fetchMyRooms:
@@ -176,42 +177,6 @@ final class AppStore: ObservableObject, @unchecked Sendable {
 
     func sendWS(type: String, data: [String: String] = [:]) {
         ws.send(type: type, data: data)
-    }
-
-    @MainActor func pollGameState() async {
-        guard let token = room.sessionToken, !room.roomCode.isEmpty else { return }
-        let urlString = APIClient.defaultBaseURL + "/api/v1/rooms/\(room.roomCode)/state"
-        guard let url = URL(string: urlString) else { return }
-
-        var request = URLRequest(url: url)
-        request.setValue(token, forHTTPHeaderField: "X-Session-Token")
-
-        do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                // Convert to [String: String] for WSMessageAdapter
-                var stringData: [String: String] = [:]
-                for (key, value) in json {
-                    if let str = value as? String {
-                        stringData[key] = str
-                    } else if let num = value as? NSNumber {
-                        stringData[key] = num.stringValue
-                    } else if let obj = value as? [String: Any],
-                              let jsonData = try? JSONSerialization.data(withJSONObject: obj),
-                              let jsonStr = String(data: jsonData, encoding: .utf8) {
-                        stringData[key] = jsonStr
-                    } else if let arr = value as? [Any],
-                              let jsonData = try? JSONSerialization.data(withJSONObject: arr),
-                              let jsonStr = String(data: jsonData, encoding: .utf8) {
-                        stringData[key] = jsonStr
-                    }
-                }
-                print("[AppStore] pollGameState: applying state")
-                WSMessageAdapter.apply(type: "game.state", data: stringData, store: self)
-            }
-        } catch {
-            print("[AppStore] pollGameState failed: \(error)")
-        }
     }
 
     func reconnectWebSocket() {
@@ -383,38 +348,6 @@ final class AppStore: ObservableObject, @unchecked Sendable {
         }
 
         isLoading = false
-    }
-
-    @MainActor private func performKeepEvidence(discoveryId: String) async {
-        guard let token = room.sessionToken else { return }
-        let urlString = APIClient.defaultBaseURL + "/api/v1/rooms/\(room.roomCode)/keep-evidence"
-        guard let url = URL(string: urlString) else { return }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(token, forHTTPHeaderField: "X-Session-Token")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["discovery_id": discoveryId])
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let title = json["title"] as? String,
-               let content = json["content"] as? String {
-                game.keptDiscoveryId = discoveryId
-                let evidenceId = json["id"] as? String
-                var item = EvidenceItem(title: title, content: content)
-                item.evidenceId = evidenceId
-                notebook.evidences.append(item)
-                print("[AppStore] keepEvidence: success \(title)")
-            } else {
-                errorMessage = "証拠の保持に失敗しました"
-            }
-        } catch {
-            print("[AppStore] keepEvidence: FAILED \(error)")
-            errorMessage = "証拠の保持に失敗しました"
-        }
     }
 
     @MainActor private func performStartGame() async {
