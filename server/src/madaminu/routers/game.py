@@ -371,6 +371,11 @@ async def get_debug_info(
     x_session_token: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
+    from madaminu.config import settings
+
+    if not settings.debug:
+        raise HTTPException(status_code=404) from None
+
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:

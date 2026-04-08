@@ -53,7 +53,6 @@ Dockerfile で起動時に自動実行。
 
 ### デプロイ
 - サーバー: Railway (Docker, GitHub 連携で自動デプロイ)
-- URL: https://REDACTED.example.com
 
 ### 実装ルール
 - **フォールバック処理に逃げない**: 本来の処理が失敗するケースを根本から解決する
