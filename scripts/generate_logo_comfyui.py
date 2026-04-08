@@ -1,14 +1,15 @@
 """Generate logo and app icon via ComfyUI."""
 
 import json
+import os
 import time
 import urllib.request
 import shutil
 from pathlib import Path
 
 COMFYUI_URL = "http://127.0.0.1:8188"
-OUTPUT_DIR = Path("/Users/tsuruta/Develop/private/ComfyUI/output")
-ASSETS_DIR = Path("/Users/tsuruta/Develop/private/murder/assets")
+OUTPUT_DIR = Path(os.environ.get("COMFYUI_OUTPUT_DIR", Path.home() / "ComfyUI" / "output"))
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 ASSETS_DIR.mkdir(exist_ok=True)
 
 LOGO_PROMPT = (

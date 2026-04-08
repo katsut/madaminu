@@ -26,11 +26,12 @@ Thumbs.db
 .env.*
 
 # iOS
-ios/Madaminu.xcodeproj/xcuserdata/
-ios/Madaminu.xcworkspace/xcuserdata/
+ios/Madaminu/Madaminu.xcodeproj/xcuserdata/
+ios/Madaminu/Madaminu.xcodeproj/project.xcworkspace/xcuserdata/
 ios/DerivedData/
 ios/build/
 .build/
 
-# BMAD plans
+# Claude Code
 .claude/plans/
+.claude/settings.local.json
