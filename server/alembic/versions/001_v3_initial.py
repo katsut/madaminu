@@ -8,6 +8,13 @@ Create Date: 2026-03-31
 import sqlalchemy as sa
 from alembic import op
 
+gamestatus = sa.Enum("waiting", "generating", "playing", "voting", "ended", name="gamestatus")
+playerrole = sa.Enum("criminal", "innocent", "witness", "related", name="playerrole")
+connectionstatus = sa.Enum("online", "offline", name="connectionstatus")
+phasetype = sa.Enum("initial", "storytelling", "opening", "briefing", "discussion", "planning", "investigation", "voting", name="phasetype")
+evidencesource = sa.Enum("investigation", "gm_push", "discovery", name="evidencesource")
+paymentstatus = sa.Enum("pending", "verified", "failed", name="paymentstatus")
+
 revision: str = "001"
 down_revision: str | None = None
 branch_labels = None
@@ -22,7 +29,7 @@ def upgrade() -> None:
         sa.Column("room_code", sa.String(6), nullable=False),
         sa.Column("room_name", sa.String(50), nullable=True),
         sa.Column("host_player_id", sa.String(), nullable=True),
-        sa.Column("status", sa.String(20), nullable=False, server_default="waiting"),
+        sa.Column("status", gamestatus, nullable=False, server_default="waiting"),
         sa.Column("current_phase_id", sa.String(), nullable=True),
         sa.Column("password", sa.String(100), nullable=True),
         sa.Column("template_id", sa.String(100), nullable=True),
@@ -60,13 +67,13 @@ def upgrade() -> None:
         sa.Column("public_info", sa.Text(), nullable=True),
         sa.Column("secret_info", sa.Text(), nullable=True),
         sa.Column("objective", sa.Text(), nullable=True),
-        sa.Column("role", sa.String(20), nullable=True),
+        sa.Column("role", playerrole, nullable=True),
         sa.Column("is_host", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("is_ai", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("is_ready", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("is_intro_ready", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("portrait_image", sa.Text(), nullable=True),
-        sa.Column("connection_status", sa.String(20), nullable=False, server_default="offline"),
+        sa.Column("connection_status", connectionstatus, nullable=False, server_default="offline"),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
@@ -80,7 +87,7 @@ def upgrade() -> None:
         "phases",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("game_id", sa.String(), nullable=False),
-        sa.Column("phase_type", sa.String(20), nullable=False),
+        sa.Column("phase_type", phasetype, nullable=False),
         sa.Column("phase_order", sa.Integer(), nullable=False),
         sa.Column("duration_sec", sa.Integer(), nullable=False),
         sa.Column("scenario_update", sa.JSON(), nullable=True),
@@ -120,7 +127,7 @@ def upgrade() -> None:
         sa.Column("phase_id", sa.String(), nullable=False),
         sa.Column("title", sa.String(200), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("source", sa.String(20), nullable=False),
+        sa.Column("source", evidencesource, nullable=False),
         sa.Column("revealed_at", sa.DateTime(), server_default=sa.func.now()),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
@@ -204,7 +211,7 @@ def upgrade() -> None:
         sa.Column("game_id", sa.String(), nullable=False),
         sa.Column("player_id", sa.String(), nullable=False),
         sa.Column("receipt_data", sa.Text(), nullable=False),
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
+        sa.Column("status", paymentstatus, nullable=False, server_default="pending"),
         sa.Column("verified_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["game_id"], ["games.id"], ondelete="CASCADE"),
