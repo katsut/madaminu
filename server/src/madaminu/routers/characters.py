@@ -47,6 +47,7 @@ async def create_character(
     player.character_appearance = req.character_appearance
     player.character_personality = req.character_personality
     player.character_background = req.character_background
+    player.is_ready = True
     await db.commit()
     await db.refresh(player)
 
