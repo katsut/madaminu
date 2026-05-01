@@ -49,12 +49,14 @@ async def fill_ai_players(db: AsyncSession, game_id: str, target_count: int = 4)
         s = game.scenario_skeleton.get("setting", {})
         setting = s.get("location", "") or s.get("situation", "") or ""
 
+    logger.info("fill_ai_players: game=%s needed=%d setting=%r", game_id, needed, setting)
     ai_players = []
-    for _ in range(needed):
+    for i in range(needed):
         try:
             char, usage = await _generate_ai_character(existing_names, setting)
             game.total_llm_cost_usd += usage.estimated_cost_usd
             name = char.get("character_name", f"AI_{uuid.uuid4().hex[:6]}")
+            logger.info("fill_ai_players: generated AI %d/%d name=%s", i + 1, needed, name)
             player = Player(
                 id=str(uuid.uuid4()),
                 game_id=game_id,
@@ -77,7 +79,7 @@ async def fill_ai_players(db: AsyncSession, game_id: str, target_count: int = 4)
             ai_players.append(player)
             existing_names.append(name)
         except Exception:
-            logger.exception("Failed to generate AI character")
+            logger.exception("fill_ai_players: failed to generate AI character %d/%d", i + 1, needed)
 
     await db.commit()
     logger.info("Added %d AI players to game %s", len(ai_players), game_id)

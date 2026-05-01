@@ -231,12 +231,25 @@ async def start_game(
     result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.room_code == room_code))
     game = result.scalar_one_or_none()
     if game is None:
+        logger.warning("start_game rejected: room %s not found", room_code)
         raise HTTPException(status_code=404, detail="Room not found") from None
 
+    logger.info(
+        "start_game request: room=%s status=%s players=%d (humans=%d with_chars=%d ready=%d)",
+        room_code,
+        game.status,
+        len(game.players),
+        sum(1 for p in game.players if not p.is_ai),
+        sum(1 for p in game.players if p.character_name),
+        sum(1 for p in game.players if p.is_ready),
+    )
+
     if game.status != GameStatus.waiting:
+        logger.warning("start_game rejected: room=%s status=%s (not waiting)", room_code, game.status)
         raise HTTPException(status_code=400, detail="Game already started") from None
 
     if game.total_llm_cost_usd > LLM_COST_LIMIT_USD:
+        logger.warning("start_game rejected: room=%s cost=%.4f exceeds limit", room_code, game.total_llm_cost_usd)
         raise HTTPException(status_code=429, detail="LLM cost limit exceeded for this game") from None
 
     player_result = await db.execute(
@@ -244,20 +257,26 @@ async def start_game(
     )
     player = player_result.scalar_one_or_none()
     if player is None or not player.is_host:
+        logger.warning("start_game rejected: room=%s caller is not host (player_found=%s)", room_code, player is not None)
         raise HTTPException(status_code=403, detail="Only the host can start the game") from None
 
     not_ready = [p for p in game.players if p.character_name and not p.is_ready and not p.is_ai and not p.is_host]
     if not_ready:
         names = ", ".join(p.display_name for p in not_ready)
+        logger.warning("start_game rejected: room=%s not_ready=%s", room_code, names)
         raise HTTPException(status_code=400, detail=f"Not all players are ready: {names}") from None
 
     characters_ready = sum(1 for p in game.players if p.character_name)
     if characters_ready < 4:
+        logger.info("start_game: room=%s filling AI players (current chars=%d)", room_code, characters_ready)
         ai_added = await fill_ai_players(db, game.id, target_count=4)
         if ai_added:
             logger.info("Added %d AI players to fill the room", len(ai_added))
             characters_ready += len(ai_added)
+        else:
+            logger.error("start_game: room=%s fill_ai_players returned no players (LLM failure?)", room_code)
         if characters_ready < 4:
+            logger.warning("start_game rejected: room=%s only %d characters after AI fill", room_code, characters_ready)
             raise HTTPException(status_code=400, detail=f"Need at least 4 characters, got {characters_ready}") from None
         await db.commit()
 
