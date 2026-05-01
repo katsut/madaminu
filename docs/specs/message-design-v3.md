@@ -19,12 +19,12 @@
 
 ### ゲーム進行
 
+v3 ハンドラは新旧 type 名の両方を受け付ける（カッコ内は legacy alias）。
+
 | type | data | フェーズ | バリデーション |
 |------|------|---------|-------------|
-| `advance` | `{force?: bool}` | 全て | deadline_at 超過チェック。force はホストのみ。Phase.ended_at IS NULL で排他 |
-| `extend` | — | 全て（ホスト） | ホスト権限チェック |
-| `pause` | — | 全て（ホスト） | ホスト権限チェック。deadline_at を NULL に |
-| `resume` | — | 一時停止中（ホスト） | ホスト権限チェック |
+| `advance` (`phase.advance`, `phase.timer_expired`) | `{force?: bool}` | 全て | deadline_at 超過チェック。force はホストのみ。Phase.ended_at IS NULL で排他 |
+| `phase.extend` / `phase.pause` / `phase.resume` / `phase.timer` | — | — | **未実装（受信されるが何もしない）**。延長・一時停止機能は v3 で取り下げ。将来追加する場合はここに仕様追加すること |
 
 #### advance のレスポンス（game.state で返す）
 
@@ -46,15 +46,15 @@ advance が不要だった場合（期限前、既に遷移済み）は送信元
 |------|------|-------------|
 | `intro.ready` | — | ゲーム状態が playing、イントロ中 |
 | `intro.unready` | — | 同上 |
-| `intro.start` | — | ホストのみ。全人間プレイヤーが ready |
+| `intro.start` | — | **未実装**。現状はイントロ全員 ready のシグナルとして `intro.all_ready` をサーバーから broadcast するのみ |
 
 ### 調査
 
 | type | data | フェーズ | バリデーション |
 |------|------|---------|-------------|
-| `select_location` | `{location_id}` | planning | location_id がマップに存在するか |
-| `keep_evidence` | `{discovery_id}` | investigation | 同フェーズで未 keep。discovery_id が自分のものか |
-| `tamper_evidence` | `{discovery_id}` | investigation | 同室に他プレイヤーがいないか。discovery_id が自分のものか |
+| `select_location` (`investigate.select`) | `{location_id}` | planning | location_id がマップに存在するか |
+| `keep_evidence` (`investigate.keep`) | `{discovery_id}` | investigation | 同フェーズで未 keep。discovery_id が自分のものか |
+| `tamper_evidence` (`investigate.tamper`) | `{discovery_id}` | investigation | **v3 では未実装**。改ざん機能は仕様策定中 |
 
 ### 発言
 
@@ -67,14 +67,14 @@ advance が不要だった場合（期限前、既に遷移済み）は送信元
 
 | type | data | フェーズ | バリデーション |
 |------|------|---------|-------------|
-| `reveal_evidence` | `{evidence_id}` | discussion | evidence_id が自分のもの。未公開か |
-| `room_message` | `{text}` | investigation | 同室にいるか |
+| `reveal_evidence` (`evidence.reveal`) | `{evidence_id}` | discussion | evidence_id が自分のもの。未公開か |
+| `room_message` (`room_message.send`) | `{text}` | investigation | 同室にいるか |
 
 ### 投票
 
 | type | data | フェーズ | バリデーション |
 |------|------|---------|-------------|
-| `vote` | `{suspect_player_id}` | voting | 未投票か。suspect が有効プレイヤーか |
+| `vote` (`vote.submit`) | `{suspect_player_id}` | voting | 未投票か。suspect が有効プレイヤーか |
 
 ---
 
@@ -152,18 +152,31 @@ advance が不要だった場合（期限前、既に遷移済み）は送信元
 }
 ```
 
+### ライフサイクル通知
+
+| type | data | 説明 |
+|------|------|------|
+| `game.generating` | `{room_code}` | start_game 受領直後 |
+| `game.ready` | `{room_code}` | シナリオ + 画像生成完了 |
+| `game.generation_failed` | `{room_code}` | シナリオ生成 3 回リトライ全滅。status は waiting に戻る |
+| `progress` | `{step, status}` | `step ∈ {scenario, scene_image, portraits}`、`status ∈ {in_progress, done}` |
+| `player.connected` / `player.disconnected` | `{player_id}` | WS 接続変動（同室全員に） |
+
 ### リアルタイム通知
 
 | type | data | 説明 |
 |------|------|------|
-| `speech.granted` | `{player_id}` | 発言権が付与された |
+| `speech.granted` | `{player_id}` | 発言権が付与された（送信元のみ） |
 | `speech.active` | `{player_id}` | 誰かが発言中（全員に） |
-| `speech` | `{player_id, character_name, transcript}` | 発言終了（全員に） |
+| `speech` | `{player_id, character_name, transcript}` | 発言終了（人間・AI 共通） |
 | `evidence_revealed` | `{player_id, player_name, title, content}` | 証拠公開（全員に） |
 | `vote_cast` | `{voted_count, total_human}` | 投票（全員に） |
 | `room_message` | `{sender_id, sender_name, text}` | 同室チャット（同室のみ） |
 | `intro.ready.count` | `{count}` | イントロ準備人数 |
-| `location.colocated` | `{players: [...]}` | 同じ場所のプレイヤー |
+| `intro.all_ready` | — | 全員 ready |
+| `location.colocated` | `{players: [...]}` | 同じ場所のプレイヤー（投入は investigation 開始直後 1 回） |
+
+> **Note**: `phase.started` / `phase.ended` / `phase.timer` 等の個別フェーズイベントは v3 では送信しない。フェーズ遷移は常に `game.state` の `current_phase` 差分で表現する。
 
 ### エラー
 
