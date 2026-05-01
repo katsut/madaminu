@@ -23,7 +23,7 @@ final class WebSocketClient: Sendable {
 
     init() {}
 
-    func connect(roomCode: String, token: String, baseURL: String = "ws://127.0.0.1:8000") {
+    func connect(roomCode: String, token: String, baseURL: String = "wss://murder-production.up.railway.app") {
         state.write {
             $0.roomCode = roomCode
             $0.token = token

@@ -8,7 +8,7 @@ enum APIError: Error {
 }
 
 actor APIClient {
-    static let defaultBaseURL = "http://127.0.0.1:8000"
+    static let defaultBaseURL = "https://murder-production.up.railway.app"
 
     let baseURL: String
 
