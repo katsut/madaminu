@@ -257,7 +257,9 @@ async def start_game(
     )
     player = player_result.scalar_one_or_none()
     if player is None or not player.is_host:
-        logger.warning("start_game rejected: room=%s caller is not host (player_found=%s)", room_code, player is not None)
+        logger.warning(
+            "start_game rejected: room=%s caller is not host (player_found=%s)", room_code, player is not None
+        )
         raise HTTPException(status_code=403, detail="Only the host can start the game") from None
 
     not_ready = [p for p in game.players if p.character_name and not p.is_ready and not p.is_ai and not p.is_host]
