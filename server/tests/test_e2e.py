@@ -370,14 +370,6 @@ async def test_full_game_lifecycle_http(async_client):
         )
         assert resp.status_code == 200
 
-    # 4. Set all players ready
-    for name in ["Bob", "Charlie", "Dave"]:
-        ready_resp = await async_client.post(
-            f"/api/v1/rooms/{room_code}/ready",
-            headers={"x-session-token": tokens[name]},
-        )
-        assert ready_resp.status_code == 200
-
     # 5. Verify room state
     room_resp = await async_client.get(f"/api/v1/rooms/{room_code}")
     assert room_resp.status_code == 200
@@ -489,9 +481,6 @@ async def test_websocket_investigation_flow(e2e_client, e2e_session_factory):
             headers={"x-session-token": player_tokens[name]},
         )
 
-    for name in ["Bob", "Charlie", "Dave"]:
-        e2e_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": player_tokens[name]})
-
     mock_generate = _scenario_and_validation_mock()
     with (
         patch("madaminu.llm.client.llm_client.generate_json", mock_generate),
@@ -542,9 +531,6 @@ async def test_websocket_speech_flow(e2e_client, e2e_session_factory):
             },
             headers={"x-session-token": player_tokens[name]},
         )
-
-    for name in ["Bob", "Charlie", "Dave"]:
-        e2e_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": player_tokens[name]})
 
     mock_generate = _scenario_and_validation_mock()
     with (
@@ -788,9 +774,6 @@ async def test_non_host_cannot_advance_phase(e2e_client, e2e_session_factory):
             headers={"x-session-token": player_tokens[name]},
         )
 
-    for name in ["Bob", "Charlie", "Dave"]:
-        e2e_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": player_tokens[name]})
-
     mock_generate = _scenario_and_validation_mock()
     with (
         patch("madaminu.llm.client.llm_client.generate_json", mock_generate),
@@ -837,9 +820,6 @@ async def test_room_state_after_game_start(async_client, e2e_session_factory):
             },
             headers={"x-session-token": player_tokens[name]},
         )
-
-    for name in ["Bob", "Charlie", "Dave"]:
-        await async_client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": player_tokens[name]})
 
     import asyncio
 

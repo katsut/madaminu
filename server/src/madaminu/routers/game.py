@@ -51,7 +51,7 @@ async def _generate_images(game_id: str, room_code: str, session_factory):
         generate_victim_portrait,
     )
 
-    client = llm_client._client
+    client = llm_client.client
 
     async with session_factory() as db:
         result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
