@@ -1,5 +1,6 @@
 import logging
 import time
+from functools import cached_property
 
 from openai import AsyncOpenAI
 
@@ -34,8 +35,9 @@ class LLMUsage:
 
 
 class LLMClient:
-    def __init__(self):
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+    @cached_property
+    def client(self) -> AsyncOpenAI:
+        return AsyncOpenAI(api_key=settings.openai_api_key)
 
     async def generate(
         self,
@@ -53,7 +55,7 @@ class LLMClient:
             len(system_prompt),
             len(user_prompt),
         )
-        response = await self._client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=model,
             max_completion_tokens=max_tokens,
             messages=[

@@ -51,7 +51,7 @@ async def _generate_images(game_id: str, room_code: str, session_factory):
         generate_victim_portrait,
     )
 
-    client = llm_client._client
+    client = llm_client.client
 
     async with session_factory() as db:
         result = await db.execute(select(Game).options(selectinload(Game.players)).where(Game.id == game_id))
@@ -257,7 +257,9 @@ async def start_game(
     )
     player = player_result.scalar_one_or_none()
     if player is None or not player.is_host:
-        logger.warning("start_game rejected: room=%s caller is not host (player_found=%s)", room_code, player is not None)
+        logger.warning(
+            "start_game rejected: room=%s caller is not host (player_found=%s)", room_code, player is not None
+        )
         raise HTTPException(status_code=403, detail="Only the host can start the game") from None
 
     not_ready = [p for p in game.players if p.character_name and not p.is_ready and not p.is_ai and not p.is_host]

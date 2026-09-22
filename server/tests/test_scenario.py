@@ -125,9 +125,6 @@ async def test_start_game_endpoint(client, test_session):
             headers={"x-session-token": token},
         )
 
-    for token in tokens[1:]:
-        await client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": token})
-
     mock_generate = AsyncMock(return_value=(json.dumps(MOCK_SCENARIO, ensure_ascii=False), MOCK_USAGE))
 
     with patch("madaminu.llm.client.llm_client.generate_json", mock_generate):
@@ -158,7 +155,7 @@ async def test_start_game_not_ready(client, test_session):
     room_code = room_resp.json()["room_code"]
     host_token = room_resp.json()["session_token"]
 
-    # Add players and set characters but don't set ready
+    # Add players and set characters, then un-ready one of them
     tokens = [host_token]
     for name in ["Bob", "Charlie", "Dave"]:
         join_resp = await client.post(f"/api/v1/rooms/{room_code}/join", json={"display_name": name})
@@ -175,6 +172,8 @@ async def test_start_game_not_ready(client, test_session):
             },
             headers={"x-session-token": token},
         )
+
+    await client.post(f"/api/v1/rooms/{room_code}/ready", headers={"x-session-token": tokens[1]})
 
     resp = await client.post(f"/api/v1/rooms/{room_code}/start", headers={"x-session-token": host_token})
     assert resp.status_code == 400
